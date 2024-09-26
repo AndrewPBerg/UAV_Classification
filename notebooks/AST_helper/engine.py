@@ -404,7 +404,7 @@ def sweep_train(model: torch.nn.Module,
         results["test_recall"].append(test_recall)
         
         # Step the scheduler (based on validation loss for ReduceLROnPlateau)
-        scheduler.step()  
+        scheduler.step(test_loss)  
 
     end = timer()
     total_time = end - start
