@@ -1,8 +1,8 @@
 # config.yaml
 
-# General configuration
+# General configuration 
 general:
-  data_path: "C:\\Users\\Sidewinders\\Desktop\\CODE\\UAV_Classification_repo\\.datasets\\UAV_Dataset_28"
+  data_path: "C:\\Users\\Sidewinders\\Desktop\\CODE\\UAV_Classification_repo\\.datasets\\UAV_Dataset_9"
   model_name: "MIT/ast-finetuned-audioset-10-10-0.4593"
   batch_size: 8
   seed: 42
@@ -18,16 +18,15 @@ general:
   accumulation_steps: 3
   learning_rate: 0.001
   patience : 3
-# WandB solo run configutation
 
+# WandB solo run configutation (precedence over General)
 wandb:
   project: "AST Fine-Tuning"
-  name: "testing 28 classes"
+  name: "testing confusion matrix"
   reinit: false
-  notes: "1st fine-tuning 28 classes"
-  tags: "AST"
+  notes: "1st attempt wandb confmat"
+  tags: "AST, confusion matrix"
   dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
-  hyper_params: 
 
 
 # WandB sweep configuration

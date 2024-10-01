@@ -8,13 +8,26 @@ from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, M
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 import wandb
+import wandb.plot as plot
 from torch.amp.grad_scaler import GradScaler
 from torch.cuda.amp import autocast
 import torch.optim
 from timeit import default_timer as timer 
+from icecream import ic
+from torchmetrics import ConfusionMatrix
+from mlxtend.plotting import plot_confusion_matrix
 
 # Set up mixed precision scaler
 scaler = GradScaler()
+ground_truth_all, predictions_all = [], []
+
+def wandb_plot_confusion_matrix(y_truth, preds, class_names) -> None:
+    cm = plot.confusion_matrix(
+        y_true=y_truth, preds=preds, class_names=class_names
+    )
+    
+    wandb.log({"confusion matrix": cm})
+
 
 
 def train_step(model: torch.nn.Module, 
@@ -82,6 +95,9 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
             precision_metric.update(y_pred_class, y)
             recall_metric.update(y_pred_class, y)
             f1_metric.update(y_pred_class, y)
+
+            ground_truth_all.extend(y.cpu().numpy())
+            predictions_all.extend(y_pred_class.cpu().numpy())
 
     test_loss /= len(dataloader)
     test_acc /= len(dataloader)
@@ -243,6 +259,12 @@ def train(model: torch.nn.Module,
     print(f"Train time on {device}: {total_time}")
     if wandb.run is not None:
         wandb.log({"train_time": formatted_time})
+
+        wandb_plot_confusion_matrix(y_truth=ground_truth_all,
+                              preds=predictions_all,
+                              class_names=train_dataloader.dataset.dataset.get_classes())
+
+        
     return results
 
 def inference_loop(model: torch.nn.Module, 
