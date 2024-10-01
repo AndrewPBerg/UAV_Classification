@@ -8,7 +8,8 @@ from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, M
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
 import wandb
-from torch.amp import autocast, GradScaler
+from torch.amp.grad_scaler import GradScaler
+from torch.cuda.amp import autocast
 import torch.optim
 from timeit import default_timer as timer 
 
@@ -64,6 +65,7 @@ def train_step(model: torch.nn.Module,
 def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metric, f1_metric):
     model.eval()
     test_loss, test_acc = 0, 0
+
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
@@ -94,7 +96,7 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
     recall_metric.reset()
     f1_metric.reset()
 
-    return test_loss, test_acc, test_precision, test_recall, test_f1
+    return test_loss, test_acc, test_precision, test_recall, test_f1, 
 
 
 def train(model: torch.nn.Module, 
@@ -105,10 +107,10 @@ def train(model: torch.nn.Module,
           loss_fn: nn.Module, 
           epochs: int, 
           device: str, 
+          num_classes: int,
           accumulation_steps: int = 1,  
           patience: int = 5, 
-          delta: float = 0.01,
-          num_classes: int = 9) -> Dict[str, List]:
+          delta: float = 0.01) -> Dict[str, List]:
     """Trains and tests a PyTorch model with additional metrics (F1, precision, recall) using torchmetrics."""
     
     results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": [], 
@@ -426,3 +428,5 @@ def sweep_train(model: torch.nn.Module,
     #                 loss_fn=criterion,
     #                 epochs=EPOCHS,
     #                 device=device,
+
+# def wb_confmat(gorund_truth, )

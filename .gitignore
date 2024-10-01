@@ -1,8 +1,8 @@
 # Private
-UAV_Dataset_9/
 wandb/
 saved_models/
 .vscode
+.datasets/
  
 
 # Byte-compiled / optimized / DLL files

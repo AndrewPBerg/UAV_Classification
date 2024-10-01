@@ -125,7 +125,7 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
     return classes, class_to_idx
 
 def train_test_split_custom(dataset: AudioDataset, test_size: float = 0.2, seed: int = 42, inference_size: Optional[float]= None
-                            ) -> Union[Tuple[Subset, Subset], Tuple[Subset,Subset,Subset]]:
+                            ):
 
     all_indices = list(range(len(dataset)))
 

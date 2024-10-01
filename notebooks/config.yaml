@@ -1,0 +1,54 @@
+# config.yaml
+
+# General configuration
+general:
+  data_path: "C:\\Users\\Sidewinders\\Desktop\\CODE\\UAV_Classification_repo\\.datasets\\UAV_Dataset_28"
+  model_name: "MIT/ast-finetuned-audioset-10-10-0.4593"
+  batch_size: 8
+  seed: 42
+  num_cuda_workers: 0
+  num_classes: 28
+  epochs: 1
+  save_model: false
+  project_name: "AST_Sweeps"
+  sweep_count: 100
+  test_size: 0.2
+  inference_size: 0.1
+  shuffled : true
+  accumulation_steps: 3
+  learning_rate: 0.001
+  patience : 3
+# WandB solo run configutation
+
+wandb:
+  project: "AST Fine-Tuning"
+  name: "testing 28 classes"
+  reinit: false
+  notes: "1st fine-tuning 28 classes"
+  tags: "AST"
+  dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
+  hyper_params: 
+
+
+# WandB sweep configuration
+sweep:
+  name: "accumulation_steps"
+  method: "random"
+  metric:
+    goal: "maximize"
+    name: "test_acc"
+  parameters:
+    learning_rate:
+      distribution: "uniform"
+      min: 0.0009
+      max: 0.005
+    batch_size:
+      values: [4, 8, 16]
+    epochs:
+      values: [7]
+    optimizer:
+      values: ["adamW"]
+    scheduler:
+      values: ["ReduceLROnPlateau"]
+    accumulation_steps:
+      values: [1, 2, 3]
