@@ -2,7 +2,7 @@
 
 # General configuration 
 general:
-  data_path: "C:\\Users\\Sidewinders\\Desktop\\CODE\\UAV_Classification_repo\\.datasets\\UAV_Dataset_9"
+  data_path: "C:\\Users\\Sidewinders\\Desktop\\CODE\\UAV_Classification_repo\\src\\.datasets\\UAV_Dataset_9"
   model_name: "MIT/ast-finetuned-audioset-10-10-0.4593"
   batch_size: 8
   seed: 42

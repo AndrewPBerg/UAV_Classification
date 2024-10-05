@@ -7,11 +7,16 @@ from sklearn.model_selection import train_test_split
 import random
 import matplotlib.pyplot as plt
 import librosa
-from typing import Optional, Union, Tuple
+from typing import Optional
 from transformers import ASTFeatureExtractor
 
+from dotenv import dotenv_values
+import wandb
 
+def wandb_login(secrets_path:str):
 
+    config = dotenv_values(secrets_path)
+    wandb.login(key=config['WANDB_API_KEY'])
 
 class AudioDataset(Dataset):
     def __init__(self, data_path: str, feature_extractor:ASTFeatureExtractor) -> None:
@@ -191,3 +196,7 @@ def save_model(model: torch.nn.Module,
 def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
     model.load_state_dict(torch.load(model_path))
     return model
+
+# if __name__ == "__main__":
+#     main()
+

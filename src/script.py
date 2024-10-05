@@ -1,26 +1,26 @@
 # DESCRIPTION
-from AST_helper.util import AudioDataset, train_test_split_custom, save_model
-from AST_helper.engine import train, inference_loop
-from AST_helper.model import auto_extractor, custom_AST
-from AST_helper.util import save_model # noqa: F401
+from helper.util import AudioDataset, train_test_split_custom, save_model, wandb_login
+from helper.engine import train, inference_loop
+from helper.model import auto_extractor, custom_AST
 
 import torch
 from torch.utils.data import DataLoader
-import torch.optim
+from torch.optim.adamw import AdamW
+# import torch.optim as optim # type: ignore
 import torch.nn as nn
 from torchinfo import summary
 import yaml
-
-from icecream import ic
 
 import wandb
 
 def main():
 
-    with open('notebooks\config.yaml', 'r') as file:
+    with open('src/config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+
+    wandb_login("src/.env")
 
     general_config = config['general']
     run_config = config['wandb']
@@ -82,15 +82,14 @@ def main():
                                         pin_memory=PINNED_MEMORY,
                                         shuffle=SHUFFLED)
 
-    if inference_subset: # may not be defined
-        inference_dataloader_custom = DataLoader(dataset=inference_subset,
-                                        batch_size=BATCH_SIZE, 
-                                        num_workers=NUM_CUDA_WORKERS,
-                                        pin_memory=PINNED_MEMORY,
-                                        shuffle=SHUFFLED) 
+    inference_dataloader_custom = DataLoader(dataset=inference_subset,
+                                    batch_size=BATCH_SIZE, 
+                                    num_workers=NUM_CUDA_WORKERS,
+                                    pin_memory=PINNED_MEMORY,
+                                    shuffle=SHUFFLED) 
     loss_fn = nn.CrossEntropyLoss()
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    optimizer = AdamW(model.parameters(), lr=learning_rate)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2) #TODO experiment w/ diff hyperparams
     wandb.init(
@@ -103,11 +102,11 @@ def main():
             dir=wandb_params.get("dir", None)
         )
         
-    results = train(model,
+    train(          model=model,
                     train_dataloader=train_dataloader_custom,
                     test_dataloader=test_dataloader_custom,
                     optimizer=optimizer,
-                    scheduler=scheduler,
+                    scheduler=scheduler, # type: ignore
                     loss_fn=loss_fn,
                     epochs=EPOCHS,
                     device=device,

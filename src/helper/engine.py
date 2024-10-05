@@ -12,10 +12,10 @@ import wandb.plot as plot
 from torch.amp.grad_scaler import GradScaler
 from torch.cuda.amp import autocast
 import torch.optim
+# from torch.optim.adamw import AdamW # type: ignore
+from torch.optim import AdamW # type: ignore
 from timeit import default_timer as timer 
-from icecream import ic
-from torchmetrics import ConfusionMatrix
-from mlxtend.plotting import plot_confusion_matrix
+
 
 # Set up mixed precision scaler
 scaler = GradScaler()
@@ -118,7 +118,7 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
 def train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           test_dataloader: DataLoader, 
-          optimizer: torch.optim.Optimizer, 
+          optimizer: AdamW, 
           scheduler: torch.optim.lr_scheduler._LRScheduler,  
           loss_fn: nn.Module, 
           epochs: int, 
@@ -146,7 +146,7 @@ def train(model: torch.nn.Module,
     recall_metric_test = MulticlassRecall(num_classes=num_classes, average="weighted").to(device)
     f1_metric_test = MulticlassF1Score(num_classes=num_classes, average="weighted").to(device)
 
-    for epoch in tqdm(range(epochs)):
+    for epoch in tqdm(range(epochs), dynamic_ncols=True):
         model.train()
         train_loss, train_acc = 0, 0
         optimizer.zero_grad()
@@ -247,7 +247,7 @@ def train(model: torch.nn.Module,
             break
 
         # Step the scheduler (based on validation loss for ReduceLROnPlateau)
-        scheduler.step(test_loss)  
+        scheduler.step(test_loss)   # type: ignore
 
     end = timer()
     total_time = end - start
@@ -262,7 +262,7 @@ def train(model: torch.nn.Module,
 
         wandb_plot_confusion_matrix(y_truth=ground_truth_all,
                               preds=predictions_all,
-                              class_names=train_dataloader.dataset.dataset.get_classes())
+                              class_names=train_dataloader.dataset.dataset.get_classes()) # type: ignore
 
         
     return results
@@ -315,7 +315,7 @@ def inference_loop(model: torch.nn.Module,
 def sweep_train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           test_dataloader: DataLoader, 
-          optimizer: torch.optim.Optimizer, 
+          optimizer: torch.optim.AdamW, 
           scheduler,  
           loss_fn: nn.Module, 
           epochs: int, 

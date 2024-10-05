@@ -1,19 +1,17 @@
 import yaml
-from AST_helper.util import AudioDataset, train_test_split_custom, save_model
-from AST_helper.engine import sweep_train, inference_loop
-from AST_helper.model import auto_extractor, custom_AST
+from helper.util import AudioDataset, train_test_split_custom, save_model
+from helper.engine import sweep_train, inference_loop
+from helper.model import auto_extractor, custom_AST
 
 import torch
 from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
 import wandb
-from torchinfo import summary
 
-from icecream import ic
 
 # Load configuration from YAML file
-with open('notebooks\config.yaml', 'r') as file:
+with open('config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 # Access general configuration
