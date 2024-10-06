@@ -11,8 +11,8 @@ import wandb
 
 
 # Load configuration from YAML file
-with open('config.yaml', 'r') as file:
-    config = yaml.safe_load(file)
+with open('src/config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
 
 # Access general configuration
 general_config = config['general']
@@ -32,11 +32,18 @@ def make(config):
     # Make the data
     feature_extractor = auto_extractor(general_config['model_name'])
 
-    dataset = AudioDataset(general_config['data_path'], feature_extractor)
-    train_subset, test_subset, inference_subset = train_test_split_custom(dataset, test_size=general_config['test_size'], inference_size=general_config['inference_size']) # type: ignore
+    # Updated dataset loading to match new format
+    train_subset, test_subset, inference_subset = train_test_split_custom(
+        general_config['data_path'], 
+        feature_extractor, 
+        test_size=general_config['test_size'], 
+        seed=general_config['seed'], 
+        inference_size=general_config['inference_size'], 
+        training_transforms=general_config['training_transforms']
+    )
     
     inference_loader = create_dataloader(inference_subset, config.batch_size)            
-    train_loader = create_dataloader(train_subset, config.batch_size)
+    train_loader = create_dataloader(train_subset, config.batch_size, )
     test_loader = create_dataloader(test_subset, config.batch_size)
 
     # Make the model
@@ -51,8 +58,7 @@ def make(config):
 
 def model_pipeline(config=None):
     with wandb.init(config=config):
-        # Use the sweep configuration from the YAML
-        # wandb_config = config['sweep'] 
+        # Updated wandb configuration handling
         config = wandb.config
 
         model, train_loader, test_loader, inference_loader, criterion, optimizer, scheduler = make(config)
@@ -62,12 +68,13 @@ def model_pipeline(config=None):
                               train_dataloader=train_loader,
                               test_dataloader=test_loader,
                               optimizer=optimizer,
-                              scheduler=scheduler,
+                              scheduler=scheduler, # type: ignore
                               loss_fn=criterion,
                               epochs=config.epochs, # type: ignore
                               device=device,
                               num_classes=general_config['num_classes'],
-                              accumulation_steps=config.accumulation_steps) # type: ignore
+                              accumulation_steps=config.accumulation_steps, # type: ignore
+                              patience=general_config['patience']) # Added patience parameter
 
         inference_loop(model=model,
                        device=config.device, # type: ignore
