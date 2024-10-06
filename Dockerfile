@@ -28,6 +28,10 @@ ENV LD_LIBRARY_PATH="/usr/local/cuda/lib64:${LD_LIBRARY_PATH}"
 # Install necessary dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
+    build-essential\
+    pkg-config\
+    libhdf5-dev\
+    python3-dev\
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
