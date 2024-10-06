@@ -1,0 +1,39 @@
+version: '3.9'
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - DOCKER_BUILDKIT=1
+    image: ast_script
+    container_name: ast_script_container
+    environment:
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
+      - DEBIAN_FRONTEND=noninteractive
+    volumes:
+      - .:/app
+      - C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    command: python3 src/script.py
+    # command: /bin/bash # interactive shell
+    working_dir: /app
+    user: "appuser"
+    networks:
+      - app_network
+
+volumes:
+  datasets:
+    driver: local
+
+networks:
+  app_network:
+    driver: bridge

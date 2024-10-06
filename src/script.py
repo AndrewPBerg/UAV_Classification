@@ -57,15 +57,12 @@ def main():
     feature_extractor = auto_extractor(model_name)
 
     # dataset = AudioDataset(data_path, feature_extractor)
-
     train_dataset, test_dataset, inference_dataset = train_test_split_custom(data_path, 
-                                                                             feature_extractor, 
-                                                                             test_size=test_size, 
-                                                                             seed=SEED, 
-                                                                             inference_size=inference_size, 
-                                                                             training_transforms=training_transforms)
-    
-    # transformed_train_dataset = apply_audio_transformations(train_dataset)
+                                                                            feature_extractor, 
+                                                                            test_size=test_size, 
+                                                                            seed=SEED, 
+                                                                            inference_size=inference_size,
+                                                                            training_transforms=training_transforms)
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
