@@ -1,5 +1,5 @@
 import os
-from torch.utils.data import Dataset, Subset
+from torch.utils.data import Dataset
 from pathlib import Path
 import torchaudio
 import torch
@@ -9,6 +9,8 @@ import matplotlib.pyplot as plt
 import librosa
 from typing import Optional
 from transformers import ASTFeatureExtractor
+import warnings
+from helper.augmentations import apply_augmentations
 
 from dotenv import dotenv_values
 import wandb
@@ -17,21 +19,87 @@ def wandb_login(secrets_path:str):
 
     config = dotenv_values(secrets_path)
     wandb.login(key=config['WANDB_API_KEY'])
+    
+def count_classes(dataset):
+    class_counts = {cls: 0 for cls in dataset.get_classes()}
+    for _, class_idx in dataset:
+        class_name = dataset.get_idx_dict()[class_idx]
+        class_counts[class_name] += 1
+    return class_counts
 
 class AudioDataset(Dataset):
-    def __init__(self, data_path: str, feature_extractor:ASTFeatureExtractor) -> None:
-        self.paths = list(Path(data_path).glob("*/*.wav"))
+    """
+    AudioDataset is a custom dataset class for loading and processing audio files.
+
+    This class inherits from PyTorch's Dataset and is designed to handle audio files 
+    in WAV format. It provides functionality to load audio, standardize it to a 
+    specified duration and sampling rate, and retrieve class information for 
+    classification tasks.
+
+    Attributes:
+        paths (list[Path]): A list of paths to the audio files.
+        feature_extractor (ASTFeatureExtractor): An instance of a feature extractor 
+            for audio processing.
+        classes (list[str]): A list of class names derived from the directory structure.
+        class_to_idx (dict[str, int]): A mapping from class names to class indices.
+        idx_to_class (dict[int, str]): A mapping from class indices to class names.
+        sampling_rate (Optional[int]): The sampling rate of the audio dataset.
+        standardize_audio_boolean (bool): A flag indicating whether to standardize audio.
+        target_sr (int): The target sampling rate for audio files.
+        target_duration (int): The target duration (in seconds) for audio files.
+
+    Methods:
+        load_audio(index: int) -> torch.Tensor:
+            Loads an audio file from the specified index and returns it as a tensor.
+
+        get_classes() -> list[str]:
+            Returns the list of class names.
+
+        get_class_dict() -> dict[str, int]:
+            Returns the mapping of class names to indices.
+
+        get_idx_dict() -> dict[int, str]:
+            Returns the mapping of indices to class names.
+
+        get_feature_extractor() -> ASTFeatureExtractor:
+            Returns the feature extractor instance.
+
+        __len__() -> int:
+            Returns the number of audio files in the dataset.
+
+        standardize_audio(audio_tensor: torch.Tensor) -> torch.Tensor:
+            Standardizes the audio tensor to the specified target duration and 
+            sampling rate.
+    """
+    def __init__(self, data_path: str, 
+                 indices : list[int], 
+                 feature_extractor: ASTFeatureExtractor, 
+                 standardize_audio_boolean: bool=True, 
+                 target_sr: int=44100, 
+                 target_duration: int=5, 
+                 training_transforms: bool = False, 
+                 augmentations_per_sample: int = 1) -> None:
+        self.paths = indices
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
         self.idx_to_class = {value: key for key, value in self.class_to_idx.items()}
-        
+        self.sampling_rate = None  # current dataset sample rate
+        self.standardize_audio_boolean = standardize_audio_boolean
+        self.target_sr = target_sr
+        self.target_duration = target_duration
+        self.training_transforms = training_transforms
+        self.augmentations_per_sample = augmentations_per_sample
+
     def load_audio(self, index:int) -> torch.Tensor:
         "load audio from path, return raw tensor"
-        audio_tensor, _= torchaudio.load(self.paths[index])
-        return audio_tensor # don't return sr (sample rate) b/c all data has same sr  
+        audio_tensor, sr= torchaudio.load(str(self.paths[index]))
+
+        if self.sampling_rate is None:
+            self.sampling_rate = sr
+        return audio_tensor 
     def get_classes(self) -> list[str]:
         return self.classes
-        
+    
     def get_class_dict(self) -> dict[str, int]:
         return self.class_to_idx
         
@@ -44,22 +112,77 @@ class AudioDataset(Dataset):
     def __len__(self) -> int:
         "Override Dataset.__len__ for custom file structre"
         return len(self.paths)
-
-
-    # can add conditional audio transformation if needed! (resamples, cutting, volume, etc.)
     
-    def __getitem__(self, index: int) -> tuple[torch.Tensor,int]:
-        "Returns one sample of data, and it's class index"
+    def standardize_audio(self, audio_tensor: torch.Tensor) -> torch.Tensor:
+        """Standardize audio to the specified target duration and sampling rate"""
+        if self.sampling_rate is None:
+            # If sampling rate is not set, use the target sampling rate and issue a warning
+            warnings.warn(f"Sampling rate not set. Using target value of {self.target_sr} Hz.", UserWarning)
+            current_sr = self.target_sr
+        else:
+            current_sr = self.sampling_rate
+        
+        target_length = self.target_sr * self.target_duration
+        
+        # Resample if necessary
+        if current_sr != self.target_sr:
+            audio_tensor = torchaudio.transforms.Resample(current_sr, self.target_sr)(audio_tensor)
+        
+        # Pad or trim to target length
+        if audio_tensor.size(1) < target_length:
+            audio_tensor = torch.nn.functional.pad(audio_tensor, (0, target_length - audio_tensor.size(1)))
+        else:
+            audio_tensor = audio_tensor[:, :target_length]
+        
+        return audio_tensor
+    
+    def show_spectrogram(self, audio_or_index):
+        # Check if the input is an index or an audio tensor
+        if isinstance(audio_or_index, int):
+            audio, _ = self.__getitem__(audio_or_index)  # Get audio tensor from index
+        else:
+            audio = audio_or_index  # Assume it's an audio tensor
 
-        audio_tensor= self.load_audio(index)
-        class_name  = self.paths[index].parent.name
+        # Convert audio features to numpy array
+        spectrogram = audio.numpy()
+        
+        # Get the sampling rate
+        if self.sampling_rate is None:
+            # If sampling rate is not set, use a default value and issue a warning
+            default_sr = 16000  # Choose an appropriate default sampling rate
+            warnings.warn(f"Sampling rate not set. Using default value of {default_sr} Hz.", UserWarning)
+            sr = default_sr
+        else:
+            sr = self.sampling_rate
+        
+        # Plot the spectrogram
+        plt.figure(figsize=(12, 8))
+        librosa.display.specshow(spectrogram, sr=sr, x_axis='time', y_axis='mel')
+        plt.colorbar(format='%+2.0f dB')
+        plt.title('Mel-Spectrogram')
+        plt.show()
+        plt.show()
+
+    def __getitem__(self, index: int) -> tuple[torch.Tensor, int]:
+        "Returns one sample of data, and its class index"
+
+        audio_tensor = self.load_audio(index)
+        class_name = self.paths[index].parent.name # type: ignore
         class_idx = self.class_to_idx[class_name]
         
-        # Using the AST model's correct size for transformation instead of mel_spectrogram
-        inputs = self.feature_extractor(audio_tensor.squeeze().numpy(), return_tensors="pt", sampling_rate=16000) # adjust sampling rate as needed
+        # Standardize audio length and frequency
+        if self.standardize_audio_boolean:
+            audio_tensor = self.standardize_audio(audio_tensor)
+
+        if self.training_transforms:
+            audio_tensor = apply_augmentations(audio_tensor, noise_factor=0.005)
+
+        # Using the AST model's correct size for transformation
+        inputs = self.feature_extractor(audio_tensor.squeeze().numpy(), return_tensors="pt", sampling_rate=16000)
         inputs = inputs['input_values'][0]  # Extract input tensor
-    
+
         return inputs, class_idx
+        
         
 def display_random_images(dataset: AudioDataset,
                           n: int = 9,  # Set n to 9 for a 3x3 grid layout
@@ -129,39 +252,43 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
 
     return classes, class_to_idx
 
-def train_test_split_custom(dataset: AudioDataset, test_size: float = 0.2, seed: int = 42, inference_size: Optional[float]= None
-                            ):
+def train_test_split_custom(
+    data_path: str, 
+    feature_extractor: ASTFeatureExtractor,
+    test_size: float = 0.2, 
+    seed: int = 42, 
+    inference_size: float = 0.1,
+    training_transforms: bool = True
+):                          
+    all_paths = list(Path(data_path).glob("*/*.wav"))  # Get all audio file paths
+    all_indices = list(range(len(all_paths)))
 
-    all_indices = list(range(len(dataset)))
-
-    if inference_size:
-        test_size += inference_size # add to test_size so test set isn't reducded (in size)
-    # 1st split
-    train_indices, test_indices = train_test_split(
-        all_indices, 
-        test_size=test_size, 
+    train_indices, test_inference_indices = train_test_split(
+        all_indices,
+        test_size=test_size + inference_size,
         random_state=seed
-        )
-    # 2nd split
-    if inference_size:
-        test_indices, inference_indices = train_test_split(
-            test_indices,
-            test_size= inference_size,
-            random_state=seed
-        )
+    )
 
-        inference_subset = Subset(dataset, inference_indices)
+    # 2nd split
+    test_indices, inference_indices = train_test_split(
+        test_inference_indices,
+        test_size=inference_size / (test_size + inference_size),
+        random_state=seed
+    )
+
+    # Create new datasets based on the split indices
+    train_paths = [all_paths[i] for i in train_indices]
+    test_paths = [all_paths[i] for i in test_indices]
+    inference_paths = [all_paths[i] for i in inference_indices]
+
+    # if training_transforms:
+    #     train_paths = inflate_train_dataset(train_paths)
     
+    train_dataset = AudioDataset(data_path, train_paths, feature_extractor, training_transforms=training_transforms)
+    test_dataset = AudioDataset(data_path, test_paths, feature_extractor)
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor)
     
-    # Subset datasets
-    train_subset = Subset(dataset, train_indices)
-    test_subset = Subset(dataset, test_indices)
-    
-    
-    if inference_size:
-        return train_subset, test_subset, inference_subset
-    else:
-        return train_subset, test_subset
+    return train_dataset, test_dataset, inference_dataset
 
 def save_model(model: torch.nn.Module,
             target_dir: str,

@@ -1,5 +1,5 @@
 # DESCRIPTION
-from helper.util import AudioDataset, train_test_split_custom, save_model, wandb_login
+from helper.util import train_test_split_custom, save_model, wandb_login
 from helper.engine import train, inference_loop
 from helper.model import auto_extractor, custom_AST
 
@@ -39,6 +39,7 @@ def main():
     SAVE_MODEL = general_config['save_model']
     test_size = general_config['test_size']
     inference_size = general_config['inference_size']
+    training_transforms = general_config['training_transforms']
 
     wandb_params = {
             "project": run_config['project'],
@@ -55,12 +56,15 @@ def main():
 
     feature_extractor = auto_extractor(model_name)
 
-    dataset = AudioDataset(data_path, feature_extractor)
+    # dataset = AudioDataset(data_path, feature_extractor)
+    train_dataset, test_dataset, inference_dataset = train_test_split_custom(data_path, 
+                                                                            feature_extractor, 
+                                                                            test_size=test_size, 
+                                                                            seed=SEED, 
+                                                                            inference_size=inference_size,
+                                                                            training_transforms=training_transforms)
 
-    train_subset, test_subset, inference_subset = train_test_split_custom(dataset, # type: ignore
-                                                                          test_size=test_size, 
-                                                                          inference_size=inference_size)  
-    num_classes = len(dataset.get_classes()) 
+    num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
     model = custom_AST(model_name, num_classes, device)
 
@@ -70,19 +74,19 @@ def main():
             row_settings=["var_names"])
     print(model)
     
-    train_dataloader_custom = DataLoader(dataset=train_subset, 
+    train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
                                         batch_size=BATCH_SIZE,
                                         num_workers=NUM_CUDA_WORKERS,
                                         pin_memory=PINNED_MEMORY,
                                         shuffle=SHUFFLED)
 
-    test_dataloader_custom = DataLoader(dataset=test_subset,
+    test_dataloader_custom = DataLoader(dataset=test_dataset,
                                         batch_size=BATCH_SIZE, 
                                         num_workers=NUM_CUDA_WORKERS,
                                         pin_memory=PINNED_MEMORY,
                                         shuffle=SHUFFLED)
 
-    inference_dataloader_custom = DataLoader(dataset=inference_subset,
+    inference_dataloader_custom = DataLoader(dataset=inference_dataset,
                                     batch_size=BATCH_SIZE, 
                                     num_workers=NUM_CUDA_WORKERS,
                                     pin_memory=PINNED_MEMORY,

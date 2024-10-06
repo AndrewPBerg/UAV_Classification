@@ -28,8 +28,10 @@
 **/node_modules
 **/npm-debug.log
 **/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
+**/wandb
+**/environment.y*ml
+**/secrets.dev.y*ml
+**/values.dev.y*ml
 **/.datasets
 LICENSE
 README.md

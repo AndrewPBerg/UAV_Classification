@@ -262,7 +262,7 @@ def train(model: torch.nn.Module,
 
         wandb_plot_confusion_matrix(y_truth=ground_truth_all,
                               preds=predictions_all,
-                              class_names=train_dataloader.dataset.dataset.get_classes()) # type: ignore
+                              class_names=train_dataloader.dataset.get_classes()) # type: ignore
 
         
     return results
@@ -315,13 +315,15 @@ def inference_loop(model: torch.nn.Module,
 def sweep_train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           test_dataloader: DataLoader, 
-          optimizer: torch.optim.AdamW, 
-          scheduler,  
+          optimizer: AdamW, 
+          scheduler: torch.optim.lr_scheduler._LRScheduler,  
           loss_fn: nn.Module, 
           epochs: int, 
-          device: str,
-          accumulation_steps: int=4,
-          num_classes: int=9) -> Dict[str, List]:
+          device: str, 
+          num_classes: int,
+          accumulation_steps: int = 1,  
+          patience: int = 5, 
+          delta: float = 0.01) -> Dict[str, List]:
 
     results = {"train_loss": [], "train_acc": [], "test_loss": [], "test_acc": [], 
                "train_f1": [], "test_f1": [], "train_precision": [], "test_precision": [], 
@@ -428,7 +430,7 @@ def sweep_train(model: torch.nn.Module,
         results["test_recall"].append(test_recall)
         
         # Step the scheduler (based on validation loss for ReduceLROnPlateau)
-        scheduler.step(test_loss)  
+        scheduler.step(test_loss) # type: ignore
 
     end = timer()
     total_time = end - start
