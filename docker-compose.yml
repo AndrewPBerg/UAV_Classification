@@ -22,7 +22,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    command: python3 src/script.py
+    # command: python3 src/script.py
+    command: python3 src/sweeps.py
     # command: /bin/bash # interactive shell
     working_dir: /app
     user: "appuser"

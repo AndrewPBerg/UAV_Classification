@@ -12,7 +12,7 @@ general:
   epochs: 7
   save_model: false
   project_name: "AST_Sweeps"
-  sweep_count: 100
+  sweep_count: 10
   test_size: 0.2
   inference_size: 0.1
   shuffled : true

@@ -1,5 +1,5 @@
 import yaml
-from helper.util import train_test_split_custom, save_model
+from helper.util import train_test_split_custom, save_model, wandb_login
 from helper.engine import sweep_train, inference_loop
 from helper.model import auto_extractor, custom_AST
 
@@ -19,6 +19,8 @@ general_config = config['general']
 # sweep_config = config['sweep']
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
+
+wandb_login("src/.env")
 
 
 def create_dataloader(dataset, batch_size, num_workers=general_config['num_cuda_workers'], shuffle=True):
