@@ -13,7 +13,8 @@ services:
       - DEBIAN_FRONTEND=noninteractive
     volumes:
       - .:/app
-      - C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets
+      # - C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets
+      - /Users/applefella/Desktop/UAV_project/UAV_Classification/src/.datasets:/app/src/.datasets
     deploy:
       resources:
         reservations:
