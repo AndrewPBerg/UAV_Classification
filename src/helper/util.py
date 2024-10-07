@@ -12,14 +12,14 @@ from transformers import ASTFeatureExtractor
 import warnings
 from helper.augmentations import apply_augmentations
 
-from dotenv import dotenv_values
 import wandb
 
-def wandb_login(secrets_path:str):
+def wandb_login():
+    api_key = os.environ.get('WANDB_API_KEY')
+    if not api_key:
+        raise ValueError("WANDB_API_KEY environment variable is not set")
+    wandb.login(key=api_key)
 
-    config = dotenv_values(secrets_path)
-    wandb.login(key=config['WANDB_API_KEY'])
-    
 def count_classes(dataset):
     class_counts = {cls: 0 for cls in dataset.get_classes()}
     for _, class_idx in dataset:

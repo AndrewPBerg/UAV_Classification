@@ -4,34 +4,62 @@
 # For more help, visit the .dockerignore file reference guide at
 # https://docs.docker.com/go/build-context-dockerignore/
 
-**/.DS_Store
+# Ignore version control files
+.git
+.gitignore
+
+# Ignore Python cache files
 **/__pycache__
-**/.venv
-**/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/bin
-**/charts
-**/docker-compose*
-**/compose.y*ml
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/wandb
-**/environment.y*ml
-**/secrets.dev.y*ml
-**/values.dev.y*ml
-**/.datasets
-LICENSE
+*.pyc
+*.pyo
+*.pyd
+
+# Ignore virtual environment
+.venv
+env/
+venv/
+
+# Ignore IDE-specific files
+.vscode
+*.code-workspace
+
+# Ignore Docker-related files
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Ignore data and model directories
+src/.datasets
+saved_models/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints
+
+# Ignore wandb directory
+wandb/
+
+# Ignore environment files
+.env
+environment.yml
+
+# Ignore documentation and license files
 README.md
+LICENSE
+
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+
+# Ignore Python distribution / packaging
+*.egg-info/
+dist/
+build/
+
+# Ignore log files
+*.log
+
+# Ignore configuration files (unless needed in the container)
+# config.yaml
+
+# Ignore any large datasets or files not needed in the container
+# Add specific large files or directories here

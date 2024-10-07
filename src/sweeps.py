@@ -11,7 +11,7 @@ import wandb
 
 
 # Load configuration from YAML file
-with open('src/config.yaml', 'r') as file:
+with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
 # Access general configuration
@@ -20,7 +20,7 @@ general_config = config['general']
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-wandb_login("src/.env")
+wandb_login()
 
 
 def create_dataloader(dataset, batch_size, num_workers=general_config['num_cuda_workers'], shuffle=True):

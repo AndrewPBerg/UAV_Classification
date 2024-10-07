@@ -15,12 +15,12 @@ import wandb
 
 def main():
 
-    with open('src/config.yaml', 'r') as file:
+    with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    wandb_login("src/.env")
+    wandb_login()
 
     general_config = config['general']
     run_config = config['wandb']

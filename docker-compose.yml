@@ -11,10 +11,11 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - DEBIAN_FRONTEND=noninteractive
+      - WANDB_API_KEY=${WANDB_API_KEY}  # Changed to WANDB_API_KEY
     volumes:
-      - .:/app
-      # - C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets
-      - /Users/applefella/Desktop/UAV_project/UAV_Classification/src/.datasets:/app/src/.datasets
+      - ./src:/app/src:ro  # Only mount the src directory as read-only
+      - C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets:ro
+      # - /Users/applefella/Desktop/UAV_project/UAV_Classification/src/.datasets:/app/src/.datasets:ro
     deploy:
       resources:
         reservations:
@@ -22,10 +23,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # command: python3 src/script.py
-    command: python3 src/sweeps.py
+    command: python3 script.py
+    # command: python3 sweeps.py
     # command: /bin/bash # interactive shell
-    working_dir: /app
+    stdin_open: true
+    tty: true
+    working_dir: /app/src  # Change this to /app/src
     user: "appuser"
     networks:
       - app_network
@@ -33,6 +36,7 @@ services:
 volumes:
   datasets:
     driver: local
+  src:  # Add this named volume
 
 networks:
   app_network:
