@@ -12,7 +12,7 @@ general:
   epochs: 10
   save_model: false
   project_name: "AST_Sweeps"
-  sweep_count: 100
+  sweep_count: 10000
   test_size: 0.2
   inference_size: 0.1
   shuffled : true
@@ -21,29 +21,29 @@ general:
   patience : 3
   num_train_transforms: 3
   augmentation_probability: 0.5 
-  augmentations: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "Limiter", "PolarityInversion", "Gain"]
+  augmentations: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
 
 # WandB solo run configutation (precedence over General)
 wandb:
-  project: "AST Fine-Tuning"
-  name: "testing confusion matrix"
+  project: "AST Augmentations"
+  name: "Find-tuning the best audio augmentation stack"
   reinit: false
-  notes: "1st attempt at audio augmentations and normalizations"
-  tags: "AST, confusion matrix"
+  notes: "available options: PitchShift, TimeStretch, AddGaussianNoise, Shift, TimeMask, Reverse, Normalize, GainTransition, PolarityInversion, Gain"
+  tags: "AST, "
   dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
 
 
 # WandB sweep configuration
 sweep:
-  name: "AST_noise_test"
+  name: "AST Augmentations"
   method: "random"
   metric:
-    goal: "maximize"
-    name: "test_acc"
+    - name: "test_acc"
+      goal: "maximize"
   parameters:
     learning_rate:
       values: [0.0001, 0.0005, 0.001, 0.005, 0.01]
     num_augmentations:
       distribution: int_uniform
       min: 0
-      max: 11
+      max: 10

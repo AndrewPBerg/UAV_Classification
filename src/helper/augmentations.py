@@ -1,6 +1,6 @@
 import torch
 from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, 
-    Shift, TimeMask, Reverse, Normalize, GainTransition, Limiter, PolarityInversion, Gain)
+    Shift, TimeMask, Reverse, Normalize, GainTransition, PolarityInversion, Gain)
 
 def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) -> torch.Tensor:
     if len(augmentations) == 0:
@@ -25,8 +25,6 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) 
             transforms.append(Normalize(apply_to="all", p=1.0))
         elif aug == "GainTransition":
             transforms.append(GainTransition(min_gain_db=-12, max_gain_db=0, p=1.0))
-        elif aug == "Limiter":
-            transforms.append(Limiter(min_threshold_db=-16.0, max_threshold_db=-6.0, threshold_mode="relative_to_signal_peak", p=1.0))
         elif aug == "PolarityInversion":
             transforms.append(PolarityInversion(p=1.0))
         elif aug == "Gain":
