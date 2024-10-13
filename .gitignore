@@ -3,6 +3,11 @@ wandb/
 saved_models/
 .vscode
 .datasets/
+datasets/
+*output/
+*/output/
+server_login.txt
+
  
 
 # Byte-compiled / optimized / DLL files

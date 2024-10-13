@@ -39,7 +39,6 @@ def main():
     SAVE_MODEL = general_config['save_model']
     test_size = general_config['test_size']
     inference_size = general_config['inference_size']
-    training_transforms = general_config['training_transforms']
 
     wandb_params = {
             "project": run_config['project'],
@@ -57,22 +56,23 @@ def main():
     feature_extractor = auto_extractor(model_name)
 
     # dataset = AudioDataset(data_path, feature_extractor)
-    train_dataset, test_dataset, inference_dataset = train_test_split_custom(data_path, 
+    train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(data_path, 
                                                                             feature_extractor, 
                                                                             test_size=test_size, 
                                                                             seed=SEED, 
                                                                             inference_size=inference_size,
-                                                                            training_transforms=training_transforms)
+                                                                            augmentations_per_sample=3,
+                                                                            augmentation_probability=0.5)
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
     model = custom_AST(model_name, num_classes, device)
 
-    summary(model,
-            col_names=["num_params","trainable"],
-            col_width=20,
-            row_settings=["var_names"])
-    print(model)
+    # summary(model,
+    #         col_names=["num_params","trainable"],
+    #         col_width=20,
+    #         row_settings=["var_names"])
+    # print(model)
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
                                         batch_size=BATCH_SIZE,
@@ -85,12 +85,22 @@ def main():
                                         num_workers=NUM_CUDA_WORKERS,
                                         pin_memory=PINNED_MEMORY,
                                         shuffle=SHUFFLED)
+    val_dataloader_custom = DataLoader(dataset=val_dataset,
+                                        batch_size=BATCH_SIZE, 
+                                        num_workers=NUM_CUDA_WORKERS,
+                                        pin_memory=PINNED_MEMORY,
+                                        shuffle=SHUFFLED)
 
     inference_dataloader_custom = DataLoader(dataset=inference_dataset,
                                     batch_size=BATCH_SIZE, 
                                     num_workers=NUM_CUDA_WORKERS,
                                     pin_memory=PINNED_MEMORY,
                                     shuffle=SHUFFLED) 
+    # print(f" size of train dataloader: {train_dataloader_custom.dataset[0]}")
+    # print(f"Size of test dataloader: {test_dataloader_custom.dataset[0]}")
+    # print(f"Size of val dataloader: {val_dataloader_custom.dataset[0]}")
+    # print(f"Size of inference dataloader: {inference_dataloader_custom.dataset[0]}")
+
     loss_fn = nn.CrossEntropyLoss()
 
     optimizer = AdamW(model.parameters(), lr=learning_rate)
@@ -106,17 +116,20 @@ def main():
             dir=wandb_params.get("dir", None)
         )
         
-    train(          model=model,
-                    train_dataloader=train_dataloader_custom,
-                    test_dataloader=test_dataloader_custom,
-                    optimizer=optimizer,
-                    scheduler=scheduler, # type: ignore
-                    loss_fn=loss_fn,
-                    epochs=EPOCHS,
-                    device=device,
-                    num_classes= num_classes,
-                    accumulation_steps=ACCUMULATION_STEPS,
-                    patience=TRAIN_PATIENCE)
+    train(
+        model=model,
+        train_dataloader=train_dataloader_custom,
+        test_dataloader=test_dataloader_custom,
+        val_dataloader=val_dataloader_custom,
+        optimizer=optimizer,
+        scheduler=scheduler,  # type: ignore
+        loss_fn=loss_fn,
+        epochs=EPOCHS,
+        device=device,
+        num_classes=num_classes,
+        accumulation_steps=ACCUMULATION_STEPS,
+        patience=TRAIN_PATIENCE
+    )
 
     inference_loop(model=model,
                 device=device,

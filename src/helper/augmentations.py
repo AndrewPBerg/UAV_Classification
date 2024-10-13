@@ -1,6 +1,18 @@
 import random
 import librosa
 import torch
+from audiomentations import PitchShift #Parse https://github.com/asteroid-team/torch-audiomentations
+
+def apply_random_augmentation(audio: torch.Tensor , sr: int) -> torch.Tensor:
+
+
+    transform = PitchShift(   # One octave == 12 semtones
+    min_semitones=-12.0,  # Minimum pitch shift in semitones 
+    max_semitones=12.0,   # Maximum pitch shift in semitones 
+        p=1.0                 # Probability of applying this transform (always applied)
+    )   
+    audio = torch.from_numpy(transform(audio.numpy(), sr)).float()
+    return audio
 
 def apply_augmentations(
     audio_tensor: torch.Tensor,

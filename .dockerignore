@@ -30,6 +30,9 @@ docker-compose.yml
 
 # Ignore data and model directories
 src/.datasets
+src/datasets
+.datasets
+datasets
 saved_models/
 
 # Ignore Jupyter Notebook checkpoints
