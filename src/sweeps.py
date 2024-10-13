@@ -8,6 +8,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 import torch.nn as nn
 import wandb
+import random
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -29,7 +30,9 @@ def make(config):
     # Make the data
     feature_extractor = auto_extractor(general_config['model_name'])
     # Get the selected augmentations directly from the config
-    selected_augmentations = config.augmentations
+    num_augmentations = config.num_augmentations
+    augmentation_list = general_config['augmentations']
+    selected_augmentations = random.sample(k=num_augmentations,population=augmentation_list)
     
     # Log the selected augmentations
     wandb.log({"selected_augmentations": selected_augmentations})
@@ -41,14 +44,15 @@ def make(config):
         test_size=general_config['test_size'], 
         seed=general_config['seed'], 
         inference_size=general_config['inference_size'],
-        augmentations_per_sample=config['num_train_transforms'],
-        augmentation_probability=config['augmentation_probability']
+        augmentations_per_sample=general_config['num_train_transforms'],
+        augmentation_probability=general_config['augmentation_probability'],
+        augmentations=selected_augmentations
     )
-    
-    inference_loader = create_dataloader(inference_dataset, config.batch_size)
-    train_loader = create_dataloader(train_dataset, config.batch_size)
-    val_loader = create_dataloader(val_dataset, config.batch_size)
-    test_loader = create_dataloader(test_dataset, config.batch_size)
+
+    inference_loader = create_dataloader(inference_dataset, general_config['batch_size'])
+    train_loader = create_dataloader(train_dataset, general_config['batch_size'])
+    val_loader = create_dataloader(val_dataset, general_config['batch_size'])
+    test_loader = create_dataloader(test_dataset, general_config['batch_size'])
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes())
 
@@ -80,7 +84,7 @@ def model_pipeline(config=None):
                         epochs=general_config['epochs'],
                         device=device,
                         num_classes=num_classes,
-                        accumulation_steps=config.accumulation_steps, # type: ignore
+                        accumulation_steps=general_config['accumulation_steps'], # type: ignore
                         patience=general_config['patience'])
 
         inference_loop(model=model,

@@ -21,7 +21,7 @@ general:
   patience : 3
   num_train_transforms: 3
   augmentation_probability: 0.5 
-  num_augmentations: 8 # max 8 atm
+  augmentations: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "Limiter", "PolarityInversion", "Gain"]
 
 # WandB solo run configutation (precedence over General)
 wandb:
@@ -43,9 +43,7 @@ sweep:
   parameters:
     learning_rate:
       values: [0.0001, 0.0005, 0.001, 0.005, 0.01]
-    augmentations:
-      values: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "Limiter", "PolarityInversion", "Gain"]
-    # augmentation_probability:
-    #   distribution: "random"
-    #   min: 0.3
-    #   max: 1.0
+    num_augmentations:
+      distribution: int_uniform
+      min: 0
+      max: 11
