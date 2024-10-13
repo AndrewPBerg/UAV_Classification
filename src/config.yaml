@@ -19,7 +19,6 @@ general:
   accumulation_steps: 3
   learning_rate: 0.001
   patience : 3
-  training_transforms: true
 
 # WandB solo run configutation (precedence over General)
 wandb:

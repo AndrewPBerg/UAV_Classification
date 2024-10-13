@@ -1,4 +1,3 @@
-import glob
 import os
 from torch.utils.data import Dataset
 from pathlib import Path
@@ -11,7 +10,7 @@ import librosa
 from typing import Optional
 from transformers import ASTFeatureExtractor
 import warnings
-from helper.augmentations import apply_augmentations, apply_random_augmentation  # Assume this function exists
+from helper.augmentations import apply_random_augmentation  # Assume this function exists
 
 from dotenv import dotenv_values
 import wandb
@@ -53,25 +52,31 @@ class AudioDataset(Dataset):
         self.augmentation_probability = augmentation_probability
         self.standardize_audio_boolean = standardize_audio_boolean
 
-        total_samples = (augmentations_per_sample+1) * (len(self.paths)) # Total amount of samples in dataset * the number of augmentations apppled to data
-        self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)  # expected shape for UAV == ([1,1,220500)
+        total_samples = (augmentations_per_sample + 1) * len(self.paths)
+        self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
         self.class_indices = []
-        # Load Original audio samples into the 0th dim of 0th index of audio_tensors
-        for index, path in enumerate(self.paths): 
-            audio_to_append, class_idx = self.load_audio(path)  
+
+        # Load original audio samples
+        for index, path in enumerate(self.paths):
+            audio_to_append, class_idx = self.load_audio(path)
             self.audio_tensors[index] = audio_to_append
             self.class_indices.append(class_idx)
 
-        original_audio_tensors = self.audio_tensors
-        # Now produce if augmentations_per_sample > 0 produce and append augmentations
+        # Apply augmentations
         if self.augmentations_per_sample > 0:
-            for i in range(len(original_audio_tensors),len(self.audio_tensors)): # Loop through each possible augmentation index, starting at 1
-                self.class_indices.append(self.class_indices[i])
-                if random.random() < self.augmentation_probability: # Chance to not augment, and repeat original
-                    augmented_audio = apply_random_augmentation(original_audio_tensors[i], self.target_sr)
-                    self.audio_tensors[i] = augmented_audio
-                else:
-                    self.audio_tensors[i] = original_audio_tensors[i]
+            original_samples = len(self.paths)
+            for i in range(original_samples):
+                for j in range(self.augmentations_per_sample):
+                    new_index = original_samples + i * self.augmentations_per_sample + j
+                    self.class_indices.append(self.class_indices[i])
+                    if random.random() < self.augmentation_probability:
+                        augmented_audio = apply_random_augmentation(self.audio_tensors[i], self.target_sr)
+                        self.audio_tensors[new_index] = augmented_audio
+                    else:
+                        self.audio_tensors[new_index] = self.audio_tensors[i]
+
+        # Ensure audio_tensors and class_indices have the same length
+        assert len(self.audio_tensors) == len(self.class_indices), "Mismatch between audio_tensors and class_indices"
     def load_audio(self, path:str):
         "load audio from path, return raw tensor"
     
@@ -98,14 +103,11 @@ class AudioDataset(Dataset):
         features = self.feature_extractor(audio_tensor.squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_values
         return features
 
-    def __getitem__(self, index):
+    def __getitem__(self, index) -> tuple[torch.Tensor, int]:
         features = self.feature_extractor(self.audio_tensors[index].squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_values
-        # features size == torch.Size([1, 1024, 128]
-
         if self.audio_tensors[index].shape[0] == 1: # if the number of channels in the first dim of self.audio_tensor == 1: squeeze the dim out
             features = features.squeeze(dim=0)
             # features size == torch.Size([1024, 128]
-        
 
         return features, self.class_indices[index]
 
@@ -283,9 +285,7 @@ def train_test_split_custom(
     test_paths = [all_paths[i] for i in test_indices]
     inference_paths = [all_paths[i] for i in inference_indices]
 
-    print(f"Train: {len(train_paths)}, Validation: {len(val_paths)}, Test: {len(test_paths)}, Inference: {len(inference_paths)}")
-    print(f"Total samples: {len(train_paths) + len(val_paths) + len(test_paths) + len(inference_paths)}")
-
+    
     # train, test,val, inferences indices contain unique keys to the all_paths list, used in AudioDataset2 for Tensor loading
     train_dataset = AudioDataset(data_path,
                                   train_paths,
@@ -296,12 +296,13 @@ def train_test_split_custom(
     val_dataset = AudioDataset(data_path, 
                                 val_paths, 
                                 feature_extractor,
-                                augmentations_per_sample=3,
+                                augmentations_per_sample=augmentations_per_sample,
                                 augmentation_probability=augmentation_probability)
     
     test_dataset = AudioDataset(data_path, test_paths, feature_extractor)
     inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor)
     
+    print(f"Lengths:Train: {len(train_dataset)}, Validation: {len(val_dataset)}, Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
     return train_dataset, val_dataset, test_dataset, inference_dataset
 
 def save_model(model: torch.nn.Module,

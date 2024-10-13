@@ -1,7 +1,7 @@
 import random
 import librosa
 import torch
-from audiomentations import PitchShift, TimeStretch, AddGaussianNoise #TODO change to pytorch audiomentations intergation
+from audiomentations import PitchShift #Parse https://github.com/asteroid-team/torch-audiomentations
 
 def apply_random_augmentation(audio: torch.Tensor , sr: int) -> torch.Tensor:
 
