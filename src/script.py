@@ -39,6 +39,9 @@ def main():
     SAVE_MODEL = general_config['save_model']
     test_size = general_config['test_size']
     inference_size = general_config['inference_size']
+    augmentations_per_sample= general_config['num_train_transforms']
+    augmentation_probability= general_config['augmentation_probability']
+
 
     wandb_params = {
             "project": run_config['project'],
@@ -61,8 +64,8 @@ def main():
                                                                             test_size=test_size, 
                                                                             seed=SEED, 
                                                                             inference_size=inference_size,
-                                                                            augmentations_per_sample=3,
-                                                                            augmentation_probability=0.5)
+                                                                            augmentations_per_sample=augmentations_per_sample,
+                                                                            augmentation_probability=augmentation_probability)
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
@@ -96,10 +99,6 @@ def main():
                                     num_workers=NUM_CUDA_WORKERS,
                                     pin_memory=PINNED_MEMORY,
                                     shuffle=SHUFFLED) 
-    # print(f" size of train dataloader: {train_dataloader_custom.dataset[0]}")
-    # print(f"Size of test dataloader: {test_dataloader_custom.dataset[0]}")
-    # print(f"Size of val dataloader: {val_dataloader_custom.dataset[0]}")
-    # print(f"Size of inference dataloader: {inference_dataloader_custom.dataset[0]}")
 
     loss_fn = nn.CrossEntropyLoss()
 
