@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader
 from torch.optim.adamw import AdamW
 # import torch.optim as optim # type: ignore
 import torch.nn as nn
-from torchinfo import summary
+# from torchinfo import summary
 import yaml
 
 import wandb

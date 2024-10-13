@@ -1,128 +1,43 @@
-import random
-import librosa
 import torch
-from audiomentations import PitchShift #Parse https://github.com/asteroid-team/torch-audiomentations
+from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, 
+    Shift, TimeMask, Reverse, Normalize, GainTransition, Limiter, PolarityInversion, Gain)
 
-def apply_random_augmentation(audio: torch.Tensor , sr: int) -> torch.Tensor:
+def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) -> torch.Tensor:
+    if len(augmentations) == 0:
+        print("No augmentations selected, returning original audio. Traceback: Augmentations.py, apply_random_augmentation()")
+        return audio
 
+    transforms = []
+    for aug in augmentations:
+        if aug == "PitchShift":
+            transforms.append(PitchShift(min_semitones=-12.0, max_semitones=12.0, p=1.0))
+        elif aug == "TimeStretch":
+            transforms.append(TimeStretch(min_rate=0.1, max_rate=0.9, p=1.0))
+        elif aug == "AddGaussianNoise":
+            transforms.append(AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=1.0))
+        elif aug == "Shift":
+            transforms.append(Shift(min_shift=1.0, max_shift=2.0, shift_unit="seconds", rollover=True, fade_duration=0.01, p=1.0))
+        elif aug == "TimeMask":
+            transforms.append(TimeMask(min_band_part=0.0, max_band_part=0.5, fade=True, p=1.0))
+        elif aug == "Reverse":
+            transforms.append(Reverse(p=1.0))
+        elif aug == "Normalize":
+            transforms.append(Normalize(apply_to="all", p=1.0))
+        elif aug == "GainTransition":
+            transforms.append(GainTransition(min_gain_db=-12, max_gain_db=0, p=1.0))
+        elif aug == "Limiter":
+            transforms.append(Limiter(min_threshold_db=-16.0, max_threshold_db=-6.0, threshold_mode="relative_to_signal_peak", p=1.0))
+        elif aug == "PolarityInversion":
+            transforms.append(PolarityInversion(p=1.0))
+        elif aug == "Gain":
+            transforms.append(Gain(min_gain_db=-12, max_gain_db=0, p=1.0))
+        else:
+            print(f"Unknown augmentation: {aug}. Skipping.")
 
-    transform = PitchShift(   # One octave == 12 semtones
-    min_semitones=-12.0,  # Minimum pitch shift in semitones 
-    max_semitones=12.0,   # Maximum pitch shift in semitones 
-        p=1.0                 # Probability of applying this transform (always applied)
-    )   
-    audio = torch.from_numpy(transform(audio.numpy(), sr)).float()
-    return audio
+    # Compose all the selected transforms
+    transform = Compose(transforms)
 
-def apply_augmentations(
-    audio_tensor: torch.Tensor,
-    noise_factor: float = 0.005,
-    target_sr: int = 44100,
-    target_duration: int = 5
-) -> torch.Tensor:
-    """
-    Applies a series of augmentations to the audio tensor.
-
-    Args:
-        audio_tensor (torch.Tensor): The original audio tensor.
-        noise_factor (float, optional): Scaling factor for adding Gaussian noise. Defaults to 0.005.
-        target_sr (int, optional): Target sampling rate. Defaults to 44100.
-        target_duration (int, optional): Target duration in seconds. Defaults to 5.
-
-    Returns:
-        torch.Tensor: The augmented audio tensor.
-    """
-    augmented_audio = audio_tensor.clone()
-
-    # # 1. Time Stretching
-    # rate = random.uniform(0.8, 1.2)
-    # augmented_audio = time_stretch(augmented_audio, rate)
-
-    # # 2. Pitch Shifting
-    # n_steps = random.randint(-5, 5)
-    # augmented_audio = pitch_shift(augmented_audio, n_steps, target_sr)
-
-    # 3. Adding Gaussian Noise
-    augmented_audio = add_noise(augmented_audio, noise_factor)
-
-    # # 4. Volume Control
-    # gain = random.uniform(0.5, 1.5)
-    # augmented_audio = volume_control(augmented_audio, gain)
-
-    # # 5. Time Shifting
-    # max_shift = int(0.1 * target_sr)  # 0.1 seconds shift
-    # augmented_audio = time_shift(augmented_audio, max_shift)
-
-    return augmented_audio
-
-def time_stretch(audio_tensor: torch.Tensor, rate: float) -> torch.Tensor:
-    """
-    Stretches the audio in time without altering the pitch.
-
-    Args:
-        audio_tensor (torch.Tensor): The audio tensor.
-        rate (float): Stretch rate.
-
-    Returns:
-        torch.Tensor: Time-stretched audio tensor.
-    """
-    audio = audio_tensor.squeeze().numpy()
-    stretched_audio = librosa.effects.time_stretch(audio, rate=rate)
-    return torch.tensor(stretched_audio).unsqueeze(0)
-
-def pitch_shift(audio_tensor: torch.Tensor, n_steps: int, sr: int) -> torch.Tensor:
-    """
-    Shifts the pitch of the audio up or down.
-
-    Args:
-        audio_tensor (torch.Tensor): The audio tensor.
-        n_steps (int): Number of steps to shift.
-        sr (int): Sampling rate.
-
-    Returns:
-        torch.Tensor: Pitch-shifted audio tensor.
-    """
-    audio = audio_tensor.squeeze().numpy()
-    shifted_audio = librosa.effects.pitch_shift(audio, sr=sr, n_steps=n_steps)
-    return torch.tensor(shifted_audio).unsqueeze(0)
-
-def add_noise(audio_tensor: torch.Tensor, noise_factor: float) -> torch.Tensor:
-    """
-    Adds Gaussian noise to the audio tensor.
-
-    Args:
-        audio_tensor (torch.Tensor): The audio tensor.
-        noise_factor (float): Noise scaling factor.
-
-    Returns:
-        torch.Tensor: Noisy audio tensor.
-    """
-    noise = torch.randn_like(audio_tensor) * noise_factor
-    return audio_tensor + noise
-
-def volume_control(audio_tensor: torch.Tensor, gain: float) -> torch.Tensor:
-    """
-    Adjusts the volume of the audio tensor.
-
-    Args:
-        audio_tensor (torch.Tensor): The audio tensor.
-        gain (float): Gain factor.
-
-    Returns:
-        torch.Tensor: Volume-controlled audio tensor.
-    """
-    return audio_tensor * gain
-
-def time_shift(audio_tensor: torch.Tensor, max_shift: int) -> torch.Tensor:
-    """
-    Shifts the audio tensor forward or backward in time.
-
-    Args:
-        audio_tensor (torch.Tensor): The audio tensor.
-        max_shift (int): Maximum number of samples to shift.
-
-    Returns:
-        torch.Tensor: Time-shifted audio tensor.
-    """
-    shift = random.randint(-max_shift, max_shift)
-    return torch.roll(audio_tensor, shifts=shift)
+    # Apply the composed transform to the audio
+    audio_numpy = audio.numpy()
+    augmented_audio = transform(samples=audio_numpy, sample_rate=sr)
+    return torch.from_numpy(augmented_audio).float()

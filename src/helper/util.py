@@ -10,7 +10,7 @@ import librosa
 from typing import Optional
 from transformers import ASTFeatureExtractor
 import warnings
-from helper.augmentations import apply_random_augmentation  # Assume this function exists
+from .augmentations import apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
 
 import wandb
@@ -40,6 +40,7 @@ class AudioDataset(Dataset):
                  target_duration: int=5, 
                  augmentations_per_sample: int = 0,
                  augmentation_probability: float = 0.5,
+                 augmentations: list[str] = [],
                  num_channels: int = 1) -> None:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
@@ -72,8 +73,8 @@ class AudioDataset(Dataset):
                 for j in range(self.augmentations_per_sample):
                     new_index = original_samples + i * self.augmentations_per_sample + j
                     self.class_indices.append(self.class_indices[i])
-                    if random.random() < self.augmentation_probability:
-                        augmented_audio = apply_random_augmentation(self.audio_tensors[i], self.target_sr)
+                    if len(augmentations) != 0:
+                        augmented_audio = apply_augmentations(self.audio_tensors[i], augmentations, self.target_sr)
                         self.audio_tensors[new_index] = augmented_audio
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
@@ -239,7 +240,8 @@ def train_test_split_custom(
     inference_size: float = 0.1,
     seed: int = 42, 
     augmentations_per_sample: int = 3,
-    augmentation_probability: float = 0.5
+    augmentation_probability: float = 0.5,
+    augmentations: list[str] = []
 ):                          
     all_paths = list(Path(data_path).glob("*/*.wav"))  # Get all audio file paths
     # print(f"all paths {all_paths}")
@@ -282,13 +284,15 @@ def train_test_split_custom(
                                   train_paths,
                                   feature_extractor,
                                   augmentations_per_sample=augmentations_per_sample,
-                                  augmentation_probability=augmentation_probability)
+                                  augmentation_probability=augmentation_probability,
+                                  augmentations=augmentations)
     
     val_dataset = AudioDataset(data_path, 
                                 val_paths, 
                                 feature_extractor,
                                 augmentations_per_sample=augmentations_per_sample,
-                                augmentation_probability=augmentation_probability)
+                                augmentation_probability=augmentation_probability,
+                                augmentations=augmentations)
     
     test_dataset = AudioDataset(data_path, test_paths, feature_extractor)
     inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor)

@@ -28,6 +28,11 @@ def create_dataloader(dataset, batch_size, num_workers=general_config['num_cuda_
 def make(config):
     # Make the data
     feature_extractor = auto_extractor(general_config['model_name'])
+    # Get the selected augmentations directly from the config
+    selected_augmentations = config.augmentations
+    
+    # Log the selected augmentations
+    wandb.log({"selected_augmentations": selected_augmentations})
 
     # Updated dataset loading to match new format
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
@@ -52,7 +57,7 @@ def make(config):
 
     # Make the loss and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=config.learning_rate)
+    optimizer = optim.AdamW(model.parameters(), lr=config.learning_rate) # type: ignore
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
 
     return model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes
@@ -69,13 +74,13 @@ def model_pipeline(config=None):
                         train_dataloader=train_loader,
                         test_dataloader=test_loader,
                         val_dataloader=val_loader,
-                        optimizer=optimizer,
-                        scheduler=scheduler,
+                        optimizer=optimizer, # type: ignore
+                        scheduler=scheduler, # type: ignore
                         loss_fn=criterion,
-                        epochs=config.epochs,
+                        epochs=general_config['epochs'],
                         device=device,
                         num_classes=num_classes,
-                        accumulation_steps=config.accumulation_steps,
+                        accumulation_steps=config.accumulation_steps, # type: ignore
                         patience=general_config['patience'])
 
         inference_loop(model=model,
