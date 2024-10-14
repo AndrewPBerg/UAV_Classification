@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, 
     Shift, TimeMask, Reverse, Normalize, GainTransition, PolarityInversion, Gain)
 
@@ -18,7 +19,7 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) 
         elif aug == "Shift":
             transforms.append(Shift(min_shift=1.0, max_shift=2.0, shift_unit="seconds", rollover=True, fade_duration=0.01, p=1.0))
         elif aug == "TimeMask":
-            transforms.append(TimeMask(min_band_part=0.0, max_band_part=0.5, fade=True, p=1.0))
+            transforms.append(TimeMask(min_band_part=0.0, max_band_part=0.5, p=1.0))
         elif aug == "Reverse":
             transforms.append(Reverse(p=1.0))
         elif aug == "Normalize":
@@ -36,6 +37,7 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) 
     transform = Compose(transforms)
 
     # Apply the composed transform to the audio
-    audio_numpy = audio.numpy()
-    augmented_audio = transform(samples=audio_numpy, sample_rate=sr)
+    audio_numpy = np.ascontiguousarray(audio)
+    augmented_audio = transform(samples=audio_numpy, sample_rate=int(sr))
+    
     return torch.from_numpy(augmented_audio).float()
