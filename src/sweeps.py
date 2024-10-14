@@ -44,7 +44,8 @@ def make(config):
         test_size=general_config['test_size'], 
         seed=general_config['seed'], 
         inference_size=general_config['inference_size'],
-        augmentations_per_sample=general_config['num_train_transforms'],
+        # augmentations_per_sample=general_config['num_train_transforms'],
+        augmentations_per_sample=config.num_train_transforms,
         augmentation_probability=general_config['augmentation_probability'],
         augmentations=selected_augmentations
     )
