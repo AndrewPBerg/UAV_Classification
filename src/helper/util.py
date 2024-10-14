@@ -12,6 +12,7 @@ from transformers import ASTFeatureExtractor
 import warnings
 from .augmentations import apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
+import numpy as np
 
 import wandb
 
@@ -242,34 +243,34 @@ def train_test_split_custom(
     augmentations_per_sample: int = 3,
     augmentation_probability: float = 0.5,
     augmentations: list[str] = []
-):                          
+):
+    def split_dataset(data, val_size, test_size, inference_size, random_state=None):
+        train_size = 1.0 - (val_size + test_size + inference_size)
+        assert np.isclose(train_size + val_size + test_size + inference_size, 1.0), \
+            "The sum of val_size, test_size, and inference_size should be less than 1.0"
+        
+        n_samples = len(data)
+        n_train = int(n_samples * train_size)
+        n_val = int(n_samples * val_size)
+        n_test = int(n_samples * test_size)
+        n_inference = n_samples - n_train - n_val - n_test
+        
+        indices = np.random.RandomState(random_state).permutation(n_samples)
+        
+        train_indices = indices[:n_train]
+        val_indices = indices[n_train:n_train+n_val]
+        test_indices = indices[n_train+n_val:n_train+n_val+n_test]
+        inference_indices = indices[n_train+n_val+n_test:]
+        
+        return train_indices, val_indices, test_indices, inference_indices
+
     all_paths = list(Path(data_path).glob("*/*.wav"))  # Get all audio file paths
-    # print(f"all paths {all_paths}")
-    all_indices = list(range(len(all_paths)))
-    
     if len(all_paths) == 0:
         raise ValueError(f"No .wav files found in {data_path}. Please check the data path and file extensions.")
 
-
-    # First split: separate train+val from test+inference
-    train_val_indices, test_inference_indices = train_test_split(
-        all_indices,
-        test_size=test_size + inference_size,
-        random_state=seed
-    )
-
-    # Second split: separate train from val
-    train_indices, val_indices = train_test_split(
-        train_val_indices,
-        test_size=val_size / (1 - test_size - inference_size),
-        random_state=seed
-    )
-
-    # Third split: separate test from inference
-    test_indices, inference_indices = train_test_split(
-        test_inference_indices,
-        test_size=inference_size / (test_size + inference_size),
-        random_state=seed
+    # Split the dataset using our new function
+    train_indices, val_indices, test_indices, inference_indices = split_dataset(
+        all_paths, val_size, test_size, inference_size, random_state=seed
     )
 
     # Create new datasets based on the split indices
@@ -278,26 +279,27 @@ def train_test_split_custom(
     test_paths = [all_paths[i] for i in test_indices]
     inference_paths = [all_paths[i] for i in inference_indices]
 
-    
-    # train, test,val, inferences indices contain unique keys to the all_paths list, used in AudioDataset2 for Tensor loading
+    # Create AudioDataset instances
     train_dataset = AudioDataset(data_path,
-                                  train_paths,
-                                  feature_extractor,
-                                  augmentations_per_sample=augmentations_per_sample,
-                                  augmentation_probability=augmentation_probability,
-                                  augmentations=augmentations)
+                                 train_paths,
+                                 feature_extractor,
+                                 augmentations_per_sample=augmentations_per_sample,
+                                 augmentation_probability=augmentation_probability,
+                                 augmentations=augmentations)
     
     val_dataset = AudioDataset(data_path, 
-                                val_paths, 
-                                feature_extractor,
-                                augmentations_per_sample=augmentations_per_sample,
-                                augmentation_probability=augmentation_probability,
-                                augmentations=augmentations)
+                               val_paths, 
+                               feature_extractor,
+                               augmentations_per_sample=augmentations_per_sample,
+                               augmentation_probability=augmentation_probability,
+                               augmentations=augmentations)
     
     test_dataset = AudioDataset(data_path, test_paths, feature_extractor)
     inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor)
     
-    print(f"Lengths:Train: {len(train_dataset)}, Validation: {len(val_dataset)}, Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
+    print(f"Lengths: Train: {len(train_dataset)}, Validation: {len(val_dataset)}, "
+          f"Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
+    
     return train_dataset, val_dataset, test_dataset, inference_dataset
 
 def save_model(model: torch.nn.Module,
