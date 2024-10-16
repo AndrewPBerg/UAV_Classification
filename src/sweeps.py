@@ -42,16 +42,13 @@ def make(config):
         general_config['data_path'], 
         feature_extractor, 
         test_size=general_config['test_size'], 
-        # test_size=config.test_size,
         seed=general_config['seed'],
-        # inference_size=config.inference_size, 
         inference_size=general_config['inference_size'],
-        # augmentations_per_sample=general_config['num_train_transforms'],
         augmentations_per_sample=config.num_train_transforms,
-        # val_size=config.val_size,
         val_size=general_config['val_size'],
         augmentation_probability=general_config['augmentation_probability'],
-        augmentations=selected_augmentations
+        augmentations=selected_augmentations,
+        config=config
     )
 
     inference_loader = create_dataloader(inference_dataset, general_config['batch_size'])

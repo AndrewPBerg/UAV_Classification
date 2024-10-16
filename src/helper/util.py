@@ -42,7 +42,8 @@ class AudioDataset(Dataset):
                  augmentations_per_sample: int = 0,
                  augmentation_probability: float = 0.5,
                  augmentations: list[str] = [],
-                 num_channels: int = 1) -> None:
+                 num_channels: int = 1,
+                 config: dict = None) -> None:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -56,6 +57,7 @@ class AudioDataset(Dataset):
         self.augmentations_per_sample = augmentations_per_sample
         self.augmentation_probability = augmentation_probability
         self.standardize_audio_boolean = standardize_audio_boolean
+        self.config = config
 
         total_samples = (augmentations_per_sample + 1) * len(self.paths)
         self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
@@ -75,7 +77,7 @@ class AudioDataset(Dataset):
                     new_index = original_samples + i * self.augmentations_per_sample + j
                     self.class_indices.append(self.class_indices[i])
                     if len(augmentations) != 0:
-                        augmented_audio = apply_augmentations(self.audio_tensors[i], augmentations, self.target_sr)
+                        augmented_audio = apply_augmentations(self.audio_tensors[i], augmentations, self.target_sr, self.config)
                         self.audio_tensors[new_index] = augmented_audio
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
@@ -242,7 +244,8 @@ def train_test_split_custom(
     seed: int = 42, 
     augmentations_per_sample: int = 3,
     augmentation_probability: float = 0.5,
-    augmentations: list[str] = []
+    augmentations: list[str] = [],
+    config: dict = None
 ):
     def split_dataset(data, val_size, test_size, inference_size, random_state=None):
         train_size = 1.0 - (val_size + test_size + inference_size)
@@ -285,17 +288,19 @@ def train_test_split_custom(
                                  feature_extractor,
                                  augmentations_per_sample=augmentations_per_sample,
                                  augmentation_probability=augmentation_probability,
-                                 augmentations=augmentations)
+                                 augmentations=augmentations,
+                                 config=config)
     
     val_dataset = AudioDataset(data_path, 
                                val_paths, 
                                feature_extractor,
                                augmentations_per_sample=augmentations_per_sample,
                                augmentation_probability=augmentation_probability,
-                               augmentations=augmentations)
+                               augmentations=augmentations,
+                               config=config)
     
-    test_dataset = AudioDataset(data_path, test_paths, feature_extractor)
-    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor)
+    test_dataset = AudioDataset(data_path, test_paths, feature_extractor, config=config)
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
     
     print(f"Lengths: Train: {len(train_dataset)}, Validation: {len(val_dataset)}, "
           f"Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
@@ -338,3 +343,4 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 # if __name__ == "__main__":
 #     main()
+

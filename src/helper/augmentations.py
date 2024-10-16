@@ -3,7 +3,7 @@ import numpy as np
 from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, 
     Shift, TimeMask, Reverse, Normalize, GainTransition, PolarityInversion, Gain)
 
-def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) -> torch.Tensor:
+def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int, config: dict) -> torch.Tensor:
     if len(augmentations) == 0:
         print("No augmentations selected, returning original audio. Traceback: Augmentations.py, apply_random_augmentation()")
         return audio
@@ -11,9 +11,13 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int) 
     transforms = []
     for aug in augmentations:
         if aug == "PitchShift":
-            transforms.append(PitchShift(min_semitones=-12.0, max_semitones=12.0, p=1.0))
+            transforms.append(PitchShift(min_semitones=config['pitchShift_min_semitones'][0],
+                                         max_semitones=config['pitchShift_max_semitones'][0],
+                                         p=1.0))
         elif aug == "TimeStretch":
-            transforms.append(TimeStretch(min_rate=0.1, max_rate=0.9, p=1.0))
+            transforms.append(TimeStretch(min_rate=config['timeStretch_min_rate'][0],
+                                          max_rate=config['timeStretch_max_rate'][0],
+                                          p=1.0))
         elif aug == "AddGaussianNoise":
             transforms.append(AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=1.0))
         elif aug == "Shift":
