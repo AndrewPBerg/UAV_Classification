@@ -22,7 +22,8 @@ general:
   patience : 3
   num_train_transforms: 3
   augmentation_probability: 0.5 
-  augmentations: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
+  # augmentations: ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
+  augmentations: ["PitchShift", "TimeStretch"]
 
 # WandB solo run configutation (precedence over General)
 wandb:
@@ -43,27 +44,25 @@ sweep:
     goal: "maximize"
   parameters:
     learning_rate:
-      distribution: uniform
-      min: 0.0055
-      max: 0.0065
+      values: [0.006]
     num_augmentations:
       distribution: int_uniform
       min: 0
-      max: 2
+      max: 3
     num_train_transforms:
-      distribution: int_uniform
-      min: 0
-      max: 8
-    test_size: 
-      distribution: uniform
-      min: 0.2
-      max: 0.4
-    inference_size:
-      distribution: uniform
-      min: 0.1
-      max: 0.2
-    val_size:
-      distribution: uniform
-      min: 0.05
-      max: 0.1
+      values: [2]
+    pitchShift_min_semitones:
+      values: [[-12.0], [-9.0], [-6.0],[-3.0], [0]]
+    pitchShift_max_semitones:
+      values: [[0], [3.0],[6.0],[9.0], [12.0]]
+    timeStretch_min_rate:
+      values: [[0.1],[0.5],[0.8],[1]]
+    timeStretch_max_rate:
+      values: [[0.9],[1],[1.1],[1.25],[1.5],[1.75],[2]]
+    
+    
+    
+      # distribution: int_uniform
+      # min: 0
+      # max: 8
 
