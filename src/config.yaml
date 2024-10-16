@@ -37,7 +37,7 @@ wandb:
 
 # WandB sweep configuration
 sweep:
-  name: "AST : max 2 Augs, max 8 Trnsfrms"
+  name: "AST : pitchShift & timeStretch auto-tune"
   method: "random"
   metric:
     name: "test_acc"
@@ -46,17 +46,17 @@ sweep:
     learning_rate:
       values: [0.006]
     num_augmentations:
-      distribution: int_uniform
-      min: 0
-      max: 3
-    num_train_transforms:
       values: [2]
+    num_train_transforms:
+      distribution: int_uniform
+      min: 1
+      max: 3
     pitchShift_min_semitones:
       values: [[-12.0], [-9.0], [-6.0],[-3.0], [0]]
     pitchShift_max_semitones:
       values: [[0], [3.0],[6.0],[9.0], [12.0]]
     timeStretch_min_rate:
-      values: [[0.1],[0.5],[0.8],[1]]
+      values: [[0.1],[0.5],[0.8],[0.9]]
     timeStretch_max_rate:
       values: [[0.9],[1],[1.1],[1.25],[1.5],[1.75],[2]]
     
