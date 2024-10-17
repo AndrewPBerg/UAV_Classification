@@ -4,7 +4,7 @@ general:
   model_name: "MIT/ast-finetuned-audioset-10-10-0.4593"
   batch_size: 8
   seed: 42
-  num_cuda_workers: 0
+  num_cuda_workers: 2
   num_classes: 9
   epochs: 10
   save_model: false
@@ -15,23 +15,19 @@ general:
   val_size: 0.1
   shuffled : true
   accumulation_steps: 3
-  learning_rate: 0.001
+  learning_rate: 0.006
   patience : 3
-
 # Augmentations Configuration
-augmentations:
-  num_train_transforms: 3
+  augmentations_per_sample: 3
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
   augmentations: ["pitch_shift", "time_stretch"]
-  pitch_shift:
-    min_semitones: 0
-    max_semitones: 12.0
-    p: 1.0
-  time_stretch:
-    min_rate: 0.8
-    max_rate: 1.25
-    p: 1.0
-
+  # transform params must be inside list for augmentations.py to process corr
+  pitch_shift_min_rate: 0
+  pitch_shift_max_rate: 12.0
+  pitch_shift_p: 1.0
+  time_stretch_min_rate: 0.8
+  time_stretch_max_rate: 1.25
+  time_stretch_p: 1.0
 
 # Script Configuration (solo run)
 wandb:
@@ -59,13 +55,11 @@ sweep:
       distribution: int_uniform
       min: 1
       max: 3
-    pitch_shift:
-      min_rate:
-        values: [[-12.0], [-9.0], [-6.0],[-3.0], [0]]
-      max_rate:
-        values: [[0], [3.0],[6.0],[9.0], [12.0]]
-    time_stretch:
-      min_rate:
-        values: [[0.1],[0.5],[0.8],[0.9]]
-      max_rate:
-        values: [[0.9],[1],[1.1],[1.25],[1.5],[1.75],[2]]
+    pitch_shift_min_rate:
+      values: [-12.0, -9.0, -6.0, -3.0, 0]
+    pitch_shift_max_rate:
+      values: [0, 3.0, 6.0, 9.0, 12.0]
+    time_stretch_min_rate:
+      values: [0.1, 0.5, 0.8, 0.9]
+    time_stretch_max_rate:
+      values: [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]

@@ -25,8 +25,8 @@ def main():
     general_config = config['general']
     run_config = config['wandb']
 
-    data_path = general_config['data_path']
-    model_name = general_config["model_name"]
+    DATA_PATH = general_config['data_path']
+    MODEL_NAME = general_config["model_name"]
     BATCH_SIZE = general_config['batch_size']
     SEED = general_config['seed']
     EPOCHS = general_config['epochs']
@@ -34,13 +34,21 @@ def main():
     PINNED_MEMORY = True
     SHUFFLED = general_config['shuffled']
     ACCUMULATION_STEPS = general_config['accumulation_steps']
-    learning_rate = general_config['learning_rate']
+    LEARNING_RATE = general_config['learning_rate']
     TRAIN_PATIENCE = general_config['patience']
     SAVE_MODEL = general_config['save_model']
-    test_size = general_config['test_size']
-    inference_size = general_config['inference_size']
-    augmentations_per_sample= general_config['num_train_transforms']
-    augmentation_probability= general_config['augmentation_probability']
+    TEST_SIZE = general_config['test_size']
+    INFERENCE_SIZE = general_config['inference_size']
+    VAL_SIZE = general_config['val_size']
+    AUGMENTATIONS_PER_SAMPLE = general_config['augmentations_per_sample']
+    AUGMENTATIONS= general_config['augmentations']
+    # pitch_shift_min_rate= general_config['pitch_shift_min_rate']
+    # pitch_shift_max_rate= general_config['pitch_shift_max_rate']
+    # pitch_shift_p= general_config['pitch_shift_p']
+    # time_stretch_min_rate= general_config['time_stretch_min_rate']
+    # time_stretch_max_rate= general_config['time_stretch_max_rate']
+    # time_stretch_p= general_config['time_stretch_p']
+
 
 
     wandb_params = {
@@ -56,20 +64,26 @@ def main():
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
 
-    feature_extractor = auto_extractor(model_name)
+    feature_extractor = auto_extractor(MODEL_NAME)
 
     # dataset = AudioDataset(data_path, feature_extractor)
-    train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(data_path, 
-                                                                            feature_extractor, 
-                                                                            test_size=test_size, 
-                                                                            seed=SEED, 
-                                                                            inference_size=inference_size,
-                                                                            augmentations_per_sample=augmentations_per_sample,
-                                                                            augmentation_probability=augmentation_probability)
+    train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
+        DATA_PATH, 
+        feature_extractor, 
+        test_size=TEST_SIZE, 
+        seed=SEED,
+        inference_size=INFERENCE_SIZE,
+        augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
+        
+        val_size=VAL_SIZE,
+        augmentations=AUGMENTATIONS,
+        config=general_config
+    )
+
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
-    model = custom_AST(model_name, num_classes, device)
+    model = custom_AST(MODEL_NAME, num_classes, device)
 
     # summary(model,
     #         col_names=["num_params","trainable"],
@@ -102,7 +116,7 @@ def main():
 
     loss_fn = nn.CrossEntropyLoss()
 
-    optimizer = AdamW(model.parameters(), lr=learning_rate)
+    optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2) #TODO experiment w/ diff hyperparams
     wandb.init(

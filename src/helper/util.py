@@ -41,7 +41,7 @@ class AudioDataset(Dataset):
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
-                 config: dict = None) -> None:
+                 config: dict = None) -> Dataset:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
