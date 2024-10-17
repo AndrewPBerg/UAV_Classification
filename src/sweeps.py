@@ -16,50 +16,83 @@ with open('config.yaml', 'r') as file:
 
 # Access yaml general configuration 
 general_config = config['general']
+augmentations_config = config['augmentations']
+
+# Assign dictionary values to variables
+NUM_CUDA_WORKERS = general_config['num_cuda_workers']
+MODEL_NAME = general_config['model_name']
+DATA_PATH = general_config['data_path']
+TEST_SIZE = general_config['test_size']
+SEED = general_config['seed']
+INFERENCE_SIZE = general_config['inference_size']
+VAL_SIZE = general_config['val_size']
+BATCH_SIZE = general_config['batch_size']
+EPOCHS = general_config['epochs']
+ACCUMULATION_STEPS = general_config['accumulation_steps']
+PATIENCE = general_config['patience']
+PROJECT_NAME = general_config['project_name']
+SWEEP_COUNT = general_config['sweep_count']
+
+AUGMENTATIONS = augmentations_config['augmentations']
+# access transform parameters by indexing the variable with the parameter name
+# ex: PITCH_SHIFT_MIN_SEMITONES = PITCH_SHIFT['min_semitones']
+PITCH_SHIFT = augmentations_config['pitch_shift']
+TIME_STRETCH = augmentations_config['time_stretch']
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-def create_dataloader(dataset, batch_size, num_workers=general_config['num_cuda_workers'], shuffle=True):
+def create_dataloader(dataset, batch_size, num_workers=NUM_CUDA_WORKERS, shuffle=True):
     return DataLoader(dataset=dataset, 
                       batch_size=batch_size,
                       num_workers=num_workers,
                       pin_memory=True,
                       shuffle=shuffle)
+def get_augmentation_params(config, augmentations_config):
+    aug_params = {}
+
+    for aug in config.augmentations:
+        aug_params[aug] = {}
+        for param in config[aug]:
+            aug_params[aug][param] = random.choice(augmentations_config[aug][param])
+    return aug_params
 
 def make(config):
     # Make the data
-    feature_extractor = auto_extractor(general_config['model_name'])
+    feature_extractor = auto_extractor(MODEL_NAME)
+
+    # aug_params = get_augmentation_params(config, general_config, augmentations_config)
+    print(f"Config: {config}")
+    print(f"Config items: {config.items()}")
     # Get the selected augmentations directly from the config
     num_augmentations = config.num_augmentations
-    augmentation_list = general_config['augmentations']
-    selected_augmentations = random.sample(k=num_augmentations,population=augmentation_list)
+    selected_augmentations = random.sample(k=num_augmentations, population=AUGMENTATIONS)
     
     # Log the selected augmentations
     wandb.log({"selected_augmentations": selected_augmentations})
 
     # Updated dataset loading to match new format
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
-        general_config['data_path'], 
+        DATA_PATH, 
         feature_extractor, 
-        test_size=general_config['test_size'], 
-        seed=general_config['seed'],
-        inference_size=general_config['inference_size'],
+        test_size=TEST_SIZE, 
+        seed=SEED,
+        inference_size=INFERENCE_SIZE,
         augmentations_per_sample=config.num_train_transforms,
-        val_size=general_config['val_size'],
-        augmentation_probability=general_config['augmentation_probability'],
+        val_size=VAL_SIZE,
         augmentations=selected_augmentations,
         config=config
     )
 
-    inference_loader = create_dataloader(inference_dataset, general_config['batch_size'])
-    train_loader = create_dataloader(train_dataset, general_config['batch_size'])
-    val_loader = create_dataloader(val_dataset, general_config['batch_size'])
-    test_loader = create_dataloader(test_dataset, general_config['batch_size'])
+    inference_loader = create_dataloader(inference_dataset, BATCH_SIZE)
+    train_loader = create_dataloader(train_dataset, BATCH_SIZE)
+    val_loader = create_dataloader(val_dataset, BATCH_SIZE)
+    test_loader = create_dataloader(test_dataset, BATCH_SIZE)
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes())
 
     # Make the model
-    model = custom_AST(general_config['model_name'], num_classes, device)
+    model = custom_AST(MODEL_NAME, num_classes, device)
 
     # Make the loss and optimizer
     criterion = nn.CrossEntropyLoss()
@@ -80,14 +113,14 @@ def model_pipeline(config=None):
                         train_dataloader=train_loader,
                         test_dataloader=test_loader,
                         val_dataloader=val_loader,
-                        optimizer=optimizer, # type: ignore
+                        optimizer=optimizer,
                         scheduler=scheduler, # type: ignore
                         loss_fn=criterion,
-                        epochs=general_config['epochs'],
+                        epochs=EPOCHS,
                         device=device,
                         num_classes=num_classes,
-                        accumulation_steps=general_config['accumulation_steps'], # type: ignore
-                        patience=general_config['patience'])
+                        accumulation_steps=ACCUMULATION_STEPS,
+                        patience=PATIENCE)
 
         inference_loop(model=model,
                        device=device,
@@ -97,13 +130,13 @@ def model_pipeline(config=None):
     return model, results
 
 def main():
-    torch.manual_seed(general_config['seed'])
-    torch.cuda.manual_seed(general_config['seed'])
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
 
     wandb_login()
 
-    sweep_id = wandb.sweep(config['sweep'], project=general_config['project_name'])
-    wandb.agent(sweep_id, model_pipeline, count=general_config['sweep_count'])
+    sweep_id = wandb.sweep(config['sweep'], project=PROJECT_NAME)
+    wandb.agent(sweep_id, model_pipeline, count=SWEEP_COUNT)
 
 if __name__ == "__main__":
     main()

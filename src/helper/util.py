@@ -3,7 +3,6 @@ from torch.utils.data import Dataset
 from pathlib import Path
 import torchaudio
 import torch
-from sklearn.model_selection import train_test_split
 import random
 import matplotlib.pyplot as plt
 import librosa
@@ -40,7 +39,6 @@ class AudioDataset(Dataset):
                  target_sr: int=44100, 
                  target_duration: int=5, 
                  augmentations_per_sample: int = 0,
-                 augmentation_probability: float = 0.5,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
                  config: dict = None) -> None:
@@ -55,7 +53,6 @@ class AudioDataset(Dataset):
         self.target_duration = target_duration
         self.target_length = target_duration * target_sr
         self.augmentations_per_sample = augmentations_per_sample
-        self.augmentation_probability = augmentation_probability
         self.standardize_audio_boolean = standardize_audio_boolean
         self.config = config
 
@@ -243,7 +240,6 @@ def train_test_split_custom(
     inference_size: float = 0.1,
     seed: int = 42, 
     augmentations_per_sample: int = 3,
-    augmentation_probability: float = 0.5,
     augmentations: list[str] = [],
     config: dict = None
 ):
@@ -256,7 +252,6 @@ def train_test_split_custom(
         n_train = int(n_samples * train_size)
         n_val = int(n_samples * val_size)
         n_test = int(n_samples * test_size)
-        n_inference = n_samples - n_train - n_val - n_test
         
         indices = np.random.RandomState(random_state).permutation(n_samples)
         
@@ -287,7 +282,6 @@ def train_test_split_custom(
                                  train_paths,
                                  feature_extractor,
                                  augmentations_per_sample=augmentations_per_sample,
-                                 augmentation_probability=augmentation_probability,
                                  augmentations=augmentations,
                                  config=config)
     
@@ -295,7 +289,6 @@ def train_test_split_custom(
                                val_paths, 
                                feature_extractor,
                                augmentations_per_sample=augmentations_per_sample,
-                               augmentation_probability=augmentation_probability,
                                augmentations=augmentations,
                                config=config)
     

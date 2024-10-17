@@ -10,13 +10,13 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int, 
 
     transforms = []
     for aug in augmentations:
-        if aug == "PitchShift":
-            transforms.append(PitchShift(min_semitones=config['pitchShift_min_semitones'][0],
-                                         max_semitones=config['pitchShift_max_semitones'][0],
+        if aug == "pitch_shift":
+            transforms.append(PitchShift(min_semitones=config['pitch_shift']['min_rate'][0],
+                                         max_semitones=config['pitch_shift']['max_rate'][0],
                                          p=1.0))
-        elif aug == "TimeStretch":
-            transforms.append(TimeStretch(min_rate=config['timeStretch_min_rate'][0],
-                                          max_rate=config['timeStretch_max_rate'][0],
+        elif aug == "time_stretch":
+            transforms.append(TimeStretch(min_rate=config['time_stretch']['min_rate'][0],
+                                          max_rate=config['time_stretch']['max_rate'][0],
                                           p=1.0))
         elif aug == "AddGaussianNoise":
             transforms.append(AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=1.0))
@@ -45,3 +45,10 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int, 
     augmented_audio = transform(samples=audio_numpy, sample_rate=int(sr))
     
     return torch.from_numpy(augmented_audio).float()
+
+def pitch_shift(audio: torch.Tensor, sr: int, config: dict):
+    try:
+            return PitchShift(min_semitones=config['pitchShift_min_semitones'][0],
+                            max_semitones=config['pitchShift_max_semitones'][0],
+                        p=1.0)
+    except Exception as e:
