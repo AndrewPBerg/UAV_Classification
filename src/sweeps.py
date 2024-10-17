@@ -104,9 +104,9 @@ def model_pipeline(config=None):
         mixed_params = get_mixed_params(config, general_config)
 
         # Assign dictionary values to variables
-        EPOCHS = mixed_params['epochs']
-        ACCUMULATION_STEPS = mixed_params['accumulation_steps']
-        PATIENCE = mixed_params['patience']
+        EPOCHS = mixed_params['epochs'] #type: ignore indexing wandb config is not typed for some reason :(
+        ACCUMULATION_STEPS = mixed_params['accumulation_steps'] #type: ignore
+        PATIENCE = mixed_params['patience'] #type: ignore
 
         model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes = make(mixed_params)
         print(model)
@@ -118,11 +118,11 @@ def model_pipeline(config=None):
                         optimizer=optimizer,
                         scheduler=scheduler, # type: ignore
                         loss_fn=criterion,
-                        epochs=EPOCHS,
+                        epochs=EPOCHS,#type: ignore
                         device=device,
                         num_classes=num_classes,
-                        accumulation_steps=ACCUMULATION_STEPS,
-                        patience=PATIENCE)
+                        accumulation_steps=ACCUMULATION_STEPS,#type: ignore
+                        patience=PATIENCE)#type: ignore
 
         inference_loop(model=model,
                        device=device,
