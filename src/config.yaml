@@ -20,7 +20,7 @@ general:
   patience : 3
   
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 3
+  augmentations_per_sample: 1
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
   augmentations: ["pitch_shift", "time_stretch"]
   # transform params must be inside list for augmentations.py to process corr

@@ -68,7 +68,8 @@ class AudioDataset(Dataset):
         self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
         self.class_indices = []
 
-        self.composed_transform = create_augmentation_pipeline(augmentations, self.config)
+        if self.augmentations_per_sample > 0:
+            self.composed_transform = create_augmentation_pipeline(augmentations, self.config)
 
         # Load original audio samples
         for index, path in enumerate(self.paths):
@@ -76,7 +77,9 @@ class AudioDataset(Dataset):
             self.audio_tensors[index] = audio_to_append
             self.class_indices.append(class_idx)
 
-        # Apply augmentations
+        # Apply augmentations 
+        # TODO refactor following this guide using torch.cat once after all augmentations are generated
+        # sourse https://discuss.pytorch.org/t/appending-to-a-tensor/2665/3 
         if self.augmentations_per_sample > 0:
             original_samples = len(self.paths)
             for i in range(original_samples):
@@ -86,8 +89,14 @@ class AudioDataset(Dataset):
                     if len(augmentations) != 0:
                         augmented_audio = apply_augmentations(self.audio_tensors[i], self.composed_transform, self.target_sr)
                         self.audio_tensors[new_index] = augmented_audio
+                        # self.audio_tensors.append(augmented_audio())
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
+                        # self.audio_tensors.append(self.audio_tensors[i])
+
+        # if self.augmentations_per_sample > 0:
+        #     outputs = []
+
 
         # Ensure audio_tensors and class_indices have the same length
         assert len(self.audio_tensors) == len(self.class_indices), "Mismatch between audio_tensors and class_indices"
@@ -251,7 +260,7 @@ def train_test_split_custom(
     inference_size: float = 0.1,
     seed: int = 42, 
     augmentations_per_sample: int = 3,
-    augmentations: list[str] = [],
+    augmentations: list[str] = None,
     config: dict = None # type: ignore
 ):
     def split_dataset(data, val_size, test_size, inference_size, random_state=None):

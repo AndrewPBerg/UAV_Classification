@@ -68,7 +68,6 @@ def main():
         seed=SEED,
         inference_size=INFERENCE_SIZE,
         augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
-        
         val_size=VAL_SIZE,
         augmentations=AUGMENTATIONS,
         config=general_config
