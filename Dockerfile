@@ -54,13 +54,15 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # Create a volume for datasets
-VOLUME ["/app/src/.datasets"]
+VOLUME ["/app/src/datasets"]
 
 # Set the default command
 CMD ["/bin/bash"]
 
 # Build and run commands (commented out):
-# $env:DOCKER_BUILDKIT=1; docker build -f Dockerfile -t ast_script .
-# docker run -it --rm --gpus all -v C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo:/app -w /app ast_script python3 src/script.py
-# docker run -it --rm --gpus all -v C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo:/app -w /app ast_script
-# docker run -it --rm --gpus all -v C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/src/.datasets:/app/src/.datasets -w /app ast_script
+    # sudo docker compose build app
+    # sudo docker compose run app
+
+# prune commands
+    # sudo docker image prune
+    # sudo docker container prune

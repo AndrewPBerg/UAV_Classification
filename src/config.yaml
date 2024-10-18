@@ -17,7 +17,8 @@ general:
   accumulation_steps: 3
   learning_rate: 0.006
   patience : 3
-# Augmentations Configuration
+  
+  # Augmentations Configuration (still under general config)
   augmentations_per_sample: 3
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
   augmentations: ["pitch_shift", "time_stretch"]

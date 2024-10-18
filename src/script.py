@@ -6,15 +6,15 @@ from helper.model import auto_extractor, custom_AST
 import torch
 from torch.utils.data import DataLoader
 from torch.optim.adamw import AdamW
-# import torch.optim as optim # type: ignore
 import torch.nn as nn
 # from torchinfo import summary
 import yaml
-
+from timeit import default_timer as timer 
 import wandb
 
 def main():
 
+    start = timer()
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
@@ -113,6 +113,15 @@ def main():
                                     num_workers=NUM_CUDA_WORKERS,
                                     pin_memory=PINNED_MEMORY,
                                     shuffle=SHUFFLED) 
+    end = timer()
+    total_load_time = end - start
+    hours = int(total_load_time // 3600)
+    minutes = int((total_load_time % 3600) // 60)
+    seconds = int(total_load_time % 60)
+    formatted_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+    print(f"Load time in on path: {DATA_PATH} --> {total_load_time}")
+    if wandb.run is not None:
+        wandb.log({"train_time": formatted_time})
 
     loss_fn = nn.CrossEntropyLoss()
 
