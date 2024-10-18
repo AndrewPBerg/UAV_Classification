@@ -1,6 +1,6 @@
 # General configuration 
 general:
-  data_path: "/app/src/datasets/UAV_Dataset_9"
+  data_path: "/app/src/datasets/UAV_Dataset_31"
   model_name: "MIT/ast-finetuned-audioset-10-10-0.4593"
   batch_size: 8
   seed: 42
