@@ -1,5 +1,5 @@
 # DESCRIPTION
-from helper.util import train_test_split_custom, save_model, wandb_login
+from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time
 from helper.engine import train, inference_loop
 from helper.model import auto_extractor, custom_AST
 
@@ -14,7 +14,9 @@ import wandb
 
 def main():
 
+    # start logging data load time
     start = timer()
+    
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
@@ -31,7 +33,7 @@ def main():
     SEED = general_config['seed']
     EPOCHS = general_config['epochs']
     NUM_CUDA_WORKERS = general_config['num_cuda_workers']
-    PINNED_MEMORY = True
+    PINNED_MEMORY = general_config['pinned_memory']
     SHUFFLED = general_config['shuffled']
     ACCUMULATION_STEPS = general_config['accumulation_steps']
     LEARNING_RATE = general_config['learning_rate']
@@ -42,14 +44,6 @@ def main():
     VAL_SIZE = general_config['val_size']
     AUGMENTATIONS_PER_SAMPLE = general_config['augmentations_per_sample']
     AUGMENTATIONS= general_config['augmentations']
-    # pitch_shift_min_rate= general_config['pitch_shift_min_rate']
-    # pitch_shift_max_rate= general_config['pitch_shift_max_rate']
-    # pitch_shift_p= general_config['pitch_shift_p']
-    # time_stretch_min_rate= general_config['time_stretch_min_rate']
-    # time_stretch_max_rate= general_config['time_stretch_max_rate']
-    # time_stretch_p= general_config['time_stretch_p']
-
-
 
     wandb_params = {
             "project": run_config['project'],
@@ -114,14 +108,10 @@ def main():
                                     pin_memory=PINNED_MEMORY,
                                     shuffle=SHUFFLED) 
     end = timer()
-    total_load_time = end - start
-    hours = int(total_load_time // 3600)
-    minutes = int((total_load_time % 3600) // 60)
-    seconds = int(total_load_time % 60)
-    formatted_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+    total_load_time = calculated_load_time(start, end)
     print(f"Load time in on path: {DATA_PATH} --> {total_load_time}")
     if wandb.run is not None:
-        wandb.log({"train_time": formatted_time})
+        wandb.log({"load_time": total_load_time})
 
     loss_fn = nn.CrossEntropyLoss()
 

@@ -3,10 +3,10 @@ import numpy as np
 from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, 
     Shift, TimeMask, Reverse, Normalize, GainTransition, PolarityInversion, Gain)
 
-def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int, config: dict) -> torch.Tensor:
+def create_augmentation_pipeline(augmentations: list[str], config: dict):
     if len(augmentations) == 0:
         print("No augmentations selected, returning original audio. Traceback: Augmentations.py, apply_random_augmentation()")
-        return audio
+        return None
 
     transforms = []
     for aug in augmentations:
@@ -36,9 +36,18 @@ def apply_augmentations(audio: torch.Tensor, augmentations: list[str], sr: int, 
             transforms.append(Gain(min_gain_db=-12, max_gain_db=0, p=1.0))
         else:
             print(f"Unknown augmentation: {aug}. Skipping.")
+        
+        # Compose all the selected transforms
+        transform = Compose(transforms)
 
-    # Compose all the selected transforms
-    transform = Compose(transforms)
+        return transform
+
+
+
+def apply_augmentations(audio: torch.Tensor, transform, sr: int) -> torch.Tensor:
+
+
+
 
     # Apply the composed transform to the audio
     audio_numpy = np.ascontiguousarray(audio)

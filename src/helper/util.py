@@ -9,11 +9,19 @@ import librosa
 from typing import Optional
 from transformers import ASTFeatureExtractor
 import warnings
-from .augmentations import apply_augmentations      # Assume this function exists
+from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
 import numpy as np
 
 import wandb
+
+def calculated_load_time(start, end) -> str:
+    total_load_time = end - start
+    hours = int(total_load_time // 3600)
+    minutes = int((total_load_time % 3600) // 60)
+    seconds = int(total_load_time % 60)
+    formatted_time = f"{hours:02}:{minutes:02}:{seconds:02}"
+    return formatted_time
 
 def wandb_login():
     api_key = os.environ.get('WANDB_API_KEY')
@@ -41,7 +49,7 @@ class AudioDataset(Dataset):
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
-                 config: dict = None) -> Dataset:
+                 config: dict = None) -> Dataset: # type: ignore
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -60,6 +68,8 @@ class AudioDataset(Dataset):
         self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
         self.class_indices = []
 
+        self.composed_transform = create_augmentation_pipeline(augmentations, self.config)
+
         # Load original audio samples
         for index, path in enumerate(self.paths):
             audio_to_append, class_idx = self.load_audio(path)
@@ -74,13 +84,14 @@ class AudioDataset(Dataset):
                     new_index = original_samples + i * self.augmentations_per_sample + j
                     self.class_indices.append(self.class_indices[i])
                     if len(augmentations) != 0:
-                        augmented_audio = apply_augmentations(self.audio_tensors[i], augmentations, self.target_sr, self.config)
+                        augmented_audio = apply_augmentations(self.audio_tensors[i], self.composed_transform, self.target_sr)
                         self.audio_tensors[new_index] = augmented_audio
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
 
         # Ensure audio_tensors and class_indices have the same length
         assert len(self.audio_tensors) == len(self.class_indices), "Mismatch between audio_tensors and class_indices"
+
     def load_audio(self, path:str):
         "load audio from path, return raw tensor"
     
@@ -241,7 +252,7 @@ def train_test_split_custom(
     seed: int = 42, 
     augmentations_per_sample: int = 3,
     augmentations: list[str] = [],
-    config: dict = None
+    config: dict = None # type: ignore
 ):
     def split_dataset(data, val_size, test_size, inference_size, random_state=None):
         train_size = 1.0 - (val_size + test_size + inference_size)
