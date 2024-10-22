@@ -54,7 +54,7 @@ def make(config):
     AUGMENTATIONS = config['augmentations']
 
     NUM_AUGMENTATIONS = config['num_augmentations']
-    AUGMENTATIONS_PER_SAMPLE = config['num_train_transforms']
+    AUGMENTATIONS_PER_SAMPLE = config['augmentations_per_sample']
     LEARNING_RATE = config['learning_rate']
     NUM_CUDA_WORKERS = config['num_cuda_workers']
     feature_extractor = auto_extractor(MODEL_NAME)

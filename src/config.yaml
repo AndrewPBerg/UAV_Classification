@@ -53,7 +53,7 @@ sweep:
       values: [0.006]
     num_augmentations:
       values: [2]
-    num_train_transforms:
+    augmentations_per_sample:
       distribution: int_uniform
       min: 1
       max: 3
