@@ -1,6 +1,6 @@
 from transformers import (
     ASTFeatureExtractor, ASTForAudioClassification, AutoFeatureExtractor, AutoModel, 
-    Wav2Vec2BertForSequenceClassification, Wav2Vec2BertModel
+    Wav2Vec2BertForSequenceClassification, Wav2Vec2BertModel, Wav2Vec2Processor, AutoFeatureExtractor
 )
 from torch import nn
 import os
@@ -22,14 +22,38 @@ class AudioClassifier(nn.Module):
         self, 
         num_classes: int,
         pretrained_model_name: str = "facebook/w2v-bert-2.0",
-        dropout_rate: float = 0.1
+        dropout_rate: float = 0.1,
+        cache_dir: str = CACHE_DIR
     ):
         super().__init__()
         
-        self.wav2vec = Wav2Vec2BertModel.from_pretrained(pretrained_model_name)
-        self.processor = AutoFeatureExtractor.from_pretrained(pretrained_model_name)
+        try:
+            # Try to load from cache first
+            self.wav2vec = Wav2Vec2BertForSequenceClassification.from_pretrained(
+                pretrained_model_name,
+                cache_dir=cache_dir,
+                local_files_only=True
+            )
+            self.processor = AutoFeatureExtractor.from_pretrained(
+                pretrained_model_name,
+                cache_dir=cache_dir,
+                local_files_only=True
+            )
+            print(f"processor: {self.processor}")
+        except OSError:
+            # If not in cache, download and save
+            logger.info(f"Model not found in cache. Downloading {pretrained_model_name}")
+            self.wav2vec = Wav2Vec2BertForSequenceClassification.from_pretrained(pretrained_model_name, cache_dir=cache_dir)
+            self.processor = AutoFeatureExtractor.from_pretrained(pretrained_model_name, cache_dir=cache_dir)
         
         hidden_size = self.wav2vec.config.hidden_size
+        
+        # Use Sequential for better organization and potential performance
+        self.feature_projector = nn.Sequential(
+            nn.Linear(hidden_size, hidden_size),
+            nn.LayerNorm(hidden_size),
+            nn.GELU()
+        )
         
         self.classifier = nn.Sequential(
             nn.Dropout(dropout_rate),
@@ -38,6 +62,11 @@ class AudioClassifier(nn.Module):
             nn.Dropout(dropout_rate),
             nn.Linear(hidden_size // 2, num_classes)
         )
+        
+        # Update model config
+        self.wav2vec.config.num_labels = num_classes
+        self.wav2vec.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
+        self.wav2vec.config.label2id = {v: k for k, v in self.wav2vec.config.id2label.items()}
         
     def forward(
         self,
@@ -71,9 +100,13 @@ def get_model_and_processor(model_name: str, num_classes: int, device: str):
         model, processor = custom_AST(num_classes, device)
         logger.info(f"Loading AST model from cache: {CACHE_DIR}")
     elif model_name == "BERT":
-        model = AudioClassifier(num_classes=num_classes, pretrained_model_name=pretrained_BERT_model)
-        processor = AutoFeatureExtractor.from_pretrained(pretrained_BERT_model, cache_dir=CACHE_DIR)
+        model = AudioClassifier(
+            num_classes=num_classes,
+            pretrained_model_name=pretrained_BERT_model,
+            cache_dir=CACHE_DIR
+        )
         model = model.to(device)
+        processor = model.processor  # Use the processor from AudioClassifier
         logger.info(f"Loading BERT model from cache: {CACHE_DIR}")
     else:
         raise ValueError(f"Unsupported model type: {model_name}")

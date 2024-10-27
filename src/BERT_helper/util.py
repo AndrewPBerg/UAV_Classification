@@ -6,8 +6,8 @@ import torch
 import random
 import matplotlib.pyplot as plt
 import librosa
-from typing import Optional
-from transformers import ASTFeatureExtractor
+from typing import Optional, Union
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor
 import warnings
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
@@ -42,9 +42,9 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: ASTFeatureExtractor, 
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
                  standardize_audio_boolean: bool=True, 
-                 target_sr: int=44100, 
+                 target_sr: int=16000,  # Changed to match Wav2Vec2 requirements
                  target_duration: int=5, 
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
@@ -135,20 +135,25 @@ class AudioDataset(Dataset):
             return len(self.paths)
         
     def feature_extraction(self, audio_tensor):
-        # Handle both feature_extractor and processor types
-        if hasattr(self.feature_extractor, 'process'):
-            features = self.feature_extractor.process(
-                audio_tensor.squeeze().numpy(), 
-                sampling_rate=16000, 
-                return_tensors="pt"
-            ).input_values
-        else:
+        """Process audio tensor for model input."""
+        audio_np = audio_tensor.squeeze().numpy()
+        
+        if isinstance(self.feature_extractor, ASTFeatureExtractor):
+            # For AST feature extractor
             features = self.feature_extractor(
-                audio_tensor.squeeze().numpy(), 
-                sampling_rate=16000, 
+                audio_np,
+                sampling_rate=self.target_sr,
                 return_tensors="pt"
-            ).input_values
-        return features
+            )
+            return features.input_values
+        else:
+            # For Wav2Vec2 processor
+            features = self.feature_extractor(
+                audio_np,
+                sampling_rate=self.target_sr,
+                return_tensors="pt"
+            )
+            return features.input_values.squeeze(0)
 
     def __getitem__(self, index) -> tuple[torch.Tensor, int]:
         features = self.feature_extraction(self.audio_tensors[index])
@@ -368,5 +373,7 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 # if __name__ == "__main__":
 #     main()
+
+
 
 
