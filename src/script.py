@@ -1,7 +1,7 @@
 # DESCRIPTION
 from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time
 from helper.engine import train, inference_loop
-from helper.model import auto_extractor, custom_AST
+from helper.model import get_model_and_processor
 
 import torch
 from torch.utils.data import DataLoader
@@ -22,13 +22,10 @@ def main():
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
 
-    wandb_login()
-
     general_config = config['general']
     run_config = config['wandb']
 
     DATA_PATH = general_config['data_path']
-    MODEL_NAME = general_config["model_name"]
     BATCH_SIZE = general_config['batch_size']
     SEED = general_config['seed']
     EPOCHS = general_config['epochs']
@@ -44,21 +41,27 @@ def main():
     VAL_SIZE = general_config['val_size']
     AUGMENTATIONS_PER_SAMPLE = general_config['augmentations_per_sample']
     AUGMENTATIONS= general_config['augmentations']
+    MODEL_NAME = general_config["model_name"]
+    USE_WANDB = general_config['use_wandb']
+    NUM_CLASSES = general_config['num_classes']
 
-    wandb_params = {
-            "project": run_config['project'],
-            "name": run_config['name'],
-            "reinit": run_config['reinit'],
-            "notes" : run_config['notes'],
-            "tags": run_config['tags'],
-            "dir" : run_config['dir'],
-            "config": general_config
-        }
+    if USE_WANDB:
+        wandb_login()
+        
+        wandb_params = {
+                "project": run_config['project'],
+                "name": run_config['name'],
+                "reinit": run_config['reinit'],
+                "notes" : run_config['notes'],
+                "tags": run_config['tags'],
+                "dir" : run_config['dir'],
+                "config": general_config
+            }
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
 
-    feature_extractor = auto_extractor(MODEL_NAME)
+    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES, device)
 
     # dataset = AudioDataset(data_path, feature_extractor)
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
@@ -75,8 +78,6 @@ def main():
 
 
     num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
-
-    model = custom_AST(MODEL_NAME, num_classes, device)
 
     # summary(model,
     #         col_names=["num_params","trainable"],
@@ -117,7 +118,9 @@ def main():
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
 
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2) #TODO experiment w/ diff hyperparams
-    wandb.init(
+
+    if USE_WANDB:
+        wandb.init(
             project=wandb_params.get("project"),
             config=wandb_params.get("config"),
             name=wandb_params.get("name"),
@@ -150,7 +153,8 @@ def main():
 
 
 
-    wandb.finish()
+    if USE_WANDB:
+        wandb.finish()
 
     if SAVE_MODEL:
         save_model(model=model,

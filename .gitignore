@@ -8,6 +8,7 @@ datasets/
 */output/
 server_login.txt
 .research_tables/
+model_cache/
 
  
 
