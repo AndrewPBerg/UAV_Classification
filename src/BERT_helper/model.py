@@ -31,6 +31,7 @@ class AudioClassifier(nn.Module):
             # Try to load from cache first
             self.wav2vec = Wav2Vec2BertForSequenceClassification.from_pretrained(
                 pretrained_model_name,
+                num_labels=num_classes,
                 cache_dir=cache_dir,
                 local_files_only=True
             )
@@ -43,8 +44,15 @@ class AudioClassifier(nn.Module):
         except OSError:
             # If not in cache, download and save
             logger.info(f"Model not found in cache. Downloading {pretrained_model_name}")
-            self.wav2vec = Wav2Vec2BertForSequenceClassification.from_pretrained(pretrained_model_name, cache_dir=cache_dir)
-            self.processor = AutoFeatureExtractor.from_pretrained(pretrained_model_name, cache_dir=cache_dir)
+            self.wav2vec = Wav2Vec2BertForSequenceClassification.from_pretrained(
+                pretrained_model_name,
+                num_labels=num_classes,
+                cache_dir=cache_dir
+            )
+            self.processor = AutoFeatureExtractor.from_pretrained(
+                pretrained_model_name,
+                cache_dir=cache_dir
+            )
         
         hidden_size = self.wav2vec.config.hidden_size
         
@@ -68,30 +76,27 @@ class AudioClassifier(nn.Module):
         self.wav2vec.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
         self.wav2vec.config.label2id = {v: k for k, v in self.wav2vec.config.id2label.items()}
         
-    def forward(
-        self,
-        input_values: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        return_features: bool = False
-    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
-        outputs = self.wav2vec(
-            input_values=input_values,
-            attention_mask=attention_mask,
-            return_dict=True
-        )
+    def forward(self, x):
+        """
+        Forward pass of the model.
+        Args:
+            x: Input tensor of shape (batch_size, sequence_length)
+        """
+        # The model expects the input as a dictionary with 'input_values' key
+        outputs = self.wav2vec(input_values=x)
         
+        # Get the hidden states
         last_hidden_state = outputs.last_hidden_state
         
-        if attention_mask is not None:
-            mask = attention_mask.unsqueeze(-1).float()
-            pooled = (last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1)
-        else:
-            pooled = last_hidden_state.mean(dim=1)
-            
-        logits = self.classifier(pooled)
+        # Apply mean pooling
+        pooled = torch.mean(last_hidden_state, dim=1)
         
-        if return_features:
-            return logits, pooled
+        # Project features
+        projected = self.feature_projector(pooled)
+        
+        # Get final logits
+        logits = self.classifier(projected)
+        
         return logits
 
 # Modify the get_model_and_processor function to use the new AudioClassifier

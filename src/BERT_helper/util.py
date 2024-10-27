@@ -50,6 +50,7 @@ class AudioDataset(Dataset):
                  augmentations: list[str] = [],
                  num_channels: int = 1,
                  config: dict = None) -> Dataset: # type: ignore
+        print(f"Initializing AudioDataset with feature_extractor type: {type(feature_extractor)}")
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -136,32 +137,47 @@ class AudioDataset(Dataset):
         
     def feature_extraction(self, audio_tensor):
         """Process audio tensor for model input."""
+        print(f"Processing audio tensor with shape: {audio_tensor.shape}")
         audio_np = audio_tensor.squeeze().numpy()
         
-        if isinstance(self.feature_extractor, ASTFeatureExtractor):
+        try:
             # For AST feature extractor
-            features = self.feature_extractor(
-                audio_np,
-                sampling_rate=self.target_sr,
-                return_tensors="pt"
-            )
-            return features.input_values
-        else:
-            # For Wav2Vec2 processor
-            features = self.feature_extractor(
-                audio_np,
-                sampling_rate=self.target_sr,
-                return_tensors="pt"
-            )
-            return features.input_values.squeeze(0)
+            if isinstance(self.feature_extractor, ASTFeatureExtractor):
+                features = self.feature_extractor(
+                    audio_np,
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt"
+                )
+                return features.input_values.squeeze(0)
+            else:
+                # For Wav2Vec2 processor
+                features = self.feature_extractor(
+                    audio_np,
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt",
+                    padding=True
+                )
+                # For Wav2Vec2 models, we want to return the raw processed audio
+                if isinstance(features, dict) and 'input_values' in features:
+                    return features['input_values'].squeeze(0)
+                else:
+                    # If it's not a dict or doesn't have input_values, return the processed audio directly
+                    return torch.tensor(audio_np, dtype=torch.float32)
+        except Exception as e:
+            print(f"Error in feature extraction: {str(e)}")
+            print(f"Feature extractor type: {type(self.feature_extractor)}")
+            print(f"Audio tensor shape: {audio_tensor.shape}")
+            print(f"Audio tensor dtype: {audio_tensor.dtype}")
+            raise
 
     def __getitem__(self, index) -> tuple[torch.Tensor, int]:
-        features = self.feature_extraction(self.audio_tensors[index])
-        
-        if self.audio_tensors[index].shape[0] == 1:
-            features = features.squeeze(dim=0)
-        
-        return features, self.class_indices[index]
+        try:
+            features = self.feature_extraction(self.audio_tensors[index])
+            return features, self.class_indices[index]
+        except Exception as e:
+            print(f"Error in __getitem__ for index {index}: {str(e)}")
+            print(f"Audio tensor shape: {self.audio_tensors[index].shape}")
+            raise
 
     def get_classes(self) -> list[str]:
         return self.classes
@@ -373,6 +389,9 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 # if __name__ == "__main__":
 #     main()
+
+
+
 
 
 
