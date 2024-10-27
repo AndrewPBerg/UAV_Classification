@@ -26,7 +26,7 @@ ground_truth_all, predictions_all = [], []
 def train_step(model: torch.nn.Module, 
                dataloader: torch.utils.data.DataLoader, 
                loss_fn: torch.nn.Module, 
-               optimizer: torch.optim.Optimizer, # type: ignore
+               optimizer: torch.optim.Optimizer,
                device: str,
                accumulation_steps: int,
                precision_metric,
@@ -39,8 +39,10 @@ def train_step(model: torch.nn.Module,
 
     for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
+        
+        # Handle both direct logits and model outputs with .logits attribute
         outputs = model(X)
-        y_pred = outputs.logits
+        y_pred = outputs.logits if hasattr(outputs, 'logits') else outputs
 
         loss = loss_fn(y_pred, y) / accumulation_steps
         loss.backward()
@@ -83,8 +85,10 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
+            
+            # Handle both direct logits and model outputs with .logits attribute
             outputs = model(X)
-            y_pred = outputs.logits
+            y_pred = outputs.logits if hasattr(outputs, 'logits') else outputs
 
             loss = loss_fn(y_pred, y)
             test_loss += loss.item()

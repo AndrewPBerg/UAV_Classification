@@ -1,10 +1,12 @@
 from transformers import (
     ASTFeatureExtractor, ASTForAudioClassification, AutoFeatureExtractor, AutoModel, 
-    Wav2Vec2BertForSequenceClassification
+    Wav2Vec2BertForSequenceClassification, Wav2Vec2BertModel
 )
 from torch import nn
 import os
 import logging
+import torch
+from typing import Optional, Tuple, Union
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -15,19 +17,66 @@ pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
 pretrained_BERT_model = "facebook/w2v-bert-2.0"
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 
+class AudioClassifier(nn.Module):
+    def __init__(
+        self, 
+        num_classes: int,
+        pretrained_model_name: str = "facebook/w2v-bert-2.0",
+        dropout_rate: float = 0.1
+    ):
+        super().__init__()
+        
+        self.wav2vec = Wav2Vec2BertModel.from_pretrained(pretrained_model_name)
+        self.processor = AutoFeatureExtractor.from_pretrained(pretrained_model_name)
+        
+        hidden_size = self.wav2vec.config.hidden_size
+        
+        self.classifier = nn.Sequential(
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_size, hidden_size // 2),
+            nn.ReLU(),
+            nn.Dropout(dropout_rate),
+            nn.Linear(hidden_size // 2, num_classes)
+        )
+        
+    def forward(
+        self,
+        input_values: torch.Tensor,
+        attention_mask: Optional[torch.Tensor] = None,
+        return_features: bool = False
+    ) -> Union[torch.Tensor, Tuple[torch.Tensor, torch.Tensor]]:
+        outputs = self.wav2vec(
+            input_values=input_values,
+            attention_mask=attention_mask,
+            return_dict=True
+        )
+        
+        last_hidden_state = outputs.last_hidden_state
+        
+        if attention_mask is not None:
+            mask = attention_mask.unsqueeze(-1).float()
+            pooled = (last_hidden_state * mask).sum(dim=1) / mask.sum(dim=1)
+        else:
+            pooled = last_hidden_state.mean(dim=1)
+            
+        logits = self.classifier(pooled)
+        
+        if return_features:
+            return logits, pooled
+        return logits
+
+# Modify the get_model_and_processor function to use the new AudioClassifier
 def get_model_and_processor(model_name: str, num_classes: int, device: str):
     if model_name == "AST":
         model, processor = custom_AST(num_classes, device)
         logger.info(f"Loading AST model from cache: {CACHE_DIR}")
     elif model_name == "BERT":
-        model, processor = custom_BERT(num_classes, device)
+        model = AudioClassifier(num_classes=num_classes, pretrained_model_name=pretrained_BERT_model)
+        processor = AutoFeatureExtractor.from_pretrained(pretrained_BERT_model, cache_dir=CACHE_DIR)
+        model = model.to(device)
         logger.info(f"Loading BERT model from cache: {CACHE_DIR}")
     else:
         raise ValueError(f"Unsupported model type: {model_name}")
-
-    # if isinstance(model, Wav2Vec2BertForSequenceClassification):
-    #     # Adjust the classifier to match the projector output
-    #     model.classifier = nn.Linear(768, num_classes)  # Changed from 1024 to 768
     
     return model, processor
 
@@ -96,4 +145,3 @@ def custom_AST(num_classes: int, device: str):
         model = model.to(device) # type: ignore
     
     return model, processor
-

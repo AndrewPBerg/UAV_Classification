@@ -135,15 +135,27 @@ class AudioDataset(Dataset):
             return len(self.paths)
         
     def feature_extraction(self, audio_tensor):
-        features = self.feature_extractor(audio_tensor.squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_values
+        # Handle both feature_extractor and processor types
+        if hasattr(self.feature_extractor, 'process'):
+            features = self.feature_extractor.process(
+                audio_tensor.squeeze().numpy(), 
+                sampling_rate=16000, 
+                return_tensors="pt"
+            ).input_values
+        else:
+            features = self.feature_extractor(
+                audio_tensor.squeeze().numpy(), 
+                sampling_rate=16000, 
+                return_tensors="pt"
+            ).input_values
         return features
 
     def __getitem__(self, index) -> tuple[torch.Tensor, int]:
-        features = self.feature_extractor(self.audio_tensors[index].squeeze().numpy(), sampling_rate=16000, return_tensors="pt").input_values
-        if self.audio_tensors[index].shape[0] == 1: # if the number of channels in the first dim of self.audio_tensor == 1: squeeze the dim out
+        features = self.feature_extraction(self.audio_tensors[index])
+        
+        if self.audio_tensors[index].shape[0] == 1:
             features = features.squeeze(dim=0)
-            # features size == torch.Size([1024, 128]
-
+        
         return features, self.class_indices[index]
 
     def get_classes(self) -> list[str]:
@@ -254,7 +266,7 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
 
 def train_test_split_custom(
     data_path: str, 
-    feature_extractor: ASTFeatureExtractor,
+    feature_extractor, # A featureExtractor object
     test_size: float = 0.2, 
     val_size: float = 0.1,
     inference_size: float = 0.1,
@@ -356,4 +368,5 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 # if __name__ == "__main__":
 #     main()
+
 
