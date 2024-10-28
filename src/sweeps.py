@@ -1,7 +1,7 @@
 import yaml
 from helper.util import train_test_split_custom, wandb_login
 from helper.engine import train, inference_loop
-from helper.model import auto_extractor, custom_AST
+from helper.model import get_model_and_processor
 
 import torch
 from torch.utils.data import DataLoader
@@ -57,14 +57,17 @@ def make(config):
     AUGMENTATIONS_PER_SAMPLE = config['augmentations_per_sample']
     LEARNING_RATE = config['learning_rate']
     NUM_CUDA_WORKERS = config['num_cuda_workers']
-    feature_extractor = auto_extractor(MODEL_NAME)
-
+    NUM_CLASSES = general_config['num_classes']
+    
     # Get the selected augmentations directly from the config
     num_augmentations = NUM_AUGMENTATIONS
     selected_augmentations = random.sample(k=num_augmentations, population=AUGMENTATIONS)
     
     # Log the selected augmentations
     wandb.log({"selected_augmentations": selected_augmentations})
+
+    # Make model and feature extractor
+    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES, device)
 
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
         DATA_PATH, 
@@ -84,17 +87,14 @@ def make(config):
     val_loader = create_dataloader(val_dataset, BATCH_SIZE, num_workers=NUM_CUDA_WORKERS)
     test_loader = create_dataloader(test_dataset, BATCH_SIZE, num_workers=NUM_CUDA_WORKERS)
 
-    num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes())
 
-    # Make the model
-    model = custom_AST(MODEL_NAME, num_classes, device)
 
     # Make the loss and optimizer
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE) # type: ignore #AdamW class isn't exported correctly :(
+    optimizer = optim.AdamW(model.parameters(), lr=LEARNING_RATE)
     scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
 
-    return model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes
+    return model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, NUM_CLASSES
 
 def model_pipeline(config=None):
     with wandb.init(config=config):
@@ -104,9 +104,10 @@ def model_pipeline(config=None):
         mixed_params = get_mixed_params(config, general_config)
 
         # Assign dictionary values to variables
-        EPOCHS = mixed_params['epochs'] #type: ignore indexing wandb config is not typed for some reason :(
-        ACCUMULATION_STEPS = mixed_params['accumulation_steps'] #type: ignore
-        PATIENCE = mixed_params['patience'] #type: ignore
+        EPOCHS = mixed_params['epochs']
+        ACCUMULATION_STEPS = mixed_params['accumulation_steps']
+        PATIENCE = mixed_params['patience']
+        NUM_CLASSES = mixed_params['num_classes']
 
         model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes = make(mixed_params)
         print(model)
@@ -120,7 +121,7 @@ def model_pipeline(config=None):
                         loss_fn=criterion,
                         epochs=EPOCHS,#type: ignore
                         device=device,
-                        num_classes=num_classes,
+                        num_classes=NUM_CLASSES,
                         accumulation_steps=ACCUMULATION_STEPS,#type: ignore
                         patience=PATIENCE)#type: ignore
 
