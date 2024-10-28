@@ -3,6 +3,7 @@ general:
   data_path: "/app/src/datasets/UAV_Dataset_9"
   num_classes: 9 # must match dataset
   model_name: "AST"
+  model_name: "WHISPER"
   batch_size: 8
   seed: 42
   num_cuda_workers: 8

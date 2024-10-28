@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim.adamw import AdamW
 import torch.nn as nn
-# from torchinfo import summary
+from torchinfo import summary
 import yaml
 from timeit import default_timer as timer 
 import wandb
@@ -61,7 +61,9 @@ def main():
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
 
-    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES, device)
+    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES)
+    
+    model.to(device)
 
     # dataset = AudioDataset(data_path, feature_extractor)
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
@@ -77,13 +79,13 @@ def main():
     )
 
 
-    num_classes = len(train_dataset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
+    # num_classes = len(train_dtaset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
 
-    # summary(model,
-    #         col_names=["num_params","trainable"],
-    #         col_width=20,
-    #         row_settings=["var_names"])
-    # print(model)
+    summary(model,
+            col_names=["num_params","trainable"],
+            col_width=20,
+            row_settings=["var_names"])
+    print(model)
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
                                         batch_size=BATCH_SIZE,
