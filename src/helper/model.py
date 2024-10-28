@@ -97,11 +97,11 @@ def custom_WHISPER(num_classes: int):
         model = AutoModelForSpeechSeq2Seq.from_pretrained(pretrained_WHISPER_model, cache_dir=CACHE_DIR, local_files_only=True)
         feature_extractor = AutoProcessor.from_pretrained(pretrained_WHISPER_model, cache_dir=CACHE_DIR, local_files_only=True)
     except OSError: # if model is not cached, download it
-        model = download_model(pretrained_AST_model, CACHE_DIR)
-        feature_extractor = AutoProcessor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        model = download_model(pretrained_WHISPER_model, CACHE_DIR)
+        feature_extractor = AutoProcessor.from_pretrained(pretrained_WHISPER_model, cache_dir=CACHE_DIR)
         
     if model is not None:
-        pass
+        print("model is not none here! line 104 model.py")
     
     return model, feature_extractor
         

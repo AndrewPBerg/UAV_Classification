@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import librosa
 from typing import Optional, Union
-from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor
 import warnings
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
@@ -43,7 +43,7 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor],
                  standardize_audio_boolean: bool=True, 
                  target_sr: int=16000,  # Changed to match Wav2Vec2 requirements
                  target_duration: int=5, 
@@ -157,8 +157,15 @@ class AudioDataset(Dataset):
                     return_tensors="pt",
                     padding=True
                 )
+                return features.input_features.squeeze(0)
+            elif isinstance(self.feature_extractor, WhisperProcessor):
+                features = self.feature_extractor(audio_np, 
+                                                  sampling_rate = self.target_sr,
+                                                  return_tensors="pt",
+                                                  padding=True)
+        
+                return features.input_features.squeeze(0)
 
-                return features.input_features.squeeze(0) # difference in key:value
             else:
                 print("Feature Extractor is not implemented")
 
