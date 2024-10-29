@@ -159,6 +159,14 @@ class AudioDataset(Dataset):
                 )
                 return features.input_features.squeeze(0)
             elif isinstance(self.feature_extractor, WhisperProcessor):
+                # Whisper expects 30-second inputs
+                target_length = 30 * self.target_sr
+                
+                # Pad the 5-second audio to 30 seconds
+                if len(audio_np) < target_length:
+                    padding_length = target_length - len(audio_np)
+                    audio_np = np.pad(audio_np, (0, padding_length), mode='constant')
+                
                 features = self.feature_extractor(audio_np, 
                                                   sampling_rate = self.target_sr,
                                                   return_tensors="pt",

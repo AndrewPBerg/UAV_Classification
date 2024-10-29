@@ -79,14 +79,11 @@ def main():
         config=general_config
     )
 
-
-    # num_classes = len(train_dtaset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
-
-    # summary(model,
-    #         col_names=["num_params","trainable"],
-    #         col_width=20,
-    #         row_settings=["var_names"])
-    # print(model)
+    summary(model,
+            col_names=["num_params","trainable"],
+            col_width=20,
+            row_settings=["var_names"])
+    print(model)
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
                                         batch_size=BATCH_SIZE,
@@ -135,26 +132,27 @@ def main():
     
     # ic(feature_extractor)
     ic(train_dataloader_custom.dataset[0][0].shape)
+    # ic(feature_extractor)
         
-    # train(
-    #     model=model,
-    #     train_dataloader=train_dataloader_custom,
-    #     test_dataloader=test_dataloader_custom,
-    #     val_dataloader=val_dataloader_custom,
-    #     optimizer=optimizer,
-    #     scheduler=scheduler,  # type: ignore
-    #     loss_fn=loss_fn,
-    #     epochs=EPOCHS,
-    #     device=device,
-    #     num_classes=NUM_CLASSES,
-    #     accumulation_steps=ACCUMULATION_STEPS,
-    #     patience=TRAIN_PATIENCE
-    # )
+    train(
+        model=model,
+        train_dataloader=train_dataloader_custom,
+        test_dataloader=test_dataloader_custom,
+        val_dataloader=val_dataloader_custom,
+        optimizer=optimizer,
+        scheduler=scheduler,  # type: ignore
+        loss_fn=loss_fn,
+        epochs=EPOCHS,
+        device=device,
+        num_classes=NUM_CLASSES,
+        accumulation_steps=ACCUMULATION_STEPS,
+        patience=TRAIN_PATIENCE
+    )
 
-    # inference_loop(model=model,
-    #             device=device,
-    #             loss_fn=loss_fn,
-    #             inference_loader= inference_dataloader_custom)
+    inference_loop(model=model,
+                device=device,
+                loss_fn=loss_fn,
+                inference_loader= inference_dataloader_custom)
 
 
 
