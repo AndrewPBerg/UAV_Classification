@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import librosa
 from typing import Optional, Union
-from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor
 import warnings
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
@@ -43,7 +43,7 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor],
                  standardize_audio_boolean: bool=True, 
                  target_sr: int=16000,  # Changed to match Wav2Vec2 requirements
                  target_duration: int=5, 
@@ -157,10 +157,34 @@ class AudioDataset(Dataset):
                     return_tensors="pt",
                     padding=True
                 )
+                return features.input_features.squeeze(0)
+            elif isinstance(self.feature_extractor, Wav2Vec2FeatureExtractor):
+                features = self.feature_extractor(
+                    audio_np,
+                    sampling_rate=self.target_sr,
+                    # sampling_rate=16000,
+                    return_tensors="pt",
+                    # padding=True
+                )
+                return features.input_values.squeeze(0)
+            elif isinstance(self.feature_extractor, WhisperProcessor):
+                # Whisper expects 30-second inputs
+                target_length = 30 * self.target_sr
+                
+                # Pad the 5-second audio to 30 seconds
+                if len(audio_np) < target_length:
+                    padding_length = target_length - len(audio_np)
+                    audio_np = np.pad(audio_np, (0, padding_length), mode='constant')
+                
+                features = self.feature_extractor(audio_np, 
+                                                  sampling_rate = self.target_sr,
+                                                  return_tensors="pt",
+                                                  padding=True)
+        
+                return features.input_features.squeeze(0)
 
-                return features.input_features.squeeze(0) # difference in key:value
             else:
-                print("Feature Extractor is not implemented")
+                print(f"Feature Extractor is not implemented {self.feature_extractor}")
 
         except Exception as e:
             raise e

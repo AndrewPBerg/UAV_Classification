@@ -11,6 +11,7 @@ from torchinfo import summary
 import yaml
 from timeit import default_timer as timer 
 import wandb
+from icecream import ic
 
 def main():
 
@@ -78,9 +79,6 @@ def main():
         config=general_config
     )
 
-
-    # num_classes = len(train_dtaset.get_classes() + test_dataset.get_classes() + inference_dataset.get_classes()) 
-
     summary(model,
             col_names=["num_params","trainable"],
             col_width=20,
@@ -131,6 +129,11 @@ def main():
             notes=wandb_params.get("notes", ""),
             dir=wandb_params.get("dir", None)
         )
+    
+    # ic(feature_extractor)
+    ic(train_dataloader_custom.dataset[0][0].shape)
+    ic(train_dataloader_custom.dataset[0])
+    ic(feature_extractor)
         
     train(
         model=model,
@@ -142,7 +145,7 @@ def main():
         loss_fn=loss_fn,
         epochs=EPOCHS,
         device=device,
-        num_classes=num_classes,
+        num_classes=NUM_CLASSES,
         accumulation_steps=ACCUMULATION_STEPS,
         patience=TRAIN_PATIENCE
     )

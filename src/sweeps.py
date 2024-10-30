@@ -67,7 +67,7 @@ def make(config):
     wandb.log({"selected_augmentations": selected_augmentations})
 
     # Make model and feature extractor
-    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES, device)
+    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES)
 
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
         DATA_PATH, 
