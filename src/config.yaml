@@ -5,7 +5,8 @@ general:
   # model_name: "AST"
   # model_name: "BERT"
   # model_name: "MERT"
-  model_name: "HUBERT"
+  # model_name: "HUBERT"
+  model_name: "MERT"
   # model_name: "WHISPER"
   batch_size: 8
   seed: 42

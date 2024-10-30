@@ -58,7 +58,7 @@ class AudioDataset(Dataset):
         self.sampling_rate = None  # current dataset sample rate
         self.resampler = None
         self.standardize_audio_boolean = standardize_audio_boolean
-        self.target_sr = target_sr
+        self.target_sr = self.feature_extractor.sampling_rate # might break for diff feat extractors
         self.target_duration = target_duration
         self.target_length = target_duration * target_sr
         self.augmentations_per_sample = augmentations_per_sample
@@ -159,6 +159,7 @@ class AudioDataset(Dataset):
                 )
                 return features.input_features.squeeze(0)
             elif isinstance(self.feature_extractor, Wav2Vec2FeatureExtractor):
+
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
@@ -348,6 +349,7 @@ def train_test_split_custom(
     val_paths = [all_paths[i] for i in val_indices]
     test_paths = [all_paths[i] for i in test_indices]
     inference_paths = [all_paths[i] for i in inference_indices]
+
 
     # Create AudioDataset instances
     train_dataset = AudioDataset(data_path,

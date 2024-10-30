@@ -15,6 +15,7 @@ pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
 pretrained_BERT_model = "facebook/w2v-bert-2.0"
 pretrained_WHISPER_model = "openai/whisper-large-v3-turbo"
 pretrained_HUBERT_model = "superb/hubert-base-superb-ks"
+pretrained_MERT_model = "m-a-p/MERT-v1-330M"
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 
 # Modify the get_model_and_processor function to use the new AudioClassifier
@@ -27,6 +28,8 @@ def get_model_and_processor(model_name: str, num_classes: int):
         model, processor = custom_WHISPER(num_classes)
     elif model_name == "HUBERT":
         model, processor = custom_HUBERT(num_classes)
+    elif model_name == "MERT":
+        model, processor = custom_MERT(num_classes)
     else:
         raise ValueError(f"Unsupported model type: {model_name}")
     
@@ -165,6 +168,52 @@ def custom_HUBERT(num_classes: int):
         )
         processor = Wav2Vec2FeatureExtractor.from_pretrained(
             pretrained_HUBERT_model,
+            cache_dir=CACHE_DIR
+        )
+
+    if model is not None:
+        # Update label mappings
+        model.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
+        model.config.label2id = {v: k for k, v in model.config.id2label.items()}
+        
+        # Optionally freeze/unfreeze parameters
+        for param in model.parameters():
+            param.requires_grad = False
+        # Unfreeze classification head
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+            
+    return model, processor
+
+
+def custom_MERT(num_classes: int):
+    try:
+        # loading our model weights
+        model = AutoModel.from_pretrained(
+            pretrained_MERT_model,
+            cache_dir=CACHE_DIR,
+            local_files_only=True,
+            num_labels=num_classes,
+            trust_remote_code=True,
+            # ignore_mismatched_sizes=True
+            # use_weighted_layer_sum=True,  # Enable weighted layer sum for classification
+        )
+        processor = Wav2Vec2FeatureExtractor.from_pretrained(
+            pretrained_MERT_model,
+            cache_dir=CACHE_DIR,
+            local_files_only=True
+        )
+    except OSError:
+        model = HubertForSequenceClassification.from_pretrained(
+            pretrained_MERT_model,
+            cache_dir=CACHE_DIR,
+            num_labels=num_classes,
+            trust_remote_code=True,
+            # ignore_mismatched_sizes=True
+            # use_weighted_layer_sum=True,
+        )
+        processor = Wav2Vec2FeatureExtractor.from_pretrained(
+            pretrained_MERT_model,
             cache_dir=CACHE_DIR
         )
 
