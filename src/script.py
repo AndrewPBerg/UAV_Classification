@@ -132,7 +132,8 @@ def main():
     
     # ic(feature_extractor)
     ic(train_dataloader_custom.dataset[0][0].shape)
-    # ic(feature_extractor)
+    ic(train_dataloader_custom.dataset[0])
+    ic(feature_extractor)
         
     train(
         model=model,

@@ -1,7 +1,9 @@
 from transformers import (
     ASTFeatureExtractor, ASTForAudioClassification, AutoFeatureExtractor, AutoModel, 
     Wav2Vec2BertForSequenceClassification, Wav2Vec2BertModel, Wav2Vec2Processor, AutoFeatureExtractor,
-    AutoModelForSpeechSeq2Seq, AutoProcessor, WhisperForAudioClassification, WhisperProcessor
+    AutoModelForSpeechSeq2Seq, AutoProcessor, WhisperForAudioClassification, WhisperProcessor, HubertForSequenceClassification,
+    Wav2Vec2FeatureExtractor
+    
 )
 from torch import nn
 import os
@@ -11,7 +13,8 @@ from typing import Optional, Tuple, Union
 # Hard coded Pretrained models
 pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
 pretrained_BERT_model = "facebook/w2v-bert-2.0"
-pretrained_WHISPER_model = "openai/whisper-large-v3"
+pretrained_WHISPER_model = "openai/whisper-large-v3-turbo"
+pretrained_HUBERT_model = "superb/hubert-base-superb-ks"
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 
 # Modify the get_model_and_processor function to use the new AudioClassifier
@@ -22,6 +25,8 @@ def get_model_and_processor(model_name: str, num_classes: int):
         model, processor = custom_BERT(num_classes)
     elif model_name == "WHISPER":
         model, processor = custom_WHISPER(num_classes)
+    elif model_name == "HUBERT":
+        model, processor = custom_HUBERT(num_classes)
     else:
         raise ValueError(f"Unsupported model type: {model_name}")
     
@@ -32,7 +37,7 @@ def get_model_and_processor(model_name: str, num_classes: int):
 def download_model(model_name, cache_dir):
     AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
 
-def custom_BERT(num_classes: int, device: str):
+def custom_BERT(num_classes: int):
     try:
         model = Wav2Vec2BertForSequenceClassification.from_pretrained(
             pretrained_BERT_model, 
@@ -67,7 +72,7 @@ def custom_BERT(num_classes: int, device: str):
 
     return model, feature_extractor
 
-def custom_AST(num_classes: int, device: str):
+def custom_AST(num_classes: int):
 
     try:
         model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
@@ -118,6 +123,48 @@ def custom_WHISPER(num_classes: int):
         )
         processor = WhisperProcessor.from_pretrained(
             pretrained_WHISPER_model,
+            cache_dir=CACHE_DIR
+        )
+
+    if model is not None:
+        # Update label mappings
+        model.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
+        model.config.label2id = {v: k for k, v in model.config.id2label.items()}
+        
+        # Optionally freeze/unfreeze parameters
+        for param in model.parameters():
+            param.requires_grad = False
+        # Unfreeze classification head
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+            
+    return model, processor
+
+def custom_HUBERT(num_classes: int):
+    try:
+        model = HubertForSequenceClassification.from_pretrained(
+            pretrained_HUBERT_model,
+            cache_dir=CACHE_DIR,
+            local_files_only=True,
+            num_labels=num_classes,
+            ignore_mismatched_sizes=True
+            # use_weighted_layer_sum=True,  # Enable weighted layer sum for classification
+        )
+        processor = Wav2Vec2FeatureExtractor.from_pretrained(
+            pretrained_HUBERT_model,
+            cache_dir=CACHE_DIR,
+            local_files_only=True
+        )
+    except OSError:
+        model = HubertForSequenceClassification.from_pretrained(
+            pretrained_HUBERT_model,
+            cache_dir=CACHE_DIR,
+            num_labels=num_classes,
+            ignore_mismatched_sizes=True
+            # use_weighted_layer_sum=True,
+        )
+        processor = Wav2Vec2FeatureExtractor.from_pretrained(
+            pretrained_HUBERT_model,
             cache_dir=CACHE_DIR
         )
 
