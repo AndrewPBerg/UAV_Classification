@@ -131,9 +131,9 @@ def main():
         )
     
     # ic(feature_extractor)
-    ic(feature_extractor.sampling_rate)
-    ic(train_dataloader_custom.dataset[0][0].shape)
-    ic(train_dataloader_custom.dataset[0])
+    # ic(feature_extractor)
+    # ic(train_dataloader_custom.dataset[0][0].shape)
+    # ic(train_dataloader_custom.dataset[0])
         
     train(
         model=model,

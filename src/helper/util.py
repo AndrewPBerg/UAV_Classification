@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import librosa
 from typing import Optional, Union
-from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 import warnings
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
@@ -58,7 +58,10 @@ class AudioDataset(Dataset):
         self.sampling_rate = None  # current dataset sample rate
         self.resampler = None
         self.standardize_audio_boolean = standardize_audio_boolean
-        self.target_sr = self.feature_extractor.sampling_rate # might break for diff feat extractors
+        try:
+            self.target_sr = self.feature_extractor.sampling_rate or 16000
+        except:
+            self.target_sr = 16000
         self.target_duration = target_duration
         self.target_length = target_duration * target_sr
         self.augmentations_per_sample = augmentations_per_sample
@@ -167,6 +170,17 @@ class AudioDataset(Dataset):
                     return_tensors="pt",
                     # padding=True
                 )
+                return features.input_values.squeeze(0)
+            elif isinstance(self.feature_extractor, BitImageProcessor):
+
+                features = self.feature_extractor(
+                    audio_np,
+                    sampling_rate=self.target_sr,
+                    # sampling_rate=16000,
+                    return_tensors="pt",
+                    # padding=True
+                )
+                print(features)
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
