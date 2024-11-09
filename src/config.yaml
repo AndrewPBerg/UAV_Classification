@@ -22,7 +22,7 @@ general:
   accumulation_steps: 5
   learning_rate: 0.006
   patience : 10
-  use_wandb: true
+  use_wandb: false
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 3
@@ -40,6 +40,20 @@ general:
 
   sin_distortion_min_rate: 0.2
   sin_distortion_max_rate: 0.9
+
+  adaptor_type: "lora"
+
+lora:
+  r: 4
+  lora_alpha: 8
+  target_modules: ["mlp.dense"]
+  lora_dropout: 0.2
+  bias: "none"
+  task_type: "SEQ_CLS"
+
+ia3:
+  target_modules: ["k_proj", "v_proj", "down_proj"]
+  feedforward_modules: ["down_proj"]
 
 # Script Configuration (solo run)
 wandb:
