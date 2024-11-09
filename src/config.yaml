@@ -27,14 +27,19 @@ general:
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 3
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
-  augmentations: ["pitch_shift", "time_stretch"]
+  augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   # transform params must be inside list for augmentations.py to process corr
   pitch_shift_min_rate: 0
   pitch_shift_max_rate: 12.0
-  pitch_shift_p: 1.0
+  
   time_stretch_min_rate: 0.8
   time_stretch_max_rate: 1.25
-  time_stretch_p: 1.0
+
+  tanh_distortion_min_rate: 0.2
+  tanh_distortion_max_rate: 0.9
+
+  sin_distortion_min_rate: 0.2
+  sin_distortion_max_rate: 0.9
 
 # Script Configuration (solo run)
 wandb:
