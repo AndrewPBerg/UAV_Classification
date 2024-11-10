@@ -137,25 +137,25 @@ def main():
     # ic(train_dataloader_custom.dataset[0][0].shape)
     # ic(train_dataloader_custom.dataset[0])
         
-    # train(
-    #     model=model,
-    #     train_dataloader=train_dataloader_custom,
-    #     test_dataloader=test_dataloader_custom,
-    #     val_dataloader=val_dataloader_custom,
-    #     optimizer=optimizer,
-    #     scheduler=scheduler,  # type: ignore
-    #     loss_fn=loss_fn,
-    #     epochs=EPOCHS,
-    #     device=device,
-    #     num_classes=NUM_CLASSES,
-    #     accumulation_steps=ACCUMULATION_STEPS,
-    #     patience=TRAIN_PATIENCE
-    # )
+    train(
+        model=model,
+        train_dataloader=train_dataloader_custom,
+        test_dataloader=test_dataloader_custom,
+        val_dataloader=val_dataloader_custom,
+        optimizer=optimizer,
+        scheduler=scheduler,  # type: ignore
+        loss_fn=loss_fn,
+        epochs=EPOCHS,
+        device=device,
+        num_classes=NUM_CLASSES,
+        accumulation_steps=ACCUMULATION_STEPS,
+        patience=TRAIN_PATIENCE
+    )
 
-    # inference_loop(model=model,
-    #             device=device,
-    #             loss_fn=loss_fn,
-    #             inference_loader= inference_dataloader_custom)
+    inference_loop(model=model,
+                device=device,
+                loss_fn=loss_fn,
+                inference_loader= inference_dataloader_custom)
 
 
 

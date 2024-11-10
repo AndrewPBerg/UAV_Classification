@@ -41,16 +41,18 @@ general:
   sin_distortion_min_rate: 0.2
   sin_distortion_max_rate: 0.9
 
-  # adaptor_type: "lora"
-  adaptor_type: "ia3"
+  adaptor_type: "lora"
+  # adaptor_type: "ia3"
+  # adaptor_type: "adalora"
+  # adaptor_type: "prefix"
 
 lora:
-  r: 4
+  r: 768
   lora_alpha: 8
-  target_modules: ["mlp.dense"]
+  target_modules: ["query", "key", "value", "dense"]
   lora_dropout: 0.2
   bias: "none"
-  task_type: "SEQ_CLS"
+  task_type: "AUDIO_CLASSIFICATION"
 
 ia3:
   target_modules: ["k_proj", "v_proj", "down_proj"]
