@@ -139,61 +139,9 @@ def get_adaptor_model(model,adaptor_type: str):
 
 
 """
-Sonnet Suggestions:
-def get_adaptor_config(adaptor_type: str):
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-
-    match adaptor_type.lower():
-        case "lora":
-            return LoraConfig(
-                r=config["lora"]["r"],  # Rank of the update matrices
-                lora_alpha=config["lora"]["lora_alpha"],  # Alpha parameter for LoRA scaling
-                target_modules=config["lora"]["target_modules"],  # List of module names to apply LoRA to
-                lora_dropout=config["lora"]["lora_dropout"],
-                bias=config["lora"]["bias"],  # "none", "all" or "lora_only"
-                task_type="AUDIO_CLASSIFICATION"  # Specify correct task type
-            )
-        
-        case "ia3":
-            return IA3Config(
-                target_modules=config["ia3"]["target_modules"],
-                feedforward_modules=config["ia3"]["feedforward_modules"],
-                task_type="AUDIO_CLASSIFICATION"
-            )
-
-        case "adalora":
-            return AdaLoraConfig(
-                target_modules=config["adalora"]["target_modules"],
-                init_r=config["adalora"]["init_r"],
-                target_r=config["adalora"]["target_r"],
-                beta1=config["adalora"]["beta1"],
-                beta2=config["adalora"]["beta2"],
-                task_type="AUDIO_CLASSIFICATION"
-            )
-
-        case "prefix":
-            return PrefixTuningConfig(
-                num_virtual_tokens=config["prefix"]["num_virtual_tokens"],
-                task_type="AUDIO_CLASSIFICATION"
-            )
-            
-        case _:
-            raise ValueError(f"Unknown adaptor type: {adaptor_type}")
-
-def get_adaptor_model(model, adaptor_type: str):
-    # Get a PEFT model with the specified adapter configuration
-    adaptor_config = get_adaptor_config(adaptor_type)
-    
-    # Get PEFT model
-    model = get_peft_model(model, adaptor_config)
-    
-    # Print trainable parameters
-    model.print_trainable_parameters()
-    
-    return model
-
-
+Suggestions:
+- X-Lora
+- OFT
+- FourierFt
+- LayerNorm Tuning
 """
-
-# If I had more data I think I would try to use the soft-MoA and MoE approaches
