@@ -16,8 +16,8 @@ from peft import (
     AdaLoraConfig,
     XLoraConfig,
     OFTConfig,
-    FourierConfig,
-    LayerNormConfig
+    FourierFTConfig,
+    LNTuningConfig
 )
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
@@ -40,13 +40,13 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         model = download_model(pretrained_AST_model, CACHE_DIR)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
     
+    in_features = model.classifier.dense.in_features
+    model.classifier.dense = nn.Linear(in_features, num_classes)
     # print(f"does the model exist:: {model}")
     model = get_adaptor_model(model, adaptor_type)
     # ic(model)
     # if model is not None:
         # model.config.num_labels = num_classes
-    in_features = model.classifier.dense.in_features
-    model.classifier.dense = nn.Linear(in_features, num_classes)
         
         # # # Add label mappings
         # # model.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
@@ -120,28 +120,19 @@ def get_adaptor_config(adaptor_type: str):
                 lora_alpha=config["lora_alpha"],
                 task_type=config["task_type"]
             )
-        
-        case "xlora":
-            config = config["xlora"]
-            return XLoraConfig(
-                r=config["r"],
-                lora_alpha=config["lora_alpha"],
-                target_modules=config["target_modules"],
-                lora_dropout=config["lora_dropout"],
-                task_type=config["task_type"]
-            )
             
         case "oft":
             config = config["oft"]
             return OFTConfig(
-                ft_type=config["ft_type"],
-                target_modules=config["target_modules"],
-                task_type=config["task_type"]
+                r=config['r'],
+                target_modules=config['target_modules'],
+                module_dropout=config['module_dropout'],
+                init_weights=config['init_weights'],
             )
             
         case "fourier":
             config = config["fourier"]
-            return FourierConfig(
+            return FourierFTConfig(
                 ft_type=config["ft_type"],
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
@@ -149,10 +140,13 @@ def get_adaptor_config(adaptor_type: str):
             
         case "layernorm":
             config = config["layernorm"]
-            return LayerNormConfig(
+            return LNTuningConfig(
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
             )
+        
+        case "none":
+            pass
         case _:
             raise ValueError(f"Unknown adaptor type: {adaptor_type}")
         
