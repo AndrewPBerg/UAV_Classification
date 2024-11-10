@@ -41,10 +41,9 @@ general:
   sin_distortion_min_rate: 0.2
   sin_distortion_max_rate: 0.9
 
-  adaptor_type: "lora"
+  # adaptor_type: "lora"
   # adaptor_type: "ia3"
-  # adaptor_type: "adalora"
-  # adaptor_type: "prefix"
+  adaptor_type: "adalora"
 
 lora:
   r: 768
@@ -55,8 +54,17 @@ lora:
   task_type: "AUDIO_CLASSIFICATION"
 
 ia3:
-  target_modules: ["k_proj", "v_proj", "down_proj"]
-  feedforward_modules: ["down_proj"]
+  target_modules: ["query", "key", "value", "dense"]
+  feedforward_modules: ["dense"]
+  task_type: "AUDIO_CLASSIFICATION"
+
+adalora:
+  init_r: 12              # Initial rank
+  target_r: 8             # Target rank
+  target_modules: ["query", "key", "value", "dense"]
+  lora_alpha: 32
+  task_type: "AUDIO_CLASSIFICATION"
+
 
 # Script Configuration (solo run)
 wandb:

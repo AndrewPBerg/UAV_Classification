@@ -13,6 +13,8 @@ from peft import (
     get_peft_model, 
     LoraConfig,
     IA3Config,
+    AdaLoraConfig,
+    PrefixTuningConfig
 )
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
@@ -99,10 +101,22 @@ def get_adaptor_config(adaptor_type: str):
                     )
         
         case "ia3":
+            config = config["ia3"]
             return IA3Config( 
-                target_modules=config.adaptor_type["target_modules"],
-                feedforward_modules=config.adaptor_type["feedforward_modules"]
+                target_modules=config["target_modules"],
+                feedforward_modules=config["feedforward_modules"],
+                task_type = config['task_type']
                 )
+        
+        case "adalora":
+            config = config["adalora"]
+            return AdaLoraConfig(
+                init_r=config["init_r"],
+                target_r=config["target_r"],
+                target_modules=config["target_modules"],
+                lora_alpha=config["lora_alpha"],
+                task_type=config["task_type"]
+            )
         case _:
             raise ValueError(f"Unknown adaptor type: {adaptor_type}")
         
@@ -111,13 +125,13 @@ def get_adaptor_model(model,adaptor_type: str):
     adaptor_config = get_adaptor_config(adaptor_type)
     print("-----------------------------------------")
     # ic(adaptor_config)
-    match adaptor_type:
-        case "lora":
-            ic(get_peft_model(model, adaptor_config))
-            return get_peft_model(model, adaptor_config)
+    # match adaptor_type:
+        # case "lora":
+    ic(get_peft_model(model, adaptor_config))
+    return get_peft_model(model, adaptor_config)
             # return (model, adaptor_config
-        case "ia3":
-            return get_peft_model(model, adaptor_config)
+        # case "ia3":
+        #     return get_peft_model(model, adaptor_config)
     
     print("no case matched!!! check config.yaml")
     print("no case matched!!! check config.yaml")
