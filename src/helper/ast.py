@@ -14,7 +14,10 @@ from peft import (
     LoraConfig,
     IA3Config,
     AdaLoraConfig,
-    PrefixTuningConfig
+    XLoraConfig,
+    OFTConfig,
+    FourierConfig,
+    LayerNormConfig
 )
 CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
 pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
@@ -115,6 +118,39 @@ def get_adaptor_config(adaptor_type: str):
                 target_r=config["target_r"],
                 target_modules=config["target_modules"],
                 lora_alpha=config["lora_alpha"],
+                task_type=config["task_type"]
+            )
+        
+        case "xlora":
+            config = config["xlora"]
+            return XLoraConfig(
+                r=config["r"],
+                lora_alpha=config["lora_alpha"],
+                target_modules=config["target_modules"],
+                lora_dropout=config["lora_dropout"],
+                task_type=config["task_type"]
+            )
+            
+        case "oft":
+            config = config["oft"]
+            return OFTConfig(
+                ft_type=config["ft_type"],
+                target_modules=config["target_modules"],
+                task_type=config["task_type"]
+            )
+            
+        case "fourier":
+            config = config["fourier"]
+            return FourierConfig(
+                ft_type=config["ft_type"],
+                target_modules=config["target_modules"],
+                task_type=config["task_type"]
+            )
+            
+        case "layernorm":
+            config = config["layernorm"]
+            return LayerNormConfig(
+                target_modules=config["target_modules"],
                 task_type=config["task_type"]
             )
         case _:
