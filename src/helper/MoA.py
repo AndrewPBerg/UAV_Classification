@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from transformers.models.audio_spectrogram_transformer.modeling_audio_spectrogram_transformer import ASTLayer, ASTEncoder
 import torch.nn.functional as F
 from typing import Optional, Tuple, Union
-
+import os
 
 
 # For now the MoA can be placed in parallel only. Future implementation may include the sequential version as well.
@@ -224,7 +224,13 @@ class AST_SoftMoA(nn.Module):
         assert adapter_type in ['Pfeiffer', 'Houlsby', ('Only Pfeiffer and Houlsby are supported!')]
         
         self.moa_config = SoftMoA_config(num_adapters, num_slots, normalize,reduction_rate, adapter_type, location, adapter_module)
-        self.model = ASTModel_SoftMoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True)
+
+        CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
+        try:
+            self.model = ASTModel_SoftMoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            self.model = ASTModel_SoftMoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True, cache_dir=CACHE_DIR)
+            
         self.model_config = self.model.config
         self.final_output = final_output
         

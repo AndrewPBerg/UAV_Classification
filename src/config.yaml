@@ -47,8 +47,8 @@ general:
   # adaptor_type: "oft" # top 0.97
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
-  # adaptor_type: "none"
-  # adaptor_type: "full"
+  # adaptor_type: "none-classifier"
+  # adaptor_type: "none-full"
   adaptor_type: "moa"
 
 lora:
@@ -84,6 +84,15 @@ fourier:
 layernorm:
   target_modules: ["layernorm"]  # targets all LayerNorm modules
   task_type: "AUDIO_CLASSIFICATION"
+
+moa:
+  'max_length': 1024  # Example AST sequence length
+  'final_output': 'CLS'  # How to aggregate sequence outputs
+  'reduction_rate': 128   # Bottleneck reduction factor
+  'adapter_type': 'Pfeiffer'  # 'Pfeiffer' or 'Houlsby'
+  'location': 'MHSA'    # 'MHSA' or 'FFN'
+  'adapter_module': 'bottleneck'  # 'bottleneck' or 'conformer'
+  'num_adapters': 3     # Number of parallel adapters
 
 # Script Configuration (solo run)
 wandb:

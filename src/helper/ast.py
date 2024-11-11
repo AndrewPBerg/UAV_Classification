@@ -35,18 +35,10 @@ def download_model(model_name, cache_dir):
 
 def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassification, ASTFeatureExtractor]:
     if adaptor_type == "moa":
-        params = {
-            'max_length': 1024,  # Example AST sequence length
-            'num_classes': num_classes,   # Number of output classes
-            'final_output': 'CLS',  # How to aggregate sequence outputs
-            'reduction_rate': 128,   # Bottleneck reduction factor
-            'adapter_type': 'Pfeiffer',  # 'Pfeiffer' or 'Houlsby'
-            'location': 'MHSA',    # 'MHSA' or 'FFN'
-            'adapter_module': 'bottleneck',  # 'bottleneck' or 'conformer'
-            'num_adapters': 3,     # Number of parallel adapters
-            'model_ckpt': 'MIT/ast-finetuned-audioset-10-10-0.4593'
-        }
+        with open('config.yaml', 'r') as file:
+            config = yaml.safe_load(file)
         
+        params = config["moa"]
         # Initialize model
         model = AST_MoA(
             max_length=params['max_length'],
@@ -57,10 +49,14 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
             location=params['location'],
             adapter_module=params['adapter_module'],
             num_adapters=params['num_adapters'],
-            model_ckpt=pretrained_AST_model
-        )
-        processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            model_ckpt=pretrained_AST_model)
+        try:
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
         return model, processor
+    
     try:
         model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
@@ -70,8 +66,8 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
     
     in_features = model.classifier.dense.in_features
     model.classifier.dense = nn.Linear(in_features, num_classes)
-    # print(f"does the model exist:: {model}")
     model = get_adaptor_model(model, adaptor_type)
+
     # ic(model)
     # if model is not None:
         # model.config.num_labels = num_classes
@@ -176,6 +172,7 @@ def get_adaptor_config(adaptor_type: str):
             pass
         case _:
             raise ValueError(f"Unknown adaptor type: {adaptor_type}")
+    
         
 def get_adaptor_model(model,adaptor_type: str):
 
