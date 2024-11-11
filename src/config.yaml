@@ -25,7 +25,7 @@ general:
   use_wandb: false
   
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 0
+  augmentations_per_sample: 3
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
   augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   # transform params must be inside list for augmentations.py to process corr
@@ -43,9 +43,9 @@ general:
 
   # adaptor_type: "lora"
   # adaptor_type: "ia3"
-  # adaptor_type: "adalora"
+  adaptor_type: "adalora"
   # adaptor_type: "oft" # top 0.97
-  adaptor_type: "fourier"
+  # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
   # adaptor_type: "none"
   # adaptor_type: "full"
@@ -64,10 +64,10 @@ ia3:
   task_type: "AUDIO_CLASSIFICATION"
 
 adalora:
-  init_r: 12              # Initial rank
-  target_r: 8             # Target rank
+  init_r: 1200              # Initial rank
+  target_r: 768             # Target rank
   target_modules: ["query", "key", "value", "dense"]
-  lora_alpha: 32
+  lora_alpha: 16
   task_type: "AUDIO_CLASSIFICATION"
 
 oft:
