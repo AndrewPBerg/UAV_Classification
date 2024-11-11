@@ -130,10 +130,9 @@ def get_adaptor_config(adaptor_type: str):
                 init_weights=config['init_weights'],
             )
             
-        case "fourier":
+        case "fourier": # TODO test fourier adaptor
             config = config["fourier"]
             return FourierFTConfig(
-                ft_type=config["ft_type"],
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
             )
