@@ -1,7 +1,7 @@
 # DESCRIPTION
 from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time
 from helper.engine import train, inference_loop
-from helper.model import get_model_and_processor
+from helper.ast import custom_AST
 
 import torch
 from torch.utils.data import DataLoader
@@ -46,6 +46,8 @@ def main():
     USE_WANDB = general_config['use_wandb']
     NUM_CLASSES = general_config['num_classes']
 
+    ADAPTOR_TYPE = general_config['adaptor_type']
+
     if USE_WANDB:
         wandb_login()
         
@@ -62,7 +64,7 @@ def main():
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
 
-    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES)
+    model, feature_extractor = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
     
     model.to(device)
 

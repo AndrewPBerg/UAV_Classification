@@ -22,7 +22,7 @@ general:
   accumulation_steps: 5
   learning_rate: 0.006
   patience : 10
-  use_wandb: true
+  use_wandb: false
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 3
@@ -40,6 +40,49 @@ general:
 
   sin_distortion_min_rate: 0.2
   sin_distortion_max_rate: 0.9
+
+  # adaptor_type: "lora"
+  # adaptor_type: "ia3"
+  adaptor_type: "adalora"
+  # adaptor_type: "oft" # top 0.97
+  # adaptor_type: "fourier"
+  # adaptor_type: "layernorm"
+  # adaptor_type: "none"
+  # adaptor_type: "full"
+
+lora:
+  r: 768
+  lora_alpha: 8
+  target_modules: ["query", "key", "value", "dense"]
+  lora_dropout: 0.2
+  bias: "none"
+  task_type: "AUDIO_CLASSIFICATION"
+
+ia3:
+  target_modules: ["query", "key", "value", "dense"]
+  feedforward_modules: ["dense"]
+  task_type: "AUDIO_CLASSIFICATION"
+
+adalora:
+  init_r: 1200              # Initial rank
+  target_r: 768             # Target rank
+  target_modules: ["query", "key", "value", "dense"]
+  lora_alpha: 16
+  task_type: "AUDIO_CLASSIFICATION"
+
+oft:
+  r: 768
+  target_modules: ["query", "key", "value", "dense"]
+  module_dropout: 0.0
+  init_weights: true
+
+fourier:
+  target_modules: ["query", "key", "value", "dense"]
+  task_type: "AUDIO_CLASSIFICATION"
+
+layernorm:
+  target_modules: ["layernorm"]  # targets all LayerNorm modules
+  task_type: "AUDIO_CLASSIFICATION"
 
 # Script Configuration (solo run)
 wandb:
