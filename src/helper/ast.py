@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Union, Dict, Type, Any
+from .MoA import AST_MoA
 import os
 import torch
 from torch import nn
@@ -33,6 +34,33 @@ def download_model(model_name, cache_dir):
     AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
 
 def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassification, ASTFeatureExtractor]:
+    if adaptor_type == "moa":
+        params = {
+            'max_length': 1024,  # Example AST sequence length
+            'num_classes': 10,   # Number of output classes
+            'final_output': 'mean',  # How to aggregate sequence outputs
+            'reduction_rate': 128,   # Bottleneck reduction factor
+            'adapter_type': 'Pfeiffer',  # 'Pfeiffer' or 'Houlsby'
+            'location': 'MHSA',    # 'MHSA' or 'FFN'
+            'adapter_module': 'bottleneck',  # 'bottleneck' or 'conformer'
+            'num_adapters': 3,     # Number of parallel adapters
+            'model_ckpt': 'MIT/ast-finetuned-audioset-10-10-0.4593'
+        }
+        
+        # Initialize model
+        model = AST_MoA(
+            max_length=params['max_length'],
+            num_classes=params['num_classes'], 
+            final_output=params['final_output'],
+            reduction_rate=params['reduction_rate'],
+            adapter_type=params['adapter_type'],
+            location=params['location'],
+            adapter_module=params['adapter_module'],
+            num_adapters=params['num_adapters'],
+            model_ckpt=pretrained_AST_model
+        )
+        processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        return model, processor
     try:
         model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)

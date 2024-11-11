@@ -43,12 +43,13 @@ general:
 
   # adaptor_type: "lora"
   # adaptor_type: "ia3"
-  adaptor_type: "adalora"
+  # adaptor_type: "adalora"
   # adaptor_type: "oft" # top 0.97
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
   # adaptor_type: "none"
   # adaptor_type: "full"
+  adaptor_type: "moa"
 
 lora:
   r: 768
