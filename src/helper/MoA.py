@@ -400,7 +400,13 @@ class AST_MoA(nn.Module):
         assert adapter_type in ['Pfeiffer', 'Houlsby', ('Only Pfeiffer and Houlsby are supported!')]
         
         self.moa_config = MoA_config(num_adapters, reduction_rate, adapter_type, location, adapter_module)
-        self.model = ASTModel_MoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True)
+        CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
+        try:
+            self.model = ASTModel_MoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            self.model = ASTModel_MoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True, cache_dir=CACHE_DIR)
+           
+        # self.model = ASTModel_MoA.from_pretrained(model_ckpt, self.moa_config, max_length=max_length, ignore_mismatched_sizes=True)
         self.model_config = self.model.config
         self.final_output = final_output
         
