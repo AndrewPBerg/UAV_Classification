@@ -58,17 +58,10 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         return model, processor
     
     if adaptor_type == "soft-moa":
-        params = {
-            'max_length': 1024,
-            'final_output': 'CLS',
-            'reduction_rate': (128, 128),  # Tuple for reduction rates
-            'adapter_type': 'Pfeiffer',
-            'location': 'MHSA',
-            'adapter_module': ['bottleneck'],
-            'num_adapters': 3,
-            'num_slots': 8,
-            'normalize': True
-        }
+        with open('config.yaml', 'r') as file:
+            config = yaml.safe_load(file)
+        
+        params = config["soft-moa"]
         
         # Initialize model
         model = AST_SoftMoA(
