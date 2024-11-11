@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from typing import Optional, Tuple, Union, Dict, Type, Any
-from .MoA import AST_MoA
+from .MoA import AST_MoA, AST_SoftMoA
 import os
 import torch
 from torch import nn
@@ -54,9 +54,41 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
-            
+
         return model, processor
     
+    if adaptor_type == "soft-moa":
+        params = {
+            'max_length': 1024,
+            'final_output': 'CLS',
+            'reduction_rate': (128, 128),  # Tuple for reduction rates
+            'adapter_type': 'Pfeiffer',
+            'location': 'MHSA',
+            'adapter_module': ['bottleneck'],
+            'num_adapters': 3,
+            'num_slots': 8,
+            'normalize': True
+        }
+        
+        # Initialize model
+        model = AST_SoftMoA(
+            max_length=params['max_length'],
+            num_classes=num_classes,
+            final_output=params['final_output'],
+            reduction_rate=params['reduction_rate'], 
+            adapter_type=params['adapter_type'],
+            location=params['location'],
+            adapter_module=params['adapter_module'],
+            num_adapters=params['num_adapters'],
+            num_slots=params['num_slots'],
+            normalize=params['normalize'],
+            model_ckpt=pretrained_AST_model)
+        try:
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        return model, processor
     try:
         model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)

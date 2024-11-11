@@ -49,7 +49,9 @@ general:
   # adaptor_type: "layernorm"
   # adaptor_type: "none-classifier"
   # adaptor_type: "none-full"
-  adaptor_type: "moa"
+  # adaptor_type: "moa"
+  adaptor_type: "soft-moa"
+
 
 lora:
   r: 768
