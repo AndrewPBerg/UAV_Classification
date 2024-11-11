@@ -37,8 +37,8 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
     if adaptor_type == "moa":
         params = {
             'max_length': 1024,  # Example AST sequence length
-            'num_classes': 10,   # Number of output classes
-            'final_output': 'mean',  # How to aggregate sequence outputs
+            'num_classes': num_classes,   # Number of output classes
+            'final_output': 'CLS',  # How to aggregate sequence outputs
             'reduction_rate': 128,   # Bottleneck reduction factor
             'adapter_type': 'Pfeiffer',  # 'Pfeiffer' or 'Houlsby'
             'location': 'MHSA',    # 'MHSA' or 'FFN'
@@ -50,7 +50,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         # Initialize model
         model = AST_MoA(
             max_length=params['max_length'],
-            num_classes=params['num_classes'], 
+            num_classes=num_classes, 
             final_output=params['final_output'],
             reduction_rate=params['reduction_rate'],
             adapter_type=params['adapter_type'],
