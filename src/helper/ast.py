@@ -76,6 +76,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
             num_slots=params['num_slots'],
             normalize=params['normalize'],
             model_ckpt=pretrained_AST_model)
+        
         try:
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
@@ -89,51 +90,25 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         model = download_model(pretrained_AST_model, CACHE_DIR)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
     
+    if adaptor_type == "none-classifier":
+        model.config.num_labels = num_classes
+
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+            
+    if adaptor_type == "none-full":
+        model.config.num_labels = num_classes
+        
+        for param in model.parameters():
+            param.requires_grad = False
+            
+            
     in_features = model.classifier.dense.in_features
     model.classifier.dense = nn.Linear(in_features, num_classes)
     model = get_adaptor_model(model, adaptor_type)
 
-    # ic(model)
-    # if model is not None:
-        # model.config.num_labels = num_classes
-        
-        # # # Add label mappings
-        # # model.config.id2label = {i: f"LABEL_{i}" for i in range(num_classes)}
-        # # model.config.label2id = {v: k for k, v in model.config.id2label.items()}
-        
-        # # for param in model.parameters():
-        # #     param.requires_grad = False
-        # # for param in model.classifier.parameters():
-        # #     param.requires_grad = True
-
-        # # Freeze all parameters first
-        # for param in model.parameters():
-        #     param.requires_grad = False
-        
-        # Model-specific customizations
-        # try:
-            # model.classifier.dense = nn.Linear(in_features, num_classes)
-            # adaptor_config = get_peft_config(adaptor_type)
-
-                
-                # original_forward = model.forward
-                # def new_forward(self, input_values=None, **kwargs):
-                #     if isinstance(input_values, torch.Tensor):
-                #         return self.base_model(input_values=input_values)
-                    
-                #     if input_values is None and kwargs:
-                #         for k, v in kwargs.items():
-                #             if isinstance(v, torch.Tensor):
-                #                 return self.base_model(input_values=v)
-                    
-                #     return self.base_model(input_values=input_values)
-                
-                # model.forward = new_forward.__get__(model)
-                
-        # except Exception as e:
-        #     # logger.error(f"Error in custom_AST: {e}")
-        #     raise e
-    
     return model, processor
 
 def get_adaptor_config(adaptor_type: str):
