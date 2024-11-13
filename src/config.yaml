@@ -22,10 +22,10 @@ general:
   accumulation_steps: 5
   learning_rate: 0.006
   patience : 10
-  use_wandb: false
+  use_wandb: true
   
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 0
+  augmentations_per_sample: 1
   # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
   augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   # transform params must be inside list for augmentations.py to process corr
@@ -44,13 +44,13 @@ general:
   # adaptor_type: "lora"
   # adaptor_type: "ia3"
   # adaptor_type: "adalora"
-  # adaptor_type: "oft" # top 0.97
+  adaptor_type: "oft" # top 0.97
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
   # adaptor_type: "none-classifier"
   # adaptor_type: "none-full"
   # adaptor_type: "moa"
-  adaptor_type: "soft-moa"
+  # adaptor_type: "soft-moa"
 
 
 lora:
@@ -109,10 +109,10 @@ soft-moa:
   
 # Script Configuration (solo run)
 wandb:
-  project: "AST Adaptors"
-  name: "Lora Adaptor Test run"
+  project: "11-13 Meeting"
+  name: "oft r =768"
   reinit: false
-  notes: "first LoRA try"
+  notes: ""
   tags: "AST, LoRA"
   dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
 
