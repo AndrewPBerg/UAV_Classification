@@ -40,7 +40,10 @@ def train_step(model: torch.nn.Module,
     for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         outputs = model(X)
-        y_pred = outputs.logits
+        if hasattr(outputs, "logits"):
+            y_pred = outputs.logits
+        else:
+            y_pred = outputs # for custom MoA AST model
 
         loss = loss_fn(y_pred, y) / accumulation_steps
         loss.backward()
@@ -84,7 +87,10 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
             outputs = model(X)
-            y_pred = outputs.logits
+            if hasattr(outputs, "logits"):
+                y_pred = outputs.logits
+            else:
+                y_pred = outputs # for custom MoA AST model
 
             loss = loss_fn(y_pred, y)
             test_loss += loss.item()
