@@ -10,6 +10,8 @@ from transformers import (
 from icecream import ic
 import yaml
 import logging
+import wandb
+
 from peft import (
     get_peft_model, 
     LoraConfig,
@@ -38,7 +40,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         with open('config.yaml', 'r') as file:
             config = yaml.safe_load(file)
         
-        params = config["moa"]
+        params = config[adaptor_type]
         # Initialize model
         model = AST_MoA(
             max_length=params['max_length'],
@@ -55,7 +57,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         except OSError:
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
 
-        return model, processor
+        return model, processor, params
     
     if adaptor_type == "soft-moa":
         with open('config.yaml', 'r') as file:
@@ -82,7 +84,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         except OSError:
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
-        return model, processor
+        return model, processor, params
     try:
         model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
@@ -92,24 +94,25 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
     
     if adaptor_type == "none-classifier":
         model.config.num_labels = num_classes
-
+        adaptor_config = {}
         for param in model.parameters():
             param.requires_grad = False
         for param in model.classifier.parameters():
             param.requires_grad = True
             
     if adaptor_type == "none-full":
+        adaptor_config = {}
         model.config.num_labels = num_classes
         
         for param in model.parameters():
-            param.requires_grad = False
+            param.requires_grad = True
             
             
     in_features = model.classifier.dense.in_features
     model.classifier.dense = nn.Linear(in_features, num_classes)
-    model = get_adaptor_model(model, adaptor_type)
+    model, adaptor_config = get_adaptor_model(model, adaptor_type)
 
-    return model, processor
+    return model, processor, adaptor_config
 
 def get_adaptor_config(adaptor_type: str):
     with open('config.yaml', 'r') as file:
@@ -167,9 +170,6 @@ def get_adaptor_config(adaptor_type: str):
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
             )
-        
-        case "none":
-            pass
         case _:
             raise ValueError(f"Unknown adaptor type: {adaptor_type}")
     
@@ -182,7 +182,7 @@ def get_adaptor_model(model,adaptor_type: str):
     # match adaptor_type:
         # case "lora":
     ic(get_peft_model(model, adaptor_config))
-    return get_peft_model(model, adaptor_config)
+    return get_peft_model(model, adaptor_config), adaptor_config
             # return (model, adaptor_config
         # case "ia3":
         #     return get_peft_model(model, adaptor_config)
@@ -190,12 +190,3 @@ def get_adaptor_model(model,adaptor_type: str):
     print("no case matched!!! check config.yaml")
     print("no case matched!!! check config.yaml")
     print("no case matched!!! check config.yaml")
-
-
-"""
-Suggestions:
-- X-Lora
-- OFT
-- FourierFt
-- LayerNorm Tuning
-"""
