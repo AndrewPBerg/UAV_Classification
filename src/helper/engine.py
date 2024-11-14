@@ -31,7 +31,8 @@ def train_step(model: torch.nn.Module,
                accumulation_steps: int,
                precision_metric,
                recall_metric,
-               f1_metric) -> Tuple[float, float, float, float, float]:
+               f1_metric,
+               scaler: GradScaler) -> Tuple[float, float, float, float, float]:
     """Trains a PyTorch model for a single epoch with mixed precision and gradient accumulation."""
     model.train()
     train_loss, train_acc = 0, 0
@@ -39,30 +40,39 @@ def train_step(model: torch.nn.Module,
 
     for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
-        outputs = model(X)
-        if hasattr(outputs, "logits"):
-            y_pred = outputs.logits
-        else:
-            y_pred = outputs # for custom MoA AST model
+        
+        # Use autocast for mixed precision
+        with autocast():
+            outputs = model(X)
+            if hasattr(outputs, "logits"):
+                y_pred = outputs.logits
+            else:
+                y_pred = outputs
+            
+            loss = loss_fn(y_pred, y) / accumulation_steps
 
-        loss = loss_fn(y_pred, y) / accumulation_steps
-        loss.backward()
-
+        # Scale the loss and call backward()
+        scaler.scale(loss).backward()
 
         if (batch_idx + 1) % accumulation_steps == 0:
-            optimizer.step()
+            # Unscale gradients and step optimizer
+            scaler.unscale_(optimizer)
+            # Update weights
+            scaler.step(optimizer)
+            # Update scaler
+            scaler.update()
             optimizer.zero_grad()
 
-        train_loss += loss.item() * accumulation_steps  
+        train_loss += loss.item() * accumulation_steps
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         train_acc += (y_pred_class == y).sum().item() / len(y_pred)
 
-        # Update torchmetrics for train set
+        # Update metrics
         precision_metric.update(y_pred_class, y)
         recall_metric.update(y_pred_class, y)
         f1_metric.update(y_pred_class, y)
 
-    # Calculate train metrics
+    # Rest of the function remains the same
     train_loss /= len(dataloader)
     train_acc /= len(dataloader)
 
@@ -70,11 +80,9 @@ def train_step(model: torch.nn.Module,
     train_recall = recall_metric.compute().item()
     train_f1 = f1_metric.compute().item()
 
-    # Reset metrics for the next epoch
     precision_metric.reset()
     recall_metric.reset()
     f1_metric.reset()
-
 
     return train_loss, train_acc, train_precision, train_recall, train_f1
 
@@ -134,7 +142,8 @@ def train(model: torch.nn.Module,
           num_classes: int,
           accumulation_steps: int = 1,  
           patience: int = 5, 
-          delta: float = 0.01) -> Dict[str, List]:
+          delta: float = 0.01,
+          scaler: GradScaler = None) -> Dict[str, List]:
     """Trains and tests a PyTorch model with additional metrics (F1, precision, recall) using torchmetrics."""
     
     results = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": [], "test_loss": [], "test_acc": [], 
@@ -171,7 +180,8 @@ def train(model: torch.nn.Module,
             accumulation_steps=accumulation_steps,
             precision_metric=precision_metric_train,
             recall_metric=recall_metric_train,
-            f1_metric=f1_metric_train
+            f1_metric=f1_metric_train,
+            scaler=scaler
         )
         
         # Validation step

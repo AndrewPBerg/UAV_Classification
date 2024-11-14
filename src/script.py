@@ -12,6 +12,7 @@ import yaml
 from timeit import default_timer as timer 
 import wandb
 from icecream import ic
+from torch.cuda.amp import GradScaler, autocast
 
 def main():
 
@@ -58,9 +59,13 @@ def main():
     general_config['adaptor_config'] = adaptor_config
 
 
-
-
     model.to(device)
+
+    # Initialize gradient scaler for mixed precision
+    scaler = GradScaler()
+
+    # Enable cudnn benchmarking for faster training
+    torch.backends.cudnn.benchmark = True
 
     if USE_WANDB:
         wandb_login()
@@ -155,7 +160,8 @@ def main():
         device=device,
         num_classes=NUM_CLASSES,
         accumulation_steps=ACCUMULATION_STEPS,
-        patience=TRAIN_PATIENCE
+        patience=TRAIN_PATIENCE,
+        scaler=scaler
     )
 
     inference_loop(model=model,

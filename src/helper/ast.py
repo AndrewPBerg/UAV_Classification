@@ -85,27 +85,42 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
         return model, processor, params
-    try:
-        model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-    except OSError: # if model is not cached, download it
-        model = download_model(pretrained_AST_model, CACHE_DIR)
-        processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
-    
+
     if adaptor_type == "none-classifier":
+        try:
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError: # if model is not cached, download it
+            model = download_model(pretrained_AST_model, CACHE_DIR)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+
         model.config.num_labels = num_classes
         adaptor_config = {}
         for param in model.parameters():
             param.requires_grad = False
         for param in model.classifier.parameters():
             param.requires_grad = True
-            
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        
+        return model, processor, {}
+
     if adaptor_type == "none-full":
-        adaptor_config = {}
+        try:
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError: # if model is not cached, download it
+            model = download_model(pretrained_AST_model, CACHE_DIR)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         model.config.num_labels = num_classes
         
         for param in model.parameters():
             param.requires_grad = True
+        
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        return model, processor, {}
+            
             
             
     in_features = model.classifier.dense.in_features
