@@ -118,44 +118,44 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "pitch_shift H-tuning"
+  name: "Control Group for solo Aug H-tuning"
   method: "random"
   metric:
     name: "test_acc"
     goal: "maximize"
   parameters:
     adaptor_type:
-      values: ["lora","none-classifier","ia3","moa"]
-    num_augmentations:
-      values: [1]
-    augmentations_per_sample:
+      values: ["ia3"]
+    num_augmentations: # how many augmentations are to be chosen  @ random per run
+      values: [0]
+    augmentations_per_sample: # how many times will the dataset be augmented?
       values: [2]
       # distribution: int_uniform
       # min: 2
       # max: 3
     # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
     augmentations: 
-      values: ["pitch_shift"]
-    pitch_shift_min_rate:
-      values: [-12.0, -9.0, -6.0, -3.0, 0]
-    pitch_shift_max_rate:
-      values: [0, 3.0, 6.0, 9.0, 12.0]
+      values: [["polarity_inversion"]]
+    # pitch_shift_min_rate:
+      # values: [-12.0, -9.0, -6.0, -3.0, 0]
+    # pitch_shift_max_rate:
+    #   values: [0, 3.0, 6.0, 9.0, 12.0]
     # time_stretch_min_rate:
     #   values: [0.1, 0.5, 0.8, 0.9]
     # time_stretch_max_rate:
     #   values: [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
     # tanh_distortion_min_rate: 
-    #   values: [0.2]
+    #   values: [0.01, 0.1, 0.2]
     # tanh_distortion_max_rate:
-    #   values: [0.9]
+    #   values: [0.25, 0.35, 0.5, 0.6]
     # sin_distortion_min_rate: 
-    #   values: [0.2]
+    #   values: [0.01, 0.1, 0.2]
     # sin_distortion_max_rate: 
-    #   values: [0.9]
+    #   values: [0.25, 0.35, 0.5, 0.6]
     # add_noise_min_amplitude: 
-    #   values: [0.001]
+    #   values: [0.01, 0.1]
     # add_noise_max_amplitude:
-    #   values: [0.015]
+    #   values: [0.15, 0.2]
     
     
     
