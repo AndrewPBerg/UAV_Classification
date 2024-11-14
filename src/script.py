@@ -59,8 +59,6 @@ def main():
     general_config['adaptor_config'] = adaptor_config
 
 
-
-
     model.to(device)
 
     # Initialize gradient scaler for mixed precision
