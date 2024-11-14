@@ -11,24 +11,23 @@ general:
   seed: 41
   num_cuda_workers: 8
   pinned_memory: true
-  epochs: 1000
+  epochs: 20
   save_model: false
-  project_name: "AST_Sweeps"
-  sweep_count: 10000
+  project_name: "Augmentation_Experiments"
+  sweep_count: 1000
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
   shuffled : false
   accumulation_steps: 2
   learning_rate: 0.006
-  patience : 10
+  patience : 3
   use_wandb: true
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0
-  # all currently available augmenations --> ["PitchShift", "TimeStretch", "AddGaussianNoise", "Shift", "TimeMask", "Reverse", "Normalize", "GainTransition", "PolarityInversion", "Gain"]
-  augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   # transform params must be inside list for augmentations.py to process corr
+  augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   pitch_shift_min_rate: 0
   pitch_shift_max_rate: 12.0
   
@@ -119,25 +118,47 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "AST : pitchShift & timeStretch auto-tune"
+  name: "pitch_shift H-tuning"
   method: "random"
   metric:
     name: "test_acc"
     goal: "maximize"
   parameters:
-    learning_rate:
-      values: [0.006]
+    adaptor_type:
+      values: ["lora","none-classifier","ia3","moa"]
     num_augmentations:
-      values: [2]
+      values: [1]
     augmentations_per_sample:
-      distribution: int_uniform
-      min: 1
-      max: 3
+      values: [2]
+      # distribution: int_uniform
+      # min: 2
+      # max: 3
+    # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
+    augmentations: 
+      values: ["pitch_shift"]
     pitch_shift_min_rate:
       values: [-12.0, -9.0, -6.0, -3.0, 0]
     pitch_shift_max_rate:
       values: [0, 3.0, 6.0, 9.0, 12.0]
-    time_stretch_min_rate:
-      values: [0.1, 0.5, 0.8, 0.9]
-    time_stretch_max_rate:
-      values: [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
+    # time_stretch_min_rate:
+    #   values: [0.1, 0.5, 0.8, 0.9]
+    # time_stretch_max_rate:
+    #   values: [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
+    # tanh_distortion_min_rate: 
+    #   values: [0.2]
+    # tanh_distortion_max_rate:
+    #   values: [0.9]
+    # sin_distortion_min_rate: 
+    #   values: [0.2]
+    # sin_distortion_max_rate: 
+    #   values: [0.9]
+    # add_noise_min_amplitude: 
+    #   values: [0.001]
+    # add_noise_max_amplitude:
+    #   values: [0.015]
+    
+    
+    
+    
+
+

@@ -35,7 +35,7 @@ def download_model(model_name, cache_dir):
     logger.info(f"Manually downloading {model_name} to {cache_dir}")
     AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
 
-def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassification, ASTFeatureExtractor]:
+def custom_AST(num_classes: int, adaptor_type: str):
     if adaptor_type == "moa":
         with open('config.yaml', 'r') as file:
             config = yaml.safe_load(file)

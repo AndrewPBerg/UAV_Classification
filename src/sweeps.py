@@ -45,7 +45,7 @@ def get_mixed_params(sweep_config, general_config):
 
 def make(config):
 
-    MODEL_NAME = config['model_name']
+    # MODEL_NAME = config['model_name'] # Deprecated; only AST now
     DATA_PATH = config['data_path']
     TEST_SIZE = config['test_size']
     SEED = config['seed']
@@ -59,6 +59,7 @@ def make(config):
     LEARNING_RATE = config['learning_rate']
     NUM_CUDA_WORKERS = config['num_cuda_workers']
     NUM_CLASSES = general_config['num_classes']
+    ADAPTOR_TYPE = config['adaptor_type']
     
     # Get the selected augmentations directly from the config
     num_augmentations = NUM_AUGMENTATIONS
@@ -68,7 +69,7 @@ def make(config):
     wandb.log({"selected_augmentations": selected_augmentations})
 
     # Update model creation to use custom_AST
-    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, config.get('adaptor_type', 'none-classifier'))
+    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
     
     # Add adaptor config to the general config
     config['adaptor_config'] = adaptor_config
