@@ -31,7 +31,9 @@ def create_augmentation_pipeline(augmentations: list[str], config: dict):
                                               max_distortion=config['sin_distortion_max_rate'],
                                               p=1.0))
             case "add_noise":
-                transforms.append(AddGaussianNoise(min_amplitude=0.001, max_amplitude=0.015, p=1.0))
+                transforms.append(AddGaussianNoise(min_amplitude=config['add_noise_min_amplitude'], 
+                                                   max_amplitude=config['add_noise_max_amplitude'],
+                                                   p=1.0))
             case "polarity_inversion":
                 transforms.append(PolarityInversion(p=1.0))
             case _:
