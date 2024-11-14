@@ -10,6 +10,7 @@ import torch.nn as nn
 import wandb
 import random
 from torch.cuda.amp import GradScaler, autocast
+import sys
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -62,9 +63,16 @@ def make(config):
     ADAPTOR_TYPE = config['adaptor_type']
     
     # Get the selected augmentations directly from the config
-    num_augmentations = NUM_AUGMENTATIONS
-    selected_augmentations = random.sample(k=num_augmentations, population=AUGMENTATIONS)
-    
+
+    if NUM_AUGMENTATIONS <0:
+        raise ValueError
+    elif NUM_AUGMENTATIONS == 0:
+        selected_augmentations = ["None"]
+    else:
+        selected_augmentations = random.sample(AUGMENTATIONS, NUM_AUGMENTATIONS)
+
+    print(f"selection augs: {selected_augmentations}")
+
     # Log the selected augmentations
     wandb.log({"selected_augmentations": selected_augmentations})
 
