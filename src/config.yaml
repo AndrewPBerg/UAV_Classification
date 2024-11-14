@@ -22,7 +22,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.006
   patience : 10
-  use_wandb: false
+  use_wandb: true
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0

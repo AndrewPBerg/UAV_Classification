@@ -23,56 +23,57 @@ ground_truth_all, predictions_all = [], []
 
 
 
-def train_step(model: torch.nn.Module, 
-               dataloader: torch.utils.data.DataLoader, 
-               loss_fn: torch.nn.Module, 
-               optimizer: torch.optim.Optimizer, # type: ignore
-               device: str,
-               accumulation_steps: int,
-               precision_metric,
-               recall_metric,
-               f1_metric,
-               scaler: GradScaler) -> Tuple[float, float, float, float, float]:
-    """Trains a PyTorch model for a single epoch with mixed precision and gradient accumulation."""
+def train_step(model, 
+              dataloader, 
+              loss_fn, 
+              optimizer,
+              device,
+              scaler,
+              precision_metric,
+              recall_metric,
+              f1_metric,
+              accumulation_steps=1):
     model.train()
     train_loss, train_acc = 0, 0
+    
+    # Initialize metrics
+    y_pred_list = []
+    y_true_list = []
+    
+    len_dataloader = len(dataloader)
     optimizer.zero_grad()
-
+    
     for batch_idx, (X, y) in enumerate(dataloader):
         X, y = X.to(device), y.to(device)
         
-        # Use autocast for mixed precision
-        with autocast():
+        # Ensure input is float32 before forward pass
+        X = X.float()
+        
+        with autocast(enabled=True, dtype=torch.float16):
             outputs = model(X)
             if hasattr(outputs, "logits"):
                 y_pred = outputs.logits
             else:
                 y_pred = outputs
-            
-            loss = loss_fn(y_pred, y) / accumulation_steps
-
-        # Scale the loss and call backward()
+            loss = loss_fn(y_pred, y)
+            loss = loss / accumulation_steps
+        
         scaler.scale(loss).backward()
-
-        if (batch_idx + 1) % accumulation_steps == 0:
-            # Unscale gradients and step optimizer
-            scaler.unscale_(optimizer)
-            # Update weights
+        
+        if ((batch_idx + 1) % accumulation_steps == 0) or (batch_idx + 1 == len_dataloader):
             scaler.step(optimizer)
-            # Update scaler
             scaler.update()
             optimizer.zero_grad()
-
+        
         train_loss += loss.item() * accumulation_steps
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        train_acc += (y_pred_class == y).sum().item() / len(y_pred)
+        train_acc += (y_pred_class == y).sum().item() / len(y_pred_class)
 
         # Update metrics
         precision_metric.update(y_pred_class, y)
         recall_metric.update(y_pred_class, y)
         f1_metric.update(y_pred_class, y)
 
-    # Rest of the function remains the same
     train_loss /= len(dataloader)
     train_acc /= len(dataloader)
 
@@ -143,9 +144,12 @@ def train(model: torch.nn.Module,
           accumulation_steps: int = 1,  
           patience: int = 5, 
           delta: float = 0.01,
-          scaler: GradScaler = None) -> Dict[str, List]:
+          scaler: GradScaler | None = None) -> Dict[str, List]:
     """Trains and tests a PyTorch model with additional metrics (F1, precision, recall) using torchmetrics."""
     
+    if scaler is None:
+        scaler = GradScaler()
+
     results = {"train_loss": [], "train_acc": [], "val_loss": [], "val_acc": [], "test_loss": [], "test_acc": [], 
                "train_f1": [], "val_f1": [], "test_f1": [], 
                "train_precision": [], "val_precision": [], "test_precision": [], 

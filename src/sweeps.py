@@ -1,7 +1,7 @@
 import yaml
 from helper.util import train_test_split_custom, wandb_login
 from helper.engine import train, inference_loop
-from helper.model import get_model_and_processor
+from helper.ast import custom_AST
 
 import torch
 from torch.utils.data import DataLoader
@@ -9,6 +9,7 @@ import torch.optim as optim
 import torch.nn as nn
 import wandb
 import random
+from torch.cuda.amp import GradScaler, autocast
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -66,8 +67,11 @@ def make(config):
     # Log the selected augmentations
     wandb.log({"selected_augmentations": selected_augmentations})
 
-    # Make model and feature extractor
-    model, feature_extractor = get_model_and_processor(MODEL_NAME, NUM_CLASSES)
+    # Update model creation to use custom_AST
+    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, config.get('adaptor_type', 'none-classifier'))
+    
+    # Add adaptor config to the general config
+    config['adaptor_config'] = adaptor_config
 
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
         DATA_PATH, 
@@ -98,9 +102,7 @@ def make(config):
 
 def model_pipeline(config=None):
     with wandb.init(config=config):
-        # Updated wandb configuration handling
         config = wandb.config
-
         mixed_params = get_mixed_params(config, general_config)
 
         # Assign dictionary values to variables
@@ -112,23 +114,40 @@ def model_pipeline(config=None):
         model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes = make(mixed_params)
         print(model)
 
-        results = train(model,
-                        train_dataloader=train_loader,
-                        test_dataloader=test_loader,
-                        val_dataloader=val_loader,
-                        optimizer=optimizer,
-                        scheduler=scheduler, # type: ignore
-                        loss_fn=criterion,
-                        epochs=EPOCHS,#type: ignore
-                        device=device,
-                        num_classes=NUM_CLASSES,
-                        accumulation_steps=ACCUMULATION_STEPS,#type: ignore
-                        patience=PATIENCE)#type: ignore
+        # Move model to device before creating scaler
+        model = model.to(device)
+        
+        # Convert model to float32 before training
+        model = model.float()
 
-        inference_loop(model=model,
-                       device=device,
-                       loss_fn=criterion,
-                       inference_loader=inference_loader)
+        # Initialize gradient scaler for mixed precision
+        scaler = GradScaler()
+
+        # Enable cudnn benchmarking for faster training
+        torch.backends.cudnn.benchmark = True
+
+        results = train(
+            model=model,
+            train_dataloader=train_loader,
+            test_dataloader=test_loader,
+            val_dataloader=val_loader,
+            optimizer=optimizer,
+            scheduler=scheduler,
+            loss_fn=criterion,
+            epochs=EPOCHS,
+            device=device,
+            num_classes=NUM_CLASSES,
+            accumulation_steps=ACCUMULATION_STEPS,
+            patience=PATIENCE,
+            scaler=scaler
+        )
+
+        inference_loop(
+            model=model,
+            device=device,
+            loss_fn=criterion,
+            inference_loader=inference_loader
+        )
 
     return model, results
 
