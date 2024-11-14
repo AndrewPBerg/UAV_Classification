@@ -48,6 +48,20 @@ def main():
 
     ADAPTOR_TYPE = general_config['adaptor_type']
 
+
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+
+    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
+    # general_config= general_config | adaptor_config
+
+    general_config['adaptor_config'] = adaptor_config
+
+
+
+
+    model.to(device)
+
     if USE_WANDB:
         wandb_login()
         
@@ -60,14 +74,6 @@ def main():
                 "dir" : run_config['dir'],
                 "config": general_config
             }
-
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-
-    model, feature_extractor = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
-    
-    model.to(device)
-
     # dataset = AudioDataset(data_path, feature_extractor)
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
         DATA_PATH, 
