@@ -13,7 +13,7 @@ import logging
 import wandb
 
 from peft import (
-    get_peft_model, 
+    get_peft_model,
     LoraConfig,
     IA3Config,
     AdaLoraConfig,
@@ -59,7 +59,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
 
         return model, processor, params
     
-    if adaptor_type == "soft-moa":
+    elif adaptor_type == "soft-moa":
         with open('config.yaml', 'r') as file:
             config = yaml.safe_load(file)
         
@@ -86,7 +86,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         
         return model, processor, params
 
-    if adaptor_type == "none-classifier":
+    elif adaptor_type == "none-classifier":
         try:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
@@ -105,7 +105,7 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         
         return model, processor, {}
 
-    if adaptor_type == "none-full":
+    elif adaptor_type == "none-full":
         try:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
             processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
@@ -120,14 +120,20 @@ def custom_AST(num_classes: int, adaptor_type: str) -> Tuple[ASTForAudioClassifi
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
         return model, processor, {}
-            
-            
-            
-    in_features = model.classifier.dense.in_features
-    model.classifier.dense = nn.Linear(in_features, num_classes)
-    model, adaptor_config = get_adaptor_model(model, adaptor_type)
 
-    return model, processor, adaptor_config
+    else:
+        # Handle other adaptor types
+        try:
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            model = download_model(pretrained_AST_model, CACHE_DIR)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        model, adaptor_config = get_adaptor_model(model, adaptor_type)
+        return model, processor, adaptor_config
 
 def get_adaptor_config(adaptor_type: str):
     with open('config.yaml', 'r') as file:
