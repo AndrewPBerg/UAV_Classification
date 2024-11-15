@@ -11,7 +11,10 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
       - DEBIAN_FRONTEND=noninteractive
-      - WANDB_API_KEY=${WANDB_API_KEY}  # Changed to WANDB_API_KEY
+      - WANDB_API_KEY=${WANDB_API_KEY}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - CHAT_ID=${CHAT_ID}
+
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
       - ./src/datasets/.:/app/src/datasets
