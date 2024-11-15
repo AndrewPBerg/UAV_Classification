@@ -118,7 +118,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "tanh_distortion H-tuning"
+  name: "sin_distortion H-tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -135,7 +135,7 @@ sweep:
       # max: 3
     # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
     augmentations: 
-      values: [["tanh_distortion"]]
+      values: [["sin_distortion"]]
     # pitch_shift_min_rate:
     #   values: [-12.0, -9.0, -6.0, -3.0, 0]
     # pitch_shift_max_rate:
@@ -144,14 +144,14 @@ sweep:
     #   values: [0.1, 0.5, 0.8, 0.9]
     # time_stretch_max_rate:
     #   values: [0.9, 1, 1.1, 1.25, 1.5, 1.75, 2]
-    tanh_distortion_min_rate: 
-      values: [0.01, 0.1, 0.2]
-    tanh_distortion_max_rate:
-      values: [0.25, 0.35, 0.5, 0.6]
-    # sin_distortion_min_rate: 
+    # tanh_distortion_min_rate: 
     #   values: [0.01, 0.1, 0.2]
-    # sin_distortion_max_rate: 
+    # tanh_distortion_max_rate:
     #   values: [0.25, 0.35, 0.5, 0.6]
+    sin_distortion_min_rate: 
+      values: [0.01, 0.1, 0.2]
+    sin_distortion_max_rate: 
+      values: [0.25, 0.35, 0.5, 0.6]
     # add_noise_min_amplitude: 
     #   values: [0.01, 0.1]
     # add_noise_max_amplitude:
