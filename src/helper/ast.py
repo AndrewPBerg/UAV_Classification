@@ -64,9 +64,9 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
             num_adapters=params['num_adapters'],
             model_ckpt=pretrained_AST_model)
         try:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True, max_length=params['max_length'])
         except OSError:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, max_length=params['max_length'])
 
         return model, processor, params
     
@@ -86,9 +86,9 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
             model_ckpt=pretrained_AST_model)
         
         try:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True, max_length=params['max_length'])
         except OSError:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, max_length=params['max_length'])
         
         return model, processor, params
 
