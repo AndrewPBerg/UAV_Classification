@@ -16,6 +16,22 @@ import numpy as np
 
 import wandb
 
+def get_mixed_params(sweep_config, general_config):
+    # copy sweep_config to result dict
+    result = sweep_config 
+
+    for key, value in general_config.items():
+        # just like LeetCode isDuplicate problem
+        if key in result:
+            pass
+        else:
+            # if not already occupied by sweep config value add the current general parameter
+            result[key] = value
+    
+    # final dict should contain all of the config.yaml parameters
+    # where sweep parameters have priority over duplicates in the general configuration
+    return result
+
 def calculated_load_time(start, end) -> str:
     total_load_time = end - start
     hours = int(total_load_time // 3600)

@@ -2,6 +2,7 @@ import yaml
 from helper.util import train_test_split_custom, wandb_login
 from helper.engine import train, inference_loop
 from helper.ast import custom_AST
+from helper.util import get_mixed_params
 
 import torch
 from torch.utils.data import DataLoader
@@ -29,22 +30,6 @@ def create_dataloader(dataset, batch_size, num_workers, shuffle=True, pin_memory
                       pin_memory=pin_memory,
                       shuffle=shuffle)
 
-def get_mixed_params(sweep_config, general_config):
-    # copy sweep_config to result dict
-    result = sweep_config 
-
-    for key, value in general_config.items():
-        # just like LeetCode isDuplicate problem
-        if key in result:
-            pass
-        else:
-            # if not already occupied by sweep config value add the current general parameter
-            result[key] = value
-    
-    # final dict should contain all of the config.yaml parameters
-    # where sweep parameters have priority over duplicates in the general configuration
-    return result
-
 def make(config):
 
     # MODEL_NAME = config['model_name'] # Deprecated; only AST now
@@ -55,18 +40,21 @@ def make(config):
     VAL_SIZE = config['val_size']
     BATCH_SIZE = config['batch_size']
     AUGMENTATIONS = config['augmentations']
-
-    NUM_AUGMENTATIONS = config['num_augmentations']
     AUGMENTATIONS_PER_SAMPLE = config['augmentations_per_sample']
     LEARNING_RATE = config['learning_rate']
+
     NUM_CUDA_WORKERS = config['num_cuda_workers']
     NUM_CLASSES = general_config['num_classes']
     ADAPTOR_TYPE = config['adaptor_type']
-    
+    try:    
+        NUM_AUGMENTATIONS = config['num_augmentations'] # sweeps exclusive
+    except KeyError: # NUM_AUGMENTATIONS isn't being utilized
+        NUM_AUGMENTATIONS = None
     # Get the selected augmentations directly from the config
 
-    if NUM_AUGMENTATIONS <0:
-        raise ValueError
+    if NUM_AUGMENTATIONS is None:
+        # this means config is setup for general augmentation use
+        selected_augmentations = AUGMENTATIONS
     elif NUM_AUGMENTATIONS == 0:
         selected_augmentations = ["None"]
     else:
@@ -78,7 +66,7 @@ def make(config):
     wandb.log({"selected_augmentations": selected_augmentations})
 
     # Update model creation to use custom_AST
-    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
+    model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE, sweep_config=config)
     
     # Add adaptor config to the general config
     config['adaptor_config'] = adaptor_config

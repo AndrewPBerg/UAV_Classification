@@ -13,8 +13,8 @@ general:
   pinned_memory: true
   epochs: 20
   save_model: false
-  project_name: "Group Augmentations"
-  sweep_count: 3
+  project_name: "Adaptor H tuning"
+  sweep_count: 300
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
@@ -27,30 +27,36 @@ general:
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0
   # transform params must be inside list for augmentations.py to process corr
-  augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
-  pitch_shift_min_rate: 0
-  pitch_shift_max_rate: 12.0
+  # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
+  augmentations: ["time_stretch", "sin_distortion"]
+  # pitch_shift_min_rate: 0
+  # pitch_shift_max_rate: 12.0
   
   time_stretch_min_rate: 0.9
   time_stretch_max_rate: 1.0
 
-  tanh_distortion_min_rate: 0.2
-  tanh_distortion_max_rate: 0.6
+  # tanh_distortion_min_rate: 0.2
+  # tanh_distortion_max_rate: 0.6
 
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
 
-  # adaptor_type: "lora"
+  adaptor_type: "lora"
   # adaptor_type: "ia3"
   # adaptor_type: "adalora"
   # adaptor_type: "oft"
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
-  adaptor_type: "none-classifier"
+  # adaptor_type: "none-classifier"
   # adaptor_type: "none-full"
   # adaptor_type: "moa"
   # adaptor_type: "soft-moa"
 
+none-classifier:
+  none: none
+
+none-full:
+  none: none
 
 lora:
   r: 768
@@ -118,24 +124,32 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "Control Group"
+  name: "moa H tuning"
   method: "random"
   metric:
     name: "test_acc"
     goal: "maximize"
   parameters:
     adaptor_type:
-      values: ["ia3"]
-    num_augmentations: # how many augmentations are to be chosen  @ random per run
-      values: [2,3]
-    augmentations_per_sample: # how many times will the dataset be augmented?
-      values: [1,2,3,4,5]
-      # distribution: int_uniform
-      # min: 2
-      # max: 3
-    # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
-    augmentations: 
-      values: [["sin_distortion","tanh_distortion","time_stretch"]]
+      # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
+      values: ["moa"]
+    #   values: ["none-classifier"]
+    # target_modules:
+    #   values: [["query","key","value","dense"]]
+    max_length:  # Example AST sequence length
+      values: [1024, 800, 600, 400, 200, 100]
+    reduction_rate:  # Bottleneck reduction factor
+      values: [128, 64, 32]
+    adapter_type: # 'Pfeiffer' or 'Houlsby'
+      values: ['Pfeiffer', 'Houlsby']
+    location: # 'MHSA' or 'FFN'
+      values: ['MHSA', 'FFN']
+    adapter_module: # 'bottleneck' or 'conformer'
+      values: ['bottleneck', 'convpass']
+    num_adapters: # Number of parallel adapters
+      values: [3,2,1]
+    num_slots:
+      values: [16,8,4,2,1]
 
     
     

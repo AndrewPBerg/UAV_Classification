@@ -11,6 +11,8 @@ from icecream import ic
 import yaml
 import logging
 import wandb
+import sys
+from .util import get_mixed_params
 
 from peft import (
     get_peft_model,
@@ -31,17 +33,26 @@ logging.getLogger('transformers').setLevel(logging.ERROR)
 
 # downloads and store cached version in mounted Docker Volume
 # Makes runs fast and the containers very tiny
+
 def download_model(model_name, cache_dir):
     logger.info(f"Manually downloading {model_name} to {cache_dir}")
     AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
 
-def custom_AST(num_classes: int, adaptor_type: str):
-    if adaptor_type == "moa":
-        with open('config.yaml', 'r') as file:
-            config = yaml.safe_load(file)
-        
+def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
+    
+    # if sweep_config is None:
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    # else: 
+    if sweep_config:
+        # config = sweep_config
+        params = get_mixed_params(sweep_config, config[adaptor_type])
+    
+    else:
         params = config[adaptor_type]
-        # Initialize model
+    
+    if adaptor_type == "moa":
+
         model = AST_MoA(
             max_length=params['max_length'],
             num_classes=num_classes, 
@@ -60,11 +71,6 @@ def custom_AST(num_classes: int, adaptor_type: str):
         return model, processor, params
     
     elif adaptor_type == "soft-moa":
-        with open('config.yaml', 'r') as file:
-            config = yaml.safe_load(file)
-        
-        params = config["soft-moa"]
-        
         # Initialize model
         model = AST_SoftMoA(
             max_length=params['max_length'],
@@ -132,16 +138,24 @@ def custom_AST(num_classes: int, adaptor_type: str):
         
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
-        model, adaptor_config = get_adaptor_model(model, adaptor_type)
+        if sweep_config is None:
+            model, adaptor_config = get_adaptor_model(model, adaptor_type)
+        else:
+            model, adaptor_config = get_adaptor_model(model, adaptor_type, params)
+        
         return model, processor, adaptor_config
 
-def get_adaptor_config(adaptor_type: str):
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-
+def get_adaptor_config(adaptor_type: str, params: dict):
+    # if sweep_config is None:
+    #     with open('config.yaml', 'r') as file:
+    #         config = yaml.safe_load(file)
+    #         config = config[adaptor_type]
+    # else:
+    #     config = sweep_config
+    config = params
     match adaptor_type:
         case "lora":
-            config = config["lora"]
+            # config = config["lora"]
             return LoraConfig(
                         r=config["r"],
                         lora_alpha=config["lora_alpha"],
@@ -152,7 +166,7 @@ def get_adaptor_config(adaptor_type: str):
                     )
         
         case "ia3":
-            config = config["ia3"]
+            # config = config["ia3"]
             return IA3Config( 
                 target_modules=config["target_modules"],
                 feedforward_modules=config["feedforward_modules"],
@@ -160,7 +174,7 @@ def get_adaptor_config(adaptor_type: str):
                 )
         
         case "adalora":
-            config = config["adalora"]
+            # config = config["adalora"]
             return AdaLoraConfig(
                 init_r=config["init_r"],
                 target_r=config["target_r"],
@@ -170,7 +184,7 @@ def get_adaptor_config(adaptor_type: str):
             )
             
         case "oft":
-            config = config["oft"]
+            # config = config["oft"]
             return OFTConfig(
                 r=config['r'],
                 target_modules=config['target_modules'],
@@ -179,14 +193,14 @@ def get_adaptor_config(adaptor_type: str):
             )
             
         case "fourier":
-            config = config["fourier"]
+            # config = config["fourier"]
             return FourierFTConfig(
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
             )
             
         case "layernorm":
-            config = config["layernorm"]
+            # config = config["layernorm"]
             return LNTuningConfig(
                 target_modules=config["target_modules"],
                 task_type=config["task_type"]
@@ -195,9 +209,9 @@ def get_adaptor_config(adaptor_type: str):
             raise ValueError(f"Unknown adaptor type: {adaptor_type}")
     
         
-def get_adaptor_model(model,adaptor_type: str):
+def get_adaptor_model(model, adaptor_type: str, params:dict):
 
-    adaptor_config = get_adaptor_config(adaptor_type)
+    adaptor_config = get_adaptor_config(adaptor_type, params)
     print("-----------------------------------------")
     # ic(adaptor_config)
     # match adaptor_type:

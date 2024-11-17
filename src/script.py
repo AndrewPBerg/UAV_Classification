@@ -13,6 +13,7 @@ from timeit import default_timer as timer
 import wandb
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
+import sys
 
 def main():
 
@@ -53,6 +54,8 @@ def main():
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
 
+
+    
     model, feature_extractor, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
     # general_config= general_config | adaptor_config
 
