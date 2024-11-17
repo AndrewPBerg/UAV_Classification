@@ -124,7 +124,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "moa H tuning"
+  name: "soft-moa H tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -132,7 +132,7 @@ sweep:
   parameters:
     adaptor_type:
       # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
-      values: ["moa"]
+      values: ["soft-moa"]
     #   values: ["none-classifier"]
     # target_modules:
     #   values: [["query","key","value","dense"]]
@@ -147,11 +147,33 @@ sweep:
     adapter_module: # 'bottleneck' or 'conformer'
       values: ['bottleneck', 'convpass']
     num_adapters: # Number of parallel adapters
-      values: [3,2,1]
+      values: [2,1]
     num_slots:
       values: [16,8,4,2,1]
 
+    # adaptor_type:
+    #   values: ['soft-moa']
+    # max_length:
+    # num_slots:
+
+    # NUM_SLOTS: int
+    # NORMALIZE: bool # Whether to normalize the input and slot_params (aka Phi). As suggested in the paper, the normalization 
+    #                 # has an impact when the hidden_size is increased. In our case, for d=768, there's no difference.
     
+    # REDUCTION_RATE: int 
+    # ADAPTER_TYPE: str  # Pfeiffer/Houlsby
+    # ADAPTER_LOCATION: str  # MHSA/FFN.
+    # ADAPTER_MODULE: str   # convpass/bottleneck. 
+
+    #       NUM_ADAPTERS: int 
+
+
+# MoA
+    # NUM_ADAPTERS: int
+    # REDUCTION_RATE: int
+    # ADAPTER_TYPE: str  # Pfeiffer/Houlsby.
+    # ADAPTER_LOCATION: str  # MHSA/FFN. If ADAPTER_TYPE == Houlsby, this parameter is not considered.
+    # ADAPTER_MODULE: str   # Convpass/Bottleneck.
     
     
     
