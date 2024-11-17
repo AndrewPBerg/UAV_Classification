@@ -308,14 +308,18 @@ def inference_loop(model: torch.nn.Module,
             with torch.cuda.amp.autocast():
                 # Forward pass (extract logits)
                 outputs = model(X_batch)
-                logits = outputs.logits  # Get logits from the model
+                # Get logits from the model
+                if hasattr(outputs, "logits"):
+                    y_pred = outputs.logits
+                else:
+                    y_pred = outputs
 
                 # Calculate loss
-                loss = loss_fn(logits, y_batch)
+                loss = loss_fn(y_pred, y_batch)
                 total_loss += loss.item()
 
                 # Get predictions
-                _, predicted = torch.max(logits, 1)
+                _, predicted = torch.max(y_pred, 1)
                 correct += (predicted == y_batch).sum().item()
                 total += y_batch.size(0)
 
