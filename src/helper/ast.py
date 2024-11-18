@@ -196,7 +196,9 @@ def get_adaptor_config(adaptor_type: str, params: dict):
             # config = config["fourier"]
             return FourierFTConfig(
                 target_modules=config["target_modules"],
-                task_type=config["task_type"]
+                task_type=config["task_type"],
+                n_frequency=config["n_frequency"],
+                scaling=config["scaling"],
             )
             
         case "layernorm":

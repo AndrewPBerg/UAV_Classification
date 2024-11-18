@@ -13,6 +13,7 @@ import random
 from torch.cuda.amp import GradScaler, autocast
 import sys
 from helper.teleBot import send_message
+from helper.util import count_parameters
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -71,6 +72,7 @@ def make(config):
     # Add adaptor config to the general config
     config['adaptor_config'] = adaptor_config
 
+
     train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
         DATA_PATH, 
         feature_extractor, 
@@ -111,8 +113,11 @@ def model_pipeline(config=None):
 
         model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes = make(mixed_params)
         print(model)
+        model_params = count_parameters(model)
+        wandb.log({"model_params": model_params})
 
         # Move model to device before creating scaler
+        
         model = model.to(device)
         
         # Convert model to float32 before training

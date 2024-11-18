@@ -16,6 +16,11 @@ import numpy as np
 
 import wandb
 
+def count_parameters(model):
+    total_params = sum(p.numel() for p in model.parameters())
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    return f'Total Parameters: {total_params:,}\nTrainable Parameters: {trainable_params:,}'
+
 def get_mixed_params(sweep_config, general_config):
     # copy sweep_config to result dict
     result = sweep_config 

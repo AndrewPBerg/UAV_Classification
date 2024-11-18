@@ -1,0 +1,140 @@
+# General configuration 
+general:
+  data_path: "/app/src/datasets/UAV_Dataset_9"
+  num_classes: 9 # must match dataset
+  model_name: "AST"
+  batch_size: 8
+  seed: 41
+  num_cuda_workers: 8
+  pinned_memory: true
+  epochs: 20
+  save_model: false
+  project_name: "Adaptor H tuning"
+  sweep_count: 200
+  test_size: 0.2
+  inference_size: 0.1
+  val_size: 0.1
+  shuffled : false
+  accumulation_steps: 2
+  learning_rate: 0.006
+  patience : 3
+  use_wandb: true
+  
+  # Augmentations Configuration (still under general config)
+  augmentations_per_sample: 0
+  # transform params must be inside list for augmentations.py to process corr
+  # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
+  augmentations: ["time_stretch", "sin_distortion"]
+  # pitch_shift_min_rate: 0
+  # pitch_shift_max_rate: 12.0
+  
+  time_stretch_min_rate: 0.9
+  time_stretch_max_rate: 1.0
+
+  # tanh_distortion_min_rate: 0.2
+  # tanh_distortion_max_rate: 0.6
+
+  sin_distortion_min_rate: 0.1
+  sin_distortion_max_rate: 0.6
+
+  adaptor_type: "lora"
+  # adaptor_type: "ia3"
+  # adaptor_type: "adalora"
+  # adaptor_type: "oft"
+  # adaptor_type: "fourier"
+  # adaptor_type: "layernorm"
+  # adaptor_type: "none-classifier"
+  # adaptor_type: "none-full"
+  # adaptor_type: "moa"
+  # adaptor_type: "soft-moa"
+
+none-classifier:
+  none: none
+
+none-full:
+  none: none
+
+lora:
+  r: 768
+  lora_alpha: 8
+  target_modules: ["query", "key", "value", "dense"]
+  lora_dropout: 0.2
+  bias: "none"
+  task_type: "AUDIO_CLASSIFICATION"
+
+ia3:
+  target_modules: ["query", "key", "value", "dense"]
+  feedforward_modules: ["dense"]
+  task_type: "AUDIO_CLASSIFICATION"
+
+adalora:
+  init_r: 1200              # Initial rank
+  target_r: 768             # Target rank
+  target_modules: ["query", "key", "value", "dense"]
+  lora_alpha: 16
+  task_type: "AUDIO_CLASSIFICATION"
+
+oft:
+  r: 768
+  target_modules: ["query", "key", "value", "dense"]
+  module_dropout: 0.0
+  init_weights: true
+
+fourier:
+  scaling: 100
+  n_frequency: 1000
+  target_modules: ["query", "key", "value", "dense"]
+  task_type: "AUDIO_CLASSIFICATION"
+
+layernorm:
+  target_modules: ["layernorm"]  # targets all LayerNorm modules
+  task_type: "AUDIO_CLASSIFICATION"
+
+moa:
+  max_length: 1024  # Example AST sequence length
+  final_output: 'CLS'  # How to aggregate sequence outputs
+  reduction_rate: 128   # Bottleneck reduction factor
+  adapter_type: 'Pfeiffer'  # 'Pfeiffer' or 'Houlsby'
+  location: 'MHSA'    # 'MHSA' or 'FFN'
+  adapter_module: 'bottleneck'  # 'bottleneck' or 'conformer'
+  num_adapters: 3     # Number of parallel adapters
+
+soft-moa:
+  max_length: 1024  # Example AST sequence length
+  final_output: 'CLS'  # How to aggregate sequence outputs
+  reduction_rate: 128   # Bottleneck reduction factor
+  adapter_type: 'Pfeiffer'  # 'Pfeiffer' or 'Houlsby'
+  location: 'MHSA'    # 'MHSA' or 'FFN'
+  adapter_module: 'bottleneck'  # 'bottleneck' or 'conformer'
+  num_adapters: 3     # Number of parallel adapters
+  num_slots: 8
+  normalize: True
+  
+# Script Configuration (solo run)
+wandb:
+  project: "11-13 Meeting"
+  name: "oft r =768"
+  reinit: false
+  notes: ""
+  tags: "AST, LoRA"
+  dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
+
+
+# Sweep Configuration
+sweep:
+  name: "none-full H tuning"
+  method: "random"
+  metric:
+    name: "test_acc"
+    goal: "maximize"
+  parameters:
+    adaptor_type:
+      # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
+      values: ["none-full"]
+    seed:
+      distribution: "int_uniform"
+      min: 1
+      max: 1000
+    
+
+
