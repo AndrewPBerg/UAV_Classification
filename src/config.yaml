@@ -3,10 +3,6 @@ general:
   data_path: "/app/src/datasets/UAV_Dataset_9"
   num_classes: 9 # must match dataset
   model_name: "AST"
-  # model_name: "BERT"
-  # model_name: "MERT"
-  # model_name: "HUBERT"
-  # model_name: "WHISPER"
   batch_size: 8
   seed: 41
   num_cuda_workers: 8
@@ -14,7 +10,7 @@ general:
   epochs: 20
   save_model: false
   project_name: "Adaptor H tuning"
-  sweep_count: 300
+  sweep_count: 200
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
@@ -85,6 +81,8 @@ oft:
   init_weights: true
 
 fourier:
+  scaling: 100
+  n_frequency: 1000
   target_modules: ["query", "key", "value", "dense"]
   task_type: "AUDIO_CLASSIFICATION"
 
@@ -124,7 +122,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "soft-moa H tuning"
+  name: "fourier H tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -132,49 +130,28 @@ sweep:
   parameters:
     adaptor_type:
       # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
-      values: ["soft-moa"]
-    #   values: ["none-classifier"]
-    # target_modules:
-    #   values: [["query","key","value","dense"]]
-    max_length:  # Example AST sequence length
-      values: [1024, 800, 600, 400, 200, 100]
-    reduction_rate:  # Bottleneck reduction factor
-      values: [128, 64, 32]
-    adapter_type: # 'Pfeiffer' or 'Houlsby'
-      values: ['Pfeiffer', 'Houlsby']
-    location: # 'MHSA' or 'FFN'
-      values: ['MHSA', 'FFN']
-    adapter_module: # 'bottleneck' or 'conformer'
-      values: ['bottleneck', 'convpass']
-    num_adapters: # Number of parallel adapters
-      values: [2,1]
-    num_slots:
-      values: [16,8,4,2,1]
-
-    # adaptor_type:
-    #   values: ['soft-moa']
-    # max_length:
-    # num_slots:
-
-    # NUM_SLOTS: int
-    # NORMALIZE: bool # Whether to normalize the input and slot_params (aka Phi). As suggested in the paper, the normalization 
-    #                 # has an impact when the hidden_size is increased. In our case, for d=768, there's no difference.
-    
-    # REDUCTION_RATE: int 
-    # ADAPTER_TYPE: str  # Pfeiffer/Houlsby
-    # ADAPTER_LOCATION: str  # MHSA/FFN.
-    # ADAPTER_MODULE: str   # convpass/bottleneck. 
-
-    #       NUM_ADAPTERS: int 
-
-
-# MoA
-    # NUM_ADAPTERS: int
-    # REDUCTION_RATE: int
-    # ADAPTER_TYPE: str  # Pfeiffer/Houlsby.
-    # ADAPTER_LOCATION: str  # MHSA/FFN. If ADAPTER_TYPE == Houlsby, this parameter is not considered.
-    # ADAPTER_MODULE: str   # Convpass/Bottleneck.
-    
+      values: ["fourier"]
+    scaling:
+      values: [100,125,150,175,200]
+    n_frequency:
+      values: [500,1000,1500,2000,2500,3000]
+    target_modules:
+      values: [
+        ["query"],
+        ["query", "key"],
+        ["query", "key", "value"],
+        ["query", "key", "value", "dense"],
+        ["key"],
+        ["value"],
+        ["dense"],
+        ["key", "value"],
+        ["query", "dense"],
+        ["key", "dense"],
+        ["value", "dense"],
+        ["query", "key", "dense"],
+        ["query", "value", "dense"],
+        ["key", "value", "dense"],
+      ]
     
     
 

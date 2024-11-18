@@ -113,8 +113,9 @@ def model_pipeline(config=None):
 
         model, train_loader, val_loader, test_loader, inference_loader, criterion, optimizer, scheduler, num_classes = make(mixed_params)
         print(model)
-        model_params = count_parameters(model)
-        wandb.log({"model_params": model_params})
+        total_params, trainable_params = count_parameters(model)
+        wandb.log({"total_params": total_params})
+        wandb.log({"trainable_parms": trainable_params})
 
         # Move model to device before creating scaler
         
