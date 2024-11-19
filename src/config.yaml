@@ -122,7 +122,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "oft H tuning"
+  name: "ia3 H tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -130,12 +130,16 @@ sweep:
   parameters:
     adaptor_type:
       # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
-      values: ["oft"]
+      values: ["ia3"]
     #TODO: add H tuning params
-    r:
-      values: [8,16,32,64,128,256,]
-    module_dropout:
-      values: [0,0.1,0.2]
+    # r:
+    #   values: [8,16,32,64]
+    # module_dropout:
+    #   values: [0,0.1,0.2]
+    target_modules:
+      values: [["query", "key", "value", "dense"]]
+    feedforward_modules: 
+      values: ["dense","query", "key", "value"]
     
 
 
