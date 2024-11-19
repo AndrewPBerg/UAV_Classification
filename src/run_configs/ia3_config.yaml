@@ -10,7 +10,7 @@ general:
   epochs: 20
   save_model: false
   project_name: "Adaptor H tuning"
-  sweep_count: 50
+  sweep_count: 200
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
@@ -122,7 +122,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "none-classifier H tuning"
+  name: "ia3 H tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -130,11 +130,14 @@ sweep:
   parameters:
     adaptor_type:
       # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
-      values: ["none-classifier"]
-    seed:
-      distribution: "int_uniform"
-      min: 1
-      max: 1000
+      values: ["ia3"]
+    #TODO: add H tuning params
+    r:
+      values: [8,16,32,64]
+    module_dropout:
+      values: [0,0.1,0.2]
+    target_modules:
+      values: ["query", "key", "value", "dense"]
     
 
 

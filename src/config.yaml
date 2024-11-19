@@ -122,7 +122,7 @@ wandb:
 
 # Sweep Configuration
 sweep:
-  name: "fourier H tuning"
+  name: "oft H tuning"
   method: "random"
   metric:
     name: "test_acc"
@@ -130,29 +130,12 @@ sweep:
   parameters:
     adaptor_type:
       # values: ["ia3", "moa", "lora", "none-classifier", "none-full"]
-      values: ["fourier"]
-    scaling:
-      values: [100,125,150,175,200]
-    n_frequency:
-      values: [500,1000,1500,2000,2500,3000]
-    target_modules:
-      values: [
-        ["query"],
-        ["query", "key"],
-        ["query", "key", "value"],
-        ["query", "key", "value", "dense"],
-        ["key"],
-        ["value"],
-        ["dense"],
-        ["key", "value"],
-        ["query", "dense"],
-        ["key", "dense"],
-        ["value", "dense"],
-        ["query", "key", "dense"],
-        ["query", "value", "dense"],
-        ["key", "value", "dense"],
-      ]
-    
+      values: ["oft"]
+    #TODO: add H tuning params
+    r:
+      values: [8,16,32,64,128,256,]
+    module_dropout:
+      values: [0,0.1,0.2]
     
 
 
