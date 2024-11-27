@@ -29,7 +29,7 @@ def get_mixed_params(sweep_config, general_config):
     for key, value in general_config.items():
         # just like LeetCode isDuplicate problem
         if key in result:
-            pass
+            passs
         else:
             # if not already occupied by sweep config value add the current general parameter
             result[key] = value

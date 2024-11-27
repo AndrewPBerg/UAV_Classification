@@ -34,6 +34,20 @@ logging.getLogger('transformers').setLevel(logging.ERROR)
 # downloads and store cached version in mounted Docker Volume
 # Makes runs fast and the containers very tiny
 
+def create_model():
+    try:
+        return ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", torch_dtype=torch.float16, cache_dir=CACHE_DIR, local_files_only=True)
+    except OSError: # if model is not cached, download it
+        return download_model(pretrained_AST_model, CACHE_DIR)
+    return None
+
+def create_processor():
+    try:
+        return ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+    except OSError:
+        return ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+    return None
+
 def download_model(model_name, cache_dir):
     logger.info(f"Manually downloading {model_name} to {cache_dir}")
     AutoModel.from_pretrained(model_name, cache_dir=cache_dir)
@@ -62,10 +76,7 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
             adapter_module=params['adapter_module'],
             num_adapters=params['num_adapters'],
             model_ckpt=pretrained_AST_model)
-        try:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True, max_length=params['max_length'])
-        except OSError:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, max_length=params['max_length'])
+        processor = create_processor()
 
         return model, processor, params
     
@@ -84,21 +95,15 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
             normalize=params['normalize'],
             model_ckpt=pretrained_AST_model)
         
-        try:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True, max_length=params['max_length'])
-        except OSError:
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, max_length=params['max_length'])
-        
+        processor = create_processor()
+
         return model, processor, params
 
     elif adaptor_type == "none-classifier":
-        try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError: # if model is not cached, download it
-            model = download_model(pretrained_AST_model, CACHE_DIR)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
-
+        model = create_model()
+        processor = create_processor()
+        model = create_model()
+        processor = create_processor()
         model.config.num_labels = num_classes
         adaptor_config = {}
         for param in model.parameters():
@@ -111,12 +116,8 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
         return model, processor, {}
 
     elif adaptor_type == "none-full":
-        try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError: # if model is not cached, download it
-            model = download_model(pretrained_AST_model, CACHE_DIR)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        model = create_model()
+        processor = create_processor()
         model.config.num_labels = num_classes
         
         for param in model.parameters():
@@ -125,17 +126,23 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
         return model, processor, {}
+    
     elif adaptor_type == "inference":
+        model = create_model()
+        processor = create_processor()
+        model.config.num_labels = num_classes
         
+        for param in model.parameters():
+            param.requires_grad = False
+        
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        return model, processor, {}
 
     else:
         # Handle other adaptor types
-        try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError:
-            model = download_model(pretrained_AST_model, CACHE_DIR)
-            processor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        model = create_model()
+        processor = create_processor()
         
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
