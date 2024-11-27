@@ -1,5 +1,5 @@
 # DESCRIPTION
-from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time
+from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image
 from helper.engine import train, inference_loop
 from helper.ast import custom_AST
 
@@ -72,8 +72,10 @@ def main():
             row_settings=["var_names"])
     print(model)
     
-
-    # sys.exit()
+    if TORCH_VIZ:
+        generate_model_image(model, device)
+    
+    sys.exit()
 
     # Initialize gradient scaler for mixed precision
     scaler = GradScaler()
@@ -108,28 +110,6 @@ def main():
     
 # with autocast(enabled=True, dtype=torch.float16):
 #             outputs = model(X)
-    if TORCH_VIZ:
-        import os
-        
-        # Add the Graphviz executable path to PATH
-        # os.environ["PATH"] += os.pathsep + "/usr/bin/dot"
-        
-        from torch.cuda.amp import autocast
-        x = torch.randn(1024,128, requires_grad=True).to(device)
-        x = x.float()
-        x = x.unsqueeze(0)
-        
-        with autocast(enabled=True, dtype=torch.float16):
-            y = model(x)
-            if hasattr(y, "logits"):
-                y_pred = y.logits
-            else:
-                y_pred = y
-
-        dot = make_dot(y_pred.mean(), params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-        dot.render("model_graph", format="png")  # Save the visualization as PNG
-        # dot.view()
-    sys.exit()
     
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
