@@ -14,6 +14,7 @@ import wandb
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
+from torchviz import make_dot
 
 def main():
 
