@@ -54,6 +54,35 @@ def download_model(model_name, cache_dir):
 
 def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
     
+    if adaptor_type == "none-classifier":
+        model = create_model()
+        processor = create_processor()
+        model = create_model()
+        processor = create_processor()
+        model.config.num_labels = num_classes
+        adaptor_config = {}
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        
+        return model, processor, {}
+
+    elif adaptor_type == "none-full":
+        model = create_model()
+        processor = create_processor()
+        model.config.num_labels = num_classes
+        
+        for param in model.parameters():
+            param.requires_grad = True
+        
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        return model, processor, {}
+    
+    
     # if sweep_config is None:
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -98,46 +127,6 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
         processor = create_processor()
 
         return model, processor, params
-
-    elif adaptor_type == "none-classifier":
-        model = create_model()
-        processor = create_processor()
-        model = create_model()
-        processor = create_processor()
-        model.config.num_labels = num_classes
-        adaptor_config = {}
-        for param in model.parameters():
-            param.requires_grad = False
-        for param in model.classifier.parameters():
-            param.requires_grad = True
-        in_features = model.classifier.dense.in_features
-        model.classifier.dense = nn.Linear(in_features, num_classes)
-        
-        return model, processor, {}
-
-    elif adaptor_type == "none-full":
-        model = create_model()
-        processor = create_processor()
-        model.config.num_labels = num_classes
-        
-        for param in model.parameters():
-            param.requires_grad = True
-        
-        in_features = model.classifier.dense.in_features
-        model.classifier.dense = nn.Linear(in_features, num_classes)
-        return model, processor, {}
-    
-    elif adaptor_type == "inference":
-        model = create_model()
-        processor = create_processor()
-        model.config.num_labels = num_classes
-        
-        for param in model.parameters():
-            param.requires_grad = False
-        
-        in_features = model.classifier.dense.in_features
-        model.classifier.dense = nn.Linear(in_features, num_classes)
-        return model, processor, {}
 
     else:
         # Handle other adaptor types
