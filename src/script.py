@@ -14,7 +14,7 @@ import wandb
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
-from torchviz import make_dot
+
 
 def main():
 
@@ -50,6 +50,7 @@ def main():
     NUM_CLASSES = general_config['num_classes']
 
     ADAPTOR_TYPE = general_config['adaptor_type']
+    TORCH_VIZ = general_config['torch_viz']
 
 
     torch.manual_seed(SEED)
@@ -71,6 +72,7 @@ def main():
             row_settings=["var_names"])
     print(model)
     
+
     # sys.exit()
 
     # Initialize gradient scaler for mixed precision
@@ -103,6 +105,31 @@ def main():
         augmentations=AUGMENTATIONS,
         config=general_config
     )
+    
+# with autocast(enabled=True, dtype=torch.float16):
+#             outputs = model(X)
+    if TORCH_VIZ:
+        import os
+        
+        # Add the Graphviz executable path to PATH
+        # os.environ["PATH"] += os.pathsep + "/usr/bin/dot"
+        
+        from torch.cuda.amp import autocast
+        x = torch.randn(1024,128, requires_grad=True).to(device)
+        x = x.float()
+        x = x.unsqueeze(0)
+        
+        with autocast(enabled=True, dtype=torch.float16):
+            y = model(x)
+            if hasattr(y, "logits"):
+                y_pred = y.logits
+            else:
+                y_pred = y
+
+        dot = make_dot(y_pred.mean(), params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
+        dot.render("model_graph", format="png")  # Save the visualization as PNG
+        # dot.view()
+    sys.exit()
     
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
