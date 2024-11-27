@@ -47,7 +47,6 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
     if sweep_config:
         # config = sweep_config
         params = get_mixed_params(sweep_config, config[adaptor_type])
-    
     else:
         params = config[adaptor_type]
     
@@ -126,6 +125,8 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
         return model, processor, {}
+    elif adaptor_type == "inference":
+        
 
     else:
         # Handle other adaptor types
@@ -138,10 +139,8 @@ def custom_AST(num_classes: int, adaptor_type: str, sweep_config: dict=None):
         
         in_features = model.classifier.dense.in_features
         model.classifier.dense = nn.Linear(in_features, num_classes)
-        if sweep_config is None:
-            model, adaptor_config = get_adaptor_model(model, adaptor_type)
-        else:
-            model, adaptor_config = get_adaptor_model(model, adaptor_type, params)
+        
+        model, adaptor_config = get_adaptor_model(model, adaptor_type, params)
         
         return model, processor, adaptor_config
 
@@ -163,6 +162,8 @@ def get_adaptor_config(adaptor_type: str, params: dict):
                         lora_dropout=config["lora_dropout"],
                         bias=config["bias"],
                         task_type=config["task_type"],
+                        use_rslora= config["use_rslora"],
+                        use_dora = config["use_dora"],
                     )
         
         case "ia3":

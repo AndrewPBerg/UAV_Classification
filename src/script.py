@@ -64,6 +64,14 @@ def main():
 
     model.to(device)
 
+    summary(model,
+            col_names=["num_params","trainable"],
+            col_width=20,
+            row_settings=["var_names"])
+    print(model)
+    
+    # sys.exit()
+
     # Initialize gradient scaler for mixed precision
     scaler = GradScaler()
 
@@ -94,12 +102,7 @@ def main():
         augmentations=AUGMENTATIONS,
         config=general_config
     )
-
-    summary(model,
-            col_names=["num_params","trainable"],
-            col_width=20,
-            row_settings=["var_names"])
-    print(model)
+    
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
                                         batch_size=BATCH_SIZE,

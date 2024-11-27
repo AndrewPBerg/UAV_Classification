@@ -26,8 +26,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    # command: python3 script.py
-    command: python3 sweeps.py
+    command: python3 script.py
+    # command: python3 sweeps.py
     # command: /bin/bash # interactive shell new
     stdin_open: true
     tty: true

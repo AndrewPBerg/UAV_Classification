@@ -18,7 +18,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.006
   patience : 3
-  use_wandb: true
+  use_wandb: false
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0
@@ -37,14 +37,15 @@ general:
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
 
-  adaptor_type: "lora"
+  # adaptor_type: "lora"
   # adaptor_type: "ia3"
-  # adaptor_type: "adalora"
+  adaptor_type: "adalora"
   # adaptor_type: "oft"
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
   # adaptor_type: "none-classifier"
   # adaptor_type: "none-full"
+  # adaptor_type: "inference"
   # adaptor_type: "moa"
   # adaptor_type: "soft-moa"
 
@@ -55,23 +56,27 @@ none-full:
   none: none
 
 lora:
-  r: 768
-  lora_alpha: 8
+  r: 1000
+  lora_alpha: 16
   target_modules: ["query", "key", "value", "dense"]
-  lora_dropout: 0.2
-  bias: "none"
+  lora_dropout: 0
+  bias: "lora_only"
   task_type: "AUDIO_CLASSIFICATION"
+  use_rslora: false
+  use_dora: false
 
 ia3:
   target_modules: ["query", "key", "value", "dense"]
-  feedforward_modules: ["dense"]
+  # feedforward_modules: ["dense"]
+  feedforward_modules: ["dense","query", "key", "value"]
+  
   task_type: "AUDIO_CLASSIFICATION"
 
 adalora:
-  init_r: 1200              # Initial rank
-  target_r: 768             # Target rank
+  init_r: 100           # Initial rank
+  target_r: 16            # Target rank
   target_modules: ["query", "key", "value", "dense"]
-  lora_alpha: 16
+  lora_alpha: 8
   task_type: "AUDIO_CLASSIFICATION"
 
 oft:

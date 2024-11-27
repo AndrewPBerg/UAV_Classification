@@ -63,7 +63,7 @@ def make(config):
 
     print(f"selection augs: {selected_augmentations}")
 
-    # Log the selected augmentations
+    # Log the selected aug∫mentations
     wandb.log({"selected_augmentations": selected_augmentations})
 
     # Update model creation to use custom_AST
