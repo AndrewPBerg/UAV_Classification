@@ -1,5 +1,5 @@
 # DESCRIPTION
-from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time
+from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image
 from helper.engine import train, inference_loop
 from helper.ast import custom_AST
 
@@ -14,6 +14,7 @@ import wandb
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
+
 
 def main():
 
@@ -49,6 +50,7 @@ def main():
     NUM_CLASSES = general_config['num_classes']
 
     ADAPTOR_TYPE = general_config['adaptor_type']
+    TORCH_VIZ = general_config['torch_viz']
 
 
     torch.manual_seed(SEED)
@@ -70,7 +72,10 @@ def main():
             row_settings=["var_names"])
     print(model)
     
-    # sys.exit()
+    if TORCH_VIZ:
+        generate_model_image(model, device)
+    
+    sys.exit()
 
     # Initialize gradient scaler for mixed precision
     scaler = GradScaler()
@@ -102,6 +107,9 @@ def main():
         augmentations=AUGMENTATIONS,
         config=general_config
     )
+    
+# with autocast(enabled=True, dtype=torch.float16):
+#             outputs = model(X)
     
     
     train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
