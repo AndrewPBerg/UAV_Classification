@@ -82,7 +82,7 @@ def main():
     # sys.exit()
 
     # Initialize gradient scaler for mixed precision
-    scaler = GradScaler()
+    scaler = torch.amp.GradScaler()
 
     # Enable cudnn benchmarking for faster training
     torch.backends.cudnn.benchmark = True

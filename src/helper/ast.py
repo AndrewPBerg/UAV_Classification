@@ -36,7 +36,7 @@ logging.getLogger('transformers').setLevel(logging.ERROR)
 
 def create_model():
     try:
-        return ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", torch_dtype=torch.float16, cache_dir=CACHE_DIR, local_files_only=True)
+        return ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
     except OSError: # if model is not cached, download it
         return download_model(pretrained_AST_model, CACHE_DIR)
     return None

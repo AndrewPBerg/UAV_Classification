@@ -20,7 +20,7 @@ general:
   patience : 3
   use_wandb: false
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5  # number of folds for k-fold cross validation
   
   # Augmentations Configuration (still under general config)

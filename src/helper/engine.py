@@ -49,7 +49,8 @@ def train_step(model,
         # Ensure input is float32 before forward pass
         X = X.float()
         
-        with autocast(enabled=True, dtype=torch.float16):
+        # Forward pass with autocast
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
             outputs = model(X)
             if hasattr(outputs, "logits"):
                 y_pred = outputs.logits
@@ -58,12 +59,18 @@ def train_step(model,
             loss = loss_fn(y_pred, y)
             loss = loss / accumulation_steps
         
+        # Backward pass with gradient scaling
         scaler.scale(loss).backward()
         
         if ((batch_idx + 1) % accumulation_steps == 0) or (batch_idx + 1 == len_dataloader):
+            # Unscale gradients and clip them
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            # Step optimizer and update scaler
             scaler.step(optimizer)
             scaler.update()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
         
         train_loss += loss.item() * accumulation_steps
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
@@ -95,40 +102,38 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
-            outputs = model(X)
-            if hasattr(outputs, "logits"):
-                y_pred = outputs.logits
-            else:
-                y_pred = outputs # for custom MoA AST model
+            X = X.float()
+            
+            with torch.autocast(device_type='cuda', dtype=torch.float16):
+                outputs = model(X)
+                if hasattr(outputs, "logits"):
+                    y_pred = outputs.logits
+                else:
+                    y_pred = outputs
+                loss = loss_fn(y_pred, y)
 
-            loss = loss_fn(y_pred, y)
             test_loss += loss.item()
 
             y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
             test_acc += (y_pred_class == y).sum().item() / len(y_pred)
 
-            # Update torchmetrics for test set
+            # Update metrics
             precision_metric.update(y_pred_class, y)
             recall_metric.update(y_pred_class, y)
             f1_metric.update(y_pred_class, y)
 
-            ground_truth_all.extend(y.cpu().numpy())
-            predictions_all.extend(y_pred_class.cpu().numpy())
-
     test_loss /= len(dataloader)
     test_acc /= len(dataloader)
 
-    # Compute metrics
     test_precision = precision_metric.compute().item()
     test_recall = recall_metric.compute().item()
     test_f1 = f1_metric.compute().item()
 
-    # Reset metrics for the next epoch
     precision_metric.reset()
     recall_metric.reset()
     f1_metric.reset()
 
-    return test_loss, test_acc, test_precision, test_recall, test_f1, 
+    return test_loss, test_acc, test_precision, test_recall, test_f1
 
 
 def train(model: torch.nn.Module, 
