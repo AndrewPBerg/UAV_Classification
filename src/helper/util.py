@@ -17,6 +17,7 @@ from torchviz import make_dot
 import os
 from torch.cuda.amp import autocast
 import wandb
+from sklearn.model_selection import KFold
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
@@ -467,6 +468,73 @@ def save_model(model: torch.nn.Module,
 def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
     model.load_state_dict(torch.load(model_path))
     return model
+
+def k_fold_split_custom(
+    data_path: str,
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+    k_folds: int = 5,
+    inference_size: float = 0.1,
+    seed: int = 42,
+    augmentations_per_sample: int = 3,
+    augmentations: list[str] = None,
+    config: dict = None
+) -> list[tuple]:
+    """
+    Creates k-fold splits of the dataset for cross validation.
+    Returns a list of tuples containing (train_dataset, val_dataset) for each fold.
+    """
+    # Get all paths
+    all_paths = list(Path(data_path).glob("*/*.wav"))
+    if len(all_paths) == 0:
+        raise ValueError(f"No .wav files found in {data_path}")
+
+    # First separate inference set
+    n_samples = len(all_paths)
+    n_inference = int(n_samples * inference_size)
+    
+    # Create random state for reproducibility
+    rng = np.random.RandomState(seed)
+    indices = rng.permutation(n_samples)
+    
+    # Split off inference set
+    train_val_indices = indices[:-n_inference]
+    inference_indices = indices[-n_inference:]
+    
+    # Create KFold object
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    
+    # Create datasets for each fold
+    fold_datasets = []
+    
+    for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
+        # Get paths for this fold
+        fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
+        fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
+        
+        # Create datasets
+        train_dataset = AudioDataset(
+            data_path,
+            fold_train_paths,
+            feature_extractor,
+            augmentations_per_sample=augmentations_per_sample,
+            augmentations=augmentations,
+            config=config
+        )
+        
+        val_dataset = AudioDataset(
+            data_path,
+            fold_val_paths,
+            feature_extractor,
+            config=config
+        )
+        
+        fold_datasets.append((train_dataset, val_dataset))
+    
+    # Create inference dataset
+    inference_paths = [all_paths[i] for i in inference_indices]
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
+    
+    return fold_datasets, inference_dataset
 
 
 

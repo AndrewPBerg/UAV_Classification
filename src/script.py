@@ -1,5 +1,5 @@
 # DESCRIPTION
-from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image
+from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image, k_fold_split_custom
 from helper.engine import train, inference_loop
 from helper.ast import custom_AST
 
@@ -14,6 +14,7 @@ import wandb
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
+import numpy as np
 
 
 def main():
@@ -52,6 +53,9 @@ def main():
     ADAPTOR_TYPE = general_config['adaptor_type']
     TORCH_VIZ = general_config['torch_viz']
 
+    USE_KFOLD = general_config['use_kfold']
+    K_FOLDS = general_config['k_folds']
+
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
@@ -75,7 +79,7 @@ def main():
     if TORCH_VIZ:
         generate_model_image(model, device)
     
-    sys.exit()
+    # sys.exit()
 
     # Initialize gradient scaler for mixed precision
     scaler = GradScaler()
@@ -95,57 +99,14 @@ def main():
                 "dir" : run_config['dir'],
                 "config": general_config
             }
-    # dataset = AudioDataset(data_path, feature_extractor)
-    train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
-        DATA_PATH, 
-        feature_extractor, 
-        test_size=TEST_SIZE, 
-        seed=SEED,
-        inference_size=INFERENCE_SIZE,
-        augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
-        val_size=VAL_SIZE,
-        augmentations=AUGMENTATIONS,
-        config=general_config
-    )
-    
-# with autocast(enabled=True, dtype=torch.float16):
-#             outputs = model(X)
     
     
-    train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
-                                        batch_size=BATCH_SIZE,
-                                        num_workers=NUM_CUDA_WORKERS,
-                                        pin_memory=PINNED_MEMORY,
-                                        shuffle=SHUFFLED)
-
-    test_dataloader_custom = DataLoader(dataset=test_dataset,
-                                        batch_size=BATCH_SIZE, 
-                                        num_workers=NUM_CUDA_WORKERS,
-                                        pin_memory=PINNED_MEMORY,
-                                        shuffle=SHUFFLED)
-    val_dataloader_custom = DataLoader(dataset=val_dataset,
-                                        batch_size=BATCH_SIZE, 
-                                        num_workers=NUM_CUDA_WORKERS,
-                                        pin_memory=PINNED_MEMORY,
-                                        shuffle=SHUFFLED)
-
-    inference_dataloader_custom = DataLoader(dataset=inference_dataset,
-                                    batch_size=BATCH_SIZE, 
-                                    num_workers=NUM_CUDA_WORKERS,
-                                    pin_memory=PINNED_MEMORY,
-                                    shuffle=SHUFFLED) 
-    end = timer()
-    total_load_time = calculated_load_time(start, end)
-    print(f"Load time in on path: {DATA_PATH} --> {total_load_time}")
-    if wandb.run is not None:
-        wandb.log({"load_time": total_load_time})
-
     loss_fn = nn.CrossEntropyLoss()
-
+    
     optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
-
+    
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2) #TODO experiment w/ diff hyperparams
-
+    
     if USE_WANDB:
         wandb.init(
             project=wandb_params.get("project"),
@@ -156,35 +117,144 @@ def main():
             notes=wandb_params.get("notes", ""),
             dir=wandb_params.get("dir", None)
         )
-    
-    # ic(feature_extractor)
-    # ic(feature_extractor)
-    # ic(train_dataloader_custom.dataset[0][0].shape)
-    # ic(train_dataloader_custom.dataset[0])
+    if USE_KFOLD:
+        # K-fold cross validation
+        fold_datasets, inference_dataset = k_fold_split_custom(
+            DATA_PATH,
+            feature_extractor,
+            k_folds=K_FOLDS,
+            inference_size=INFERENCE_SIZE,
+            seed=SEED,
+            augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
+            augmentations=AUGMENTATIONS,
+            config=general_config
+        )
+        ic(fold_datasets)
+        ic(inference_dataset)
         
-    train(
-        model=model,
-        train_dataloader=train_dataloader_custom,
-        test_dataloader=test_dataloader_custom,
-        val_dataloader=val_dataloader_custom,
-        optimizer=optimizer,
-        scheduler=scheduler,  # type: ignore
-        loss_fn=loss_fn,
-        epochs=EPOCHS,
-        device=device,
-        num_classes=NUM_CLASSES,
-        accumulation_steps=ACCUMULATION_STEPS,
-        patience=TRAIN_PATIENCE,
-        scaler=scaler
-    )
-
-    inference_loop(model=model,
-                device=device,
+        fold_results = []
+        for fold, (fold_train_dataset, fold_val_dataset) in enumerate(fold_datasets):
+            print(f"\nTraining Fold {fold + 1}/{K_FOLDS}")
+            
+            # Create dataloaders for this fold
+            fold_train_dataloader = DataLoader(
+                dataset=fold_train_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+            
+            fold_val_dataloader = DataLoader(
+                dataset=fold_val_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+            
+            # Reset model for each fold
+            model, _, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
+            model.to(device)
+            optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
+            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
+            
+            # Train the model for this fold
+            fold_result = train(
+                model=model,
+                train_dataloader=fold_train_dataloader,
+                test_dataloader=None,  # No test set in k-fold
+                val_dataloader=fold_val_dataloader,
+                optimizer=optimizer,
+                scheduler=scheduler,
                 loss_fn=loss_fn,
-                inference_loader= inference_dataloader_custom)
+                epochs=EPOCHS,
+                device=device,
+                num_classes=NUM_CLASSES,
+                accumulation_steps=ACCUMULATION_STEPS,
+                patience=TRAIN_PATIENCE,
+                scaler=scaler
+            )
+            
+            fold_results.append(fold_result)
+            
+            if wandb.run is not None:
+                wandb.log({
+                    f"fold_{fold+1}_val_acc": fold_result["val_acc"][-1],
+                    f"fold_{fold+1}_val_loss": fold_result["val_loss"][-1]
+                })
+        
+        # Calculate and log average metrics across folds
+        if wandb.run is not None:
+            avg_val_acc = np.mean([result["val_acc"][-1] for result in fold_results])
+            avg_val_loss = np.mean([result["val_loss"][-1] for result in fold_results])
+            wandb.log({
+                "average_val_acc": avg_val_acc,
+                "average_val_loss": avg_val_loss
+            })
+            
+    else:
+        # Original train-test split code
+        train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
+            DATA_PATH,
+            feature_extractor,
+            test_size=TEST_SIZE,
+            seed=SEED,
+            inference_size=INFERENCE_SIZE,
+            augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
+            val_size=VAL_SIZE,
+            augmentations=AUGMENTATIONS,
+            config=general_config
+        )
+        
+        train_dataloader_custom = DataLoader(dataset=train_dataset, #transformed_train_dataset,
+                                            batch_size=BATCH_SIZE,
+                                            num_workers=NUM_CUDA_WORKERS,
+                                            pin_memory=PINNED_MEMORY,
+                                            shuffle=SHUFFLED)
+        
+        test_dataloader_custom = DataLoader(dataset=test_dataset,
+                                            batch_size=BATCH_SIZE, 
+                                            num_workers=NUM_CUDA_WORKERS,
+                                            pin_memory=PINNED_MEMORY,
+                                            shuffle=SHUFFLED)
+        val_dataloader_custom = DataLoader(dataset=val_dataset,
+                                            batch_size=BATCH_SIZE, 
+                                            num_workers=NUM_CUDA_WORKERS,
+                                            pin_memory=PINNED_MEMORY,
+                                            shuffle=SHUFFLED)
+        
+        inference_dataloader_custom = DataLoader(dataset=inference_dataset,
+                                        batch_size=BATCH_SIZE, 
+                                        num_workers=NUM_CUDA_WORKERS,
+                                        pin_memory=PINNED_MEMORY,
+                                        shuffle=SHUFFLED) 
+        end = timer()
+        total_load_time = calculated_load_time(start, end)
+        print(f"Load time in on path: {DATA_PATH} --> {total_load_time}")
+        if wandb.run is not None:
+            wandb.log({"load_time": total_load_time})
+            
+        train(
+            model=model,
+            train_dataloader=train_dataloader_custom,
+            test_dataloader=test_dataloader_custom,
+            val_dataloader=val_dataloader_custom,
+            optimizer=optimizer,
+            scheduler=scheduler,  # type: ignore
+            loss_fn=loss_fn,
+            epochs=EPOCHS,
+            device=device,
+            num_classes=NUM_CLASSES,
+            accumulation_steps=ACCUMULATION_STEPS,
+            patience=TRAIN_PATIENCE,
+            scaler=scaler
+        )
 
-
-
+        inference_loop(model=model,
+                    device=device,
+                    loss_fn=loss_fn,
+                    inference_loader= inference_dataloader_custom)   
 
     if USE_WANDB:
         wandb.finish()

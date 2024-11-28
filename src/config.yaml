@@ -19,7 +19,9 @@ general:
   learning_rate: 0.006
   patience : 3
   use_wandb: false
-  torch_viz: true
+  torch_viz: false
+  use_kfold: false
+  k_folds: 5  # number of folds for k-fold cross validation
   
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0

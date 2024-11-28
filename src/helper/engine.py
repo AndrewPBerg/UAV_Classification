@@ -134,7 +134,7 @@ def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metri
 def train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           val_dataloader: DataLoader,
-          test_dataloader: DataLoader, 
+          test_dataloader: DataLoader | None, 
           optimizer: AdamW, 
           scheduler: torch.optim.lr_scheduler._LRScheduler,  
           loss_fn: nn.Module, 
@@ -199,16 +199,22 @@ def train(model: torch.nn.Module,
             f1_metric=f1_metric_val
         )
         
-        # Test step
-        test_loss, test_acc, test_precision, test_recall, test_f1 = test_step(
-            model=model,
-            dataloader=test_dataloader,
-            loss_fn=loss_fn,
-            device=device,
-            precision_metric=precision_metric_test,
-            recall_metric=recall_metric_test,
-            f1_metric=f1_metric_test
-        )
+        # Test step (only if test_dataloader is provided)
+        if test_dataloader is not None:
+            test_loss, test_acc, test_precision, test_recall, test_f1 = test_step(
+                model=model,
+                dataloader=test_dataloader,
+                loss_fn=loss_fn,
+                device=device,
+                precision_metric=precision_metric_test,
+                recall_metric=recall_metric_test,
+                f1_metric=f1_metric_test
+            )
+            results["test_loss"].append(test_loss)
+            results["test_acc"].append(test_acc)
+            results["test_f1"].append(test_f1)
+            results["test_precision"].append(test_precision)
+            results["test_recall"].append(test_recall)
 
         # Print metrics
         print(
