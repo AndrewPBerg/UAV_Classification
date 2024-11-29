@@ -14,6 +14,7 @@ from torch.cuda.amp import GradScaler, autocast
 import sys
 from helper.teleBot import send_message
 from helper.util import count_parameters
+import numpy as np
 
 # Load configuration from YAML file
 with open('config.yaml', 'r') as file:
@@ -165,6 +166,7 @@ def main():
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
+    np.random.RandomState(SEED)
 
     wandb_login()
 

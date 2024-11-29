@@ -18,6 +18,8 @@ import os
 from torch.cuda.amp import autocast
 import wandb
 from sklearn.model_selection import KFold
+from icecream import ic
+from time import time as timer
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
@@ -505,6 +507,7 @@ def k_fold_split_custom(
     
     # Create datasets for each fold
     fold_datasets = []
+    start_time = timer()  # Start timer for dataset initialization
     
     for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
         # Get paths for this fold
@@ -529,14 +532,17 @@ def k_fold_split_custom(
         )
         
         fold_datasets.append((train_dataset, val_dataset))
+        ic(f"Fold {fold+1} datasets loaded")  # Show progression of folds datasets loading
     
     # Create inference dataset
     inference_paths = [all_paths[i] for i in inference_indices]
     inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
     
+    end_time = timer()  # End timer for dataset initialization
+    dataset_init_time = end_time - start_time
+    print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
+    
     return fold_datasets, inference_dataset
-
-
 
 
 

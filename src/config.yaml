@@ -9,7 +9,7 @@ general:
   pinned_memory: true
   epochs: 20
   save_model: false
-  project_name: "Adaptor H tuning"
+  project_name: "5-fold Cross-Validation"
   sweep_count: 200
   test_size: 0.2
   inference_size: 0.1
@@ -18,11 +18,11 @@ general:
   accumulation_steps: 2
   learning_rate: 0.006
   patience : 3
-  use_wandb: false
+  use_wandb: true
   torch_viz: false
   use_kfold: true
   k_folds: 5  # number of folds for k-fold cross validation
-  
+
   # Augmentations Configuration (still under general config)
   augmentations_per_sample: 0
   # transform params must be inside list for augmentations.py to process corr
@@ -50,6 +50,17 @@ general:
   # adaptor_type: "none-full"
   # adaptor_type: "moa"
   # adaptor_type: "soft-moa"
+
+
+# Script Configuration (solo run)
+wandb:
+  project: "Testing CrossValidation on wandb"
+  name: "test 1"
+  reinit: false
+  notes: ""
+  tags: ""
+  dir : ""
+
 
 none-classifier:
   none: none
@@ -116,16 +127,6 @@ soft-moa:
   num_adapters: 3     # Number of parallel adapters
   num_slots: 8
   normalize: True
-  
-# Script Configuration (solo run)
-wandb:
-  project: "11-13 Meeting"
-  name: "oft r =768"
-  reinit: false
-  notes: ""
-  tags: "AST, LoRA"
-  dir : "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/notebooks/wandb"
-
 
 # Sweep Configuration
 sweep:

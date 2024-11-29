@@ -1,6 +1,7 @@
 # DESCRIPTION
 from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image, k_fold_split_custom
 from helper.engine import train, inference_loop
+from helper.fold_engine import k_fold_cross_validation
 from helper.ast import custom_AST
 
 import torch
@@ -59,6 +60,7 @@ def main():
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
+    np.random.RandomState(SEED)
 
 
     
@@ -129,68 +131,48 @@ def main():
             augmentations=AUGMENTATIONS,
             config=general_config
         )
-        ic(fold_datasets)
-        ic(inference_dataset)
         
-        fold_results = []
-        for fold, (fold_train_dataset, fold_val_dataset) in enumerate(fold_datasets):
-            print(f"\nTraining Fold {fold + 1}/{K_FOLDS}")
-            
-            # Create dataloaders for this fold
-            fold_train_dataloader = DataLoader(
-                dataset=fold_train_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
-            
-            fold_val_dataloader = DataLoader(
-                dataset=fold_val_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
-            
-            # Reset model for each fold
+        # Define factory functions for model, optimizer, and scheduler
+        # This allows for creating new instances of the model, optimizer, 
+        # and scheduler for each fold
+        def model_fn():
             model, _, adaptor_config = custom_AST(NUM_CLASSES, ADAPTOR_TYPE)
-            model.to(device)
-            optimizer = AdamW(model.parameters(), lr=LEARNING_RATE)
-            scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode='min', factor=0.1, patience=2)
-            
-            # Train the model for this fold
-            fold_result = train(
-                model=model,
-                train_dataloader=fold_train_dataloader,
-                test_dataloader=None,  # No test set in k-fold
-                val_dataloader=fold_val_dataloader,
-                optimizer=optimizer,
-                scheduler=scheduler,
-                loss_fn=loss_fn,
-                epochs=EPOCHS,
-                device=device,
-                num_classes=NUM_CLASSES,
-                accumulation_steps=ACCUMULATION_STEPS,
-                patience=TRAIN_PATIENCE,
-                scaler=scaler
-            )
-            
-            fold_results.append(fold_result)
-            
-            if wandb.run is not None:
-                wandb.log({
-                    f"fold_{fold+1}_val_acc": fold_result["val_acc"][-1],
-                    f"fold_{fold+1}_val_loss": fold_result["val_loss"][-1]
-                })
+            return model
         
-        # Calculate and log average metrics across folds
+        def optimizer_fn(parameters):
+            return AdamW(parameters, lr=LEARNING_RATE)
+        
+        def scheduler_fn(optimizer):
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', factor=0.1, patience=2
+            )
+        
+        # Perform k-fold cross validation
+        fold_results = k_fold_cross_validation(
+            model_fn=model_fn,
+            fold_datasets=fold_datasets,
+            optimizer_fn=optimizer_fn,
+            scheduler_fn=scheduler_fn,
+            loss_fn=loss_fn,
+            device=device,
+            num_classes=NUM_CLASSES,
+            epochs=EPOCHS,
+            batch_size=BATCH_SIZE,
+            num_workers=NUM_CUDA_WORKERS,
+            pin_memory=PINNED_MEMORY,
+            shuffle=SHUFFLED,
+            accumulation_steps=ACCUMULATION_STEPS,
+            patience=TRAIN_PATIENCE,
+            scaler=scaler
+        )
+        
         if wandb.run is not None:
-            avg_val_acc = np.mean([result["val_acc"][-1] for result in fold_results])
-            avg_val_loss = np.mean([result["val_loss"][-1] for result in fold_results])
+            ic(fold_results)
+            
             wandb.log({
-                "average_val_acc": avg_val_acc,
-                "average_val_loss": avg_val_loss
+                f"final_val_acc": fold_results["val_acc"][-1],
+                f"final_val_loss": fold_results["val_loss"][-1],
+                f"final_val_f1": fold_results["val_f1"][-1]
             })
             
     else:
