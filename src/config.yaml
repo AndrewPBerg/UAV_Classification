@@ -1,7 +1,7 @@
 # General configuration 
 general:
-  data_path: "/app/src/datasets/UAV_Dataset_9"
-  num_classes: 9 # must match dataset
+  data_path: "/app/src/datasets/UAV_Dataset_31"
+  num_classes: 31 # must match dataset
   model_name: "AST"
   batch_size: 8
   seed: 41
@@ -24,7 +24,7 @@ general:
   k_folds: 5  # number of folds for k-fold cross validation
 
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 0
+  augmentations_per_sample: 4
   # transform params must be inside list for augmentations.py to process corr
   # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   augmentations: ["time_stretch", "sin_distortion"]
@@ -55,7 +55,7 @@ general:
 # Script Configuration (solo run)
 wandb:
   project: "Testing CrossValidation on wandb"
-  name: "test 1"
+  name: "31 class, 4 augs, ia3"
   reinit: false
   notes: ""
   tags: ""

@@ -218,11 +218,20 @@ def k_fold_cross_validation(
                 f"fold_{fold+1}_final_val_loss": fold_results["val_loss"][-1],
                 f"fold_{fold+1}_final_val_f1": fold_results["val_f1"][-1]
             })
-    
+            
     # Calculate and log average metrics across folds
     avg_metrics = calculate_average_metrics(all_fold_results)
     if wandb.run is not None:
         wandb.log(avg_metrics)
+            
+    if wandb.run is not None:
+        wandb_table = wandb.Table(columns=["Metric", "Average", "Standard Deviation"])
+        for metric in ["val_acc", "val_f1", "val_loss", "val_precision", "val_recall"]:
+            avg_value = avg_metrics[f"average_{metric}"]
+            std_value = avg_metrics[f"std_{metric}"]
+            wandb_table.add_data(metric, avg_value, std_value)
+        wandb.log({"average_metrics_table": wandb_table})
+    
     
     return all_fold_results
 

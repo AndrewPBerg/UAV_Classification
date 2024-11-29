@@ -166,14 +166,14 @@ def main():
             scaler=scaler
         )
         
-        if wandb.run is not None:
-            ic(fold_results)
+        # if wandb.run is not None:
+        #     ic(fold_results)
             
-            wandb.log({
-                f"final_val_acc": fold_results["val_acc"][-1],
-                f"final_val_loss": fold_results["val_loss"][-1],
-                f"final_val_f1": fold_results["val_f1"][-1]
-            })
+        #     wandb.log({
+        #         f"final_val_acc": fold_results["val_acc"][-1],
+        #         f"final_val_loss": fold_results["val_loss"][-1],
+        #         f"final_val_f1": fold_results["val_f1"][-1]
+        #     })
             
     else:
         # Original train-test split code
