@@ -41,12 +41,12 @@ general:
   sin_distortion_max_rate: 0.6
 
   # adaptor_type: "lora"
-  # adaptor_type: "ia3"
+  adaptor_type: "ia3"
   # adaptor_type: "adalora"
   # adaptor_type: "oft"
   # adaptor_type: "fourier"
   # adaptor_type: "layernorm"
-  adaptor_type: "none-classifier"
+  # adaptor_type: "none-classifier"
   # adaptor_type: "none-full"
   # adaptor_type: "moa"
   # adaptor_type: "soft-moa"
