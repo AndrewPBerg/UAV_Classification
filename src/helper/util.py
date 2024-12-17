@@ -13,13 +13,14 @@ from .augmentations import create_augmentation_pipeline, apply_augmentations    
 from torchaudio.transforms import Resample
 from typing import Union
 import numpy as np
-from torchviz import make_dot
+# from torchviz import make_dot
 import os
 from torch.cuda.amp import autocast
 import wandb
 from sklearn.model_selection import KFold
 from icecream import ic
 from time import time as timer
+from dotenv import load_dotenv
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
@@ -74,6 +75,8 @@ def calculated_load_time(start, end) -> str:
     return formatted_time
 
 def wandb_login():
+    load_dotenv()
+
     api_key = os.environ.get('WANDB_API_KEY')
     if not api_key:
         raise ValueError("WANDB_API_KEY environment variable is not set")

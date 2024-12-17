@@ -16,87 +16,9 @@ from sklearn.model_selection import KFold
 from timeit import default_timer as timer
 from icecream import ic
 from helper.fold_engine import train_fold, k_fold_cross_validation
+import wandb
+from typing import Dict, List, Optional
 
-def CNN_k_fold_split_custom(
-    data_path: str,
-    k_folds: int = 5,
-    inference_size: float = 0.1,
-    seed: int = 42,
-    target_sr: int = 16000,
-    n_mels: int = 128,
-    n_fft: int = 1024,
-    hop_length: int = 512
-) -> Tuple[list, AudioDataset]:
-    """
-    Creates k-fold splits of the dataset for cross validation.
-    Returns a tuple containing:
-    - List of (train_dataset, val_dataset) tuples for each fold
-    - Inference dataset
-    """
-    # Get all paths
-    all_paths = list(Path(data_path).glob("*/*.wav"))
-    if len(all_paths) == 0:
-        raise ValueError(f"No .wav files found in {data_path}")
-
-    # First separate inference set
-    n_samples = len(all_paths)
-    n_inference = int(n_samples * inference_size)
-    
-    # Create random state for reproducibility
-    rng = np.random.RandomState(seed)
-    indices = rng.permutation(n_samples)
-    
-    # Split off inference set
-    train_val_indices = indices[:-n_inference]
-    inference_indices = indices[-n_inference:]
-    
-    # Create KFold object
-    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
-    
-    # Create datasets for each fold
-    fold_datasets = []
-    start_time = timer()  # Start timer for dataset initialization
-    
-    for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
-        # Get paths for this fold
-        fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
-        fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
-        
-        # Create datasets
-        train_dataset = AudioDataset(
-            fold_train_paths,
-            target_sr=target_sr,
-            n_mels=n_mels,
-            n_fft=n_fft,
-            hop_length=hop_length
-        )
-        
-        val_dataset = AudioDataset(
-            fold_val_paths,
-            target_sr=target_sr,
-            n_mels=n_mels,
-            n_fft=n_fft,
-            hop_length=hop_length
-        )
-        
-        fold_datasets.append((train_dataset, val_dataset))
-        ic(f"Fold {fold+1} datasets loaded")
-    
-    # Create inference dataset
-    inference_paths = [all_paths[i] for i in inference_indices]
-    inference_dataset = AudioDataset(
-        inference_paths,
-        target_sr=target_sr,
-        n_mels=n_mels,
-        n_fft=n_fft,
-        hop_length=hop_length
-    )
-    
-    end_time = timer()
-    dataset_init_time = end_time - start_time
-    print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
-    
-    return fold_datasets, inference_dataset
 
 class AudioDataset(Dataset):
     def __init__(
@@ -169,6 +91,89 @@ class AudioDataset(Dataset):
     
     def get_classes(self) -> List[str]:
         return self.classes
+
+def CNN_k_fold_split_custom(
+    data_path: str,
+    k_folds: int = 5,
+    inference_size: float = 0.1,
+    seed: int = 42,
+    target_sr: int = 16000,
+    n_mels: int = 128,
+    n_fft: int = 1024,
+    hop_length: int = 512
+) -> list:
+    """
+    Creates k-fold splits of the dataset for cross validation.
+    Returns a tuple containing:
+    - List of (train_dataset, val_dataset) tuples for each fold
+    - Inference dataset
+    """
+    # Get all paths
+    all_paths = list(Path(data_path).glob("*/*.wav"))
+    if len(all_paths) == 0:
+        raise ValueError(f"No .wav files found in {data_path}")
+
+    # First separate inference set
+    n_samples = len(all_paths)
+    n_inference = int(n_samples * inference_size)
+    
+    # Create random state for reproducibility
+    rng = np.random.RandomState(seed)
+    indices = rng.permutation(n_samples)
+    
+    # Split off inference set
+    train_val_indices = indices[:-n_inference]
+    inference_indices = indices[-n_inference:]
+    
+    # Create KFold object
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    
+    # Create datasets for each fold
+    fold_datasets = []
+    start_time = timer()  # Start timer for dataset initialization
+    
+    for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
+        # Get paths for this fold
+        fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
+        fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
+        
+        # Create datasets
+        train_dataset = AudioDataset(
+            fold_train_paths,
+            target_sr=target_sr,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
+        )
+        
+        val_dataset = AudioDataset(
+            fold_val_paths,
+            target_sr=target_sr,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
+        )
+        
+        fold_datasets.append((train_dataset, val_dataset))
+        ic(f"Fold {fold+1} datasets loaded")
+    
+    # Create inference dataset
+    inference_paths = [all_paths[i] for i in inference_indices]
+    inference_dataset = AudioDataset(
+        inference_paths,
+        target_sr=target_sr,
+        n_mels=n_mels,
+        n_fft=n_fft,
+        hop_length=hop_length
+    )
+    
+    end_time = timer()
+    dataset_init_time = end_time - start_time
+    print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
+    
+    return fold_datasets
+
+
 
 def create_data_splits(
     data_path: str,
@@ -374,108 +379,254 @@ class TorchCNN(nn.Module):
         
         return x
 
+def train_fold(
+    model: nn.Module,
+    train_dataloader: DataLoader,
+    val_dataloader: DataLoader,
+    optimizer: Adam,
+    criterion: nn.Module,
+    device: str,
+    fold: int,
+    epochs: int = 50,
+    patience: int = 5,
+) -> Dict[str, List]:
+    """Trains a single fold of k-fold cross validation"""
+    
+    results = {
+        "train_loss": [], "train_acc": [], "val_loss": [], "val_acc": []
+    }
+    
+    best_val_loss = float("inf")
+    patience_counter = 0
+
+    for epoch in tqdm(range(epochs), desc=f"Fold {fold+1} Training"):
+        # Training
+        model.train()
+        train_loss, train_acc = 0.0, 0.0
+        
+        for inputs, targets in train_dataloader:
+            inputs, targets = inputs.to(device), targets.to(device)
+            
+            # Add channel dimension if needed
+            if inputs.dim() == 3:
+                inputs = inputs.unsqueeze(1)
+                
+            optimizer.zero_grad()
+            outputs = model(inputs)
+            loss = criterion(outputs, targets)
+            
+            loss.backward()
+            optimizer.step()
+            
+            train_loss += loss.item()
+            _, predicted = outputs.max(1)
+            train_acc += predicted.eq(targets).sum().item() / targets.size(0)
+            
+        train_loss /= len(train_dataloader)
+        train_acc /= len(train_dataloader)
+        
+        # Validation
+        model.eval()
+        val_loss, val_acc = 0.0, 0.0
+        
+        with torch.no_grad():
+            for inputs, targets in val_dataloader:
+                inputs, targets = inputs.to(device), targets.to(device)
+                
+                if inputs.dim() == 3:
+                    inputs = inputs.unsqueeze(1)
+                    
+                outputs = model(inputs)
+                loss = criterion(outputs, targets)
+                
+                val_loss += loss.item()
+                _, predicted = outputs.max(1)
+                val_acc += predicted.eq(targets).sum().item() / targets.size(0)
+                
+        val_loss /= len(val_dataloader)
+        val_acc /= len(val_dataloader)
+
+        # Print progress
+        print(
+            f"Fold {fold+1} Epoch {epoch+1}/{epochs} | "
+            f"Train Loss: {train_loss:.4f} | "
+            f"Train Acc: {train_acc:.4f} | "
+            f"Val Loss: {val_loss:.4f} | "
+            f"Val Acc: {val_acc:.4f}"
+        )
+
+        # Log metrics to wandb
+        if wandb.run is not None:
+            wandb.log({
+                f"fold_{fold+1}/train_acc": train_acc,
+                f"fold_{fold+1}/train_loss": train_loss,
+                f"fold_{fold+1}/val_acc": val_acc,
+                f"fold_{fold+1}/val_loss": val_loss,
+                "epoch": epoch+1
+            })
+
+        # Store results
+        results["train_loss"].append(train_loss)
+        results["train_acc"].append(train_acc)
+        results["val_loss"].append(val_loss)
+        results["val_acc"].append(val_acc)
+
+        # Early stopping check
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            patience_counter = 0
+        else:
+            patience_counter += 1
+
+        if patience_counter >= patience:
+            print(f"Early stopping triggered in fold {fold+1} at epoch {epoch+1}")
+            break
+
+    return results
+
+def k_fold_cross_validation(
+    model_fn,  # Function that creates a new model instance
+    fold_datasets: list,
+    optimizer_fn,  # Function that creates a new optimizer instance
+    criterion: nn.Module,
+    device: str,
+    epochs: int,
+    patience: int = 5,
+) -> List[Dict]:
+    """Performs k-fold cross validation training"""
+    
+    all_fold_results = []
+    
+    for fold, (train_dataset, val_dataset) in enumerate(fold_datasets):
+        print(f"\nTraining Fold {fold + 1}/{len(fold_datasets)}")
+        
+        # Create dataloaders for this fold
+        train_dataloader = DataLoader(
+            dataset=train_dataset,
+            batch_size=32,
+            num_workers=2,
+            pin_memory=True,
+            shuffle=True
+        )
+        
+        val_dataloader = DataLoader(
+            dataset=val_dataset,
+            batch_size=32,
+            num_workers=2,
+            pin_memory=True,
+            shuffle=False
+        )
+        
+        # Create new model instance for this fold
+        model = model_fn().to(device)
+        optimizer = optimizer_fn(model.parameters())
+        
+        # Train the fold
+        fold_results = train_fold(
+            model=model,
+            train_dataloader=train_dataloader,
+            val_dataloader=val_dataloader,
+            optimizer=optimizer,
+            criterion=criterion,
+            device=device,
+            fold=fold,
+            epochs=epochs,
+            patience=patience
+        )
+        
+        all_fold_results.append(fold_results)
+        
+    return all_fold_results
+
 def main():
-    # Set device
+    # Configuration
     USE_KFOLD = True
     USE_WANDB = True
-    
-    # Configuration
-    DATA_PATH = "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
+    # DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
+    DATA_PATH ="/app/src/datasets/UAV_Dataset_9"
     INFERENCE_SIZE = 0.1
     SEED = 42
+    EPOCHS = 20
+    PATIENCE = 5
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
-    # Create data splits
+    if USE_WANDB:
+        wandb_login()
+
+        wandb.init(project="CNN kfold test",
+                    name="") # run name
+    
     if USE_KFOLD:
         # K-fold cross validation
-        fold_datasets, inference_dataset = CNN_k_fold_split_custom(
+        fold_datasets = CNN_k_fold_split_custom(
             DATA_PATH,
             k_folds=5,
             inference_size=INFERENCE_SIZE,
-            seed=SEED,
-            target_sr=16000,
-            n_mels=128,
-            n_fft=1024,
-            hop_length=512
+            seed=SEED
         )
         
-        # Train model for each fold
-        for fold, (train_dataset, val_dataset) in enumerate(fold_datasets):
-            print(f"\nTraining Fold {fold + 1}")
-            
-            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-            val_loader = DataLoader(val_dataset, batch_size=32)
-            
-            # Initialize model
-            model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
-            
-            # Initialize training components
-            criterion = nn.CrossEntropyLoss()
-            optimizer = Adam(model.parameters(), lr=0.001)
-            
-            # Train model
-            history = train_model(
-                model=model,
-                train_loader=train_loader,
-                test_loader=val_loader,
-                optimizer=optimizer,
-                criterion=criterion,
-                device=device,
-                epochs=50,
-                patience=5
-            )
-            
-            # Here you can add code to save the model, log metrics, etc.
-    
-    else:    
-        # Rest of the existing code for non-k-fold training...
-        train_paths, test_paths = create_data_splits(
-            "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
+        # Define model and optimizer creation functions
+        def model_fn():
+            return TorchCNN(num_classes=9).to(device)
+        
+        def optimizer_fn(parameters):
+            return Adam(parameters, lr=0.001)
+        
+        criterion = nn.CrossEntropyLoss()
+        
+        # Perform k-fold cross validation
+        fold_results = k_fold_cross_validation(
+            model_fn=model_fn,
+            fold_datasets=fold_datasets,
+            optimizer_fn=optimizer_fn,
+            criterion=criterion,
+            device=device,
+            epochs=EPOCHS,
+            patience=PATIENCE
         )
         
-        # Create datasets with mel spectrogram parameters
-        train_dataset = AudioDataset(
-            train_paths,
-            target_sr=16000,
-            n_mels=128,
-            n_fft=1024,
-            hop_length=512
-        )
-        test_dataset = AudioDataset(
-            test_paths,
-            target_sr=16000,
-            n_mels=128,
-            n_fft=1024,
-            hop_length=512
-        )
+        # Calculate and log average metrics
+        if USE_WANDB:
+            final_metrics = {}
+            for metric in ["val_acc", "val_loss"]:
+                values = [fold[metric][-1] for fold in fold_results]
+                final_metrics[f"average_{metric}"] = sum(values) / len(values)
+            wandb.log(final_metrics)
+            
+    else:
+        # Original train-test split training
+        train_paths, test_paths = create_data_splits(DATA_PATH)
         
-        # Create data loaders
+        train_dataset = AudioDataset(train_paths)
+        test_dataset = AudioDataset(test_paths)
+        
         train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
         test_loader = DataLoader(test_dataset, batch_size=32)
         
-        # Initialize model
         model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
-        
-        summary(model, input_size=(32, 1, 128, 157))  # Batch size, channels, n_mels, time
-        # Initialize training components
         criterion = nn.CrossEntropyLoss()
         optimizer = Adam(model.parameters(), lr=0.001)
         
-        # Train model
         history = train_model(
             model=model,
             train_loader=train_loader,
             test_loader=test_loader,
             optimizer=optimizer,
             criterion=criterion,
-            device="cuda",
-            epochs=50,
-            patience=5
+            device=device,
+            epochs=EPOCHS,
+            patience=PATIENCE
         )
         
-        
-        
+        if USE_WANDB:
+            wandb.log({
+                "final_test_acc": history["test_acc"][-1],
+                "final_test_loss": history["test_loss"][-1]
+            })
+
+    if USE_WANDB:
+        wandb.finish()
 
 if __name__ == "__main__":
     main()
