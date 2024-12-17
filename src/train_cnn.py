@@ -294,7 +294,7 @@ def main():
     
     # Create data splits
     train_paths, test_paths = create_data_splits(
-        "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_31"
+        "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
     )
     
     # Create datasets with mel spectrogram parameters
