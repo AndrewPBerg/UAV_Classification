@@ -7,10 +7,96 @@ import numpy as np
 from torch.optim import Adam
 from tqdm.auto import tqdm
 import random
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 from torchaudio.transforms import MelSpectrogram, Resample
 import torch.nn.functional as F
 from torchinfo import summary
+from helper.util import k_fold_split_custom, wandb_login
+from sklearn.model_selection import KFold
+from timeit import default_timer as timer
+from icecream import ic
+from helper.fold_engine import train_fold, k_fold_cross_validation
+
+def CNN_k_fold_split_custom(
+    data_path: str,
+    k_folds: int = 5,
+    inference_size: float = 0.1,
+    seed: int = 42,
+    target_sr: int = 16000,
+    n_mels: int = 128,
+    n_fft: int = 1024,
+    hop_length: int = 512
+) -> Tuple[list, AudioDataset]:
+    """
+    Creates k-fold splits of the dataset for cross validation.
+    Returns a tuple containing:
+    - List of (train_dataset, val_dataset) tuples for each fold
+    - Inference dataset
+    """
+    # Get all paths
+    all_paths = list(Path(data_path).glob("*/*.wav"))
+    if len(all_paths) == 0:
+        raise ValueError(f"No .wav files found in {data_path}")
+
+    # First separate inference set
+    n_samples = len(all_paths)
+    n_inference = int(n_samples * inference_size)
+    
+    # Create random state for reproducibility
+    rng = np.random.RandomState(seed)
+    indices = rng.permutation(n_samples)
+    
+    # Split off inference set
+    train_val_indices = indices[:-n_inference]
+    inference_indices = indices[-n_inference:]
+    
+    # Create KFold object
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    
+    # Create datasets for each fold
+    fold_datasets = []
+    start_time = timer()  # Start timer for dataset initialization
+    
+    for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
+        # Get paths for this fold
+        fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
+        fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
+        
+        # Create datasets
+        train_dataset = AudioDataset(
+            fold_train_paths,
+            target_sr=target_sr,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
+        )
+        
+        val_dataset = AudioDataset(
+            fold_val_paths,
+            target_sr=target_sr,
+            n_mels=n_mels,
+            n_fft=n_fft,
+            hop_length=hop_length
+        )
+        
+        fold_datasets.append((train_dataset, val_dataset))
+        ic(f"Fold {fold+1} datasets loaded")
+    
+    # Create inference dataset
+    inference_paths = [all_paths[i] for i in inference_indices]
+    inference_dataset = AudioDataset(
+        inference_paths,
+        target_sr=target_sr,
+        n_mels=n_mels,
+        n_fft=n_fft,
+        hop_length=hop_length
+    )
+    
+    end_time = timer()
+    dataset_init_time = end_time - start_time
+    print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
+    
+    return fold_datasets, inference_dataset
 
 class AudioDataset(Dataset):
     def __init__(
@@ -290,54 +376,106 @@ class TorchCNN(nn.Module):
 
 def main():
     # Set device
+    USE_KFOLD = True
+    USE_WANDB = True
+    
+    # Configuration
+    DATA_PATH = "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
+    INFERENCE_SIZE = 0.1
+    SEED = 42
+    
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     # Create data splits
-    train_paths, test_paths = create_data_splits(
-        "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
-    )
+    if USE_KFOLD:
+        # K-fold cross validation
+        fold_datasets, inference_dataset = CNN_k_fold_split_custom(
+            DATA_PATH,
+            k_folds=5,
+            inference_size=INFERENCE_SIZE,
+            seed=SEED,
+            target_sr=16000,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512
+        )
+        
+        # Train model for each fold
+        for fold, (train_dataset, val_dataset) in enumerate(fold_datasets):
+            print(f"\nTraining Fold {fold + 1}")
+            
+            train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+            val_loader = DataLoader(val_dataset, batch_size=32)
+            
+            # Initialize model
+            model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
+            
+            # Initialize training components
+            criterion = nn.CrossEntropyLoss()
+            optimizer = Adam(model.parameters(), lr=0.001)
+            
+            # Train model
+            history = train_model(
+                model=model,
+                train_loader=train_loader,
+                test_loader=val_loader,
+                optimizer=optimizer,
+                criterion=criterion,
+                device=device,
+                epochs=50,
+                patience=5
+            )
+            
+            # Here you can add code to save the model, log metrics, etc.
     
-    # Create datasets with mel spectrogram parameters
-    train_dataset = AudioDataset(
-        train_paths,
-        target_sr=16000,
-        n_mels=128,
-        n_fft=1024,
-        hop_length=512
-    )
-    test_dataset = AudioDataset(
-        test_paths,
-        target_sr=16000,
-        n_mels=128,
-        n_fft=1024,
-        hop_length=512
-    )
-    
-    # Create data loaders
-    train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    test_loader = DataLoader(test_dataset, batch_size=32)
-    
-    # Initialize model
-    model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
-    
-    summary(model, input_size=(32, 1, 128, 157))  # Batch size, channels, n_mels, time
-    # Initialize training components
-    criterion = nn.CrossEntropyLoss()
-    optimizer = Adam(model.parameters(), lr=0.001)
-    
-    # Train model
-    history = train_model(
-        model=model,
-        train_loader=train_loader,
-        test_loader=test_loader,
-        optimizer=optimizer,
-        criterion=criterion,
-        device="cuda",
-        epochs=50,
-        patience=5
-    )
-    
-
+    else:    
+        # Rest of the existing code for non-k-fold training...
+        train_paths, test_paths = create_data_splits(
+            "C:/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9"
+        )
+        
+        # Create datasets with mel spectrogram parameters
+        train_dataset = AudioDataset(
+            train_paths,
+            target_sr=16000,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512
+        )
+        test_dataset = AudioDataset(
+            test_paths,
+            target_sr=16000,
+            n_mels=128,
+            n_fft=1024,
+            hop_length=512
+        )
+        
+        # Create data loaders
+        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
+        test_loader = DataLoader(test_dataset, batch_size=32)
+        
+        # Initialize model
+        model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
+        
+        summary(model, input_size=(32, 1, 128, 157))  # Batch size, channels, n_mels, time
+        # Initialize training components
+        criterion = nn.CrossEntropyLoss()
+        optimizer = Adam(model.parameters(), lr=0.001)
+        
+        # Train model
+        history = train_model(
+            model=model,
+            train_loader=train_loader,
+            test_loader=test_loader,
+            optimizer=optimizer,
+            criterion=criterion,
+            device="cuda",
+            epochs=50,
+            patience=5
+        )
+        
+        
+        
 
 if __name__ == "__main__":
     main()
