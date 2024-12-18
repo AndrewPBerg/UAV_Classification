@@ -24,7 +24,7 @@ general:
   k_folds: 5  # number of folds for k-fold cross validation
 
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 4
+  augmentations_per_sample: 0
   # transform params must be inside list for augmentations.py to process corr
   # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   augmentations: ["time_stretch", "sin_distortion"]
@@ -54,7 +54,7 @@ general:
 
 # Script Configuration (solo run)
 wandb:
-  project: "CNN kfold test"
+  project: "Kfold-Results"
   name: ""
   reinit: false
   notes: ""
