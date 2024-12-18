@@ -18,7 +18,9 @@ from icecream import ic
 from helper.fold_engine import train_fold, k_fold_cross_validation
 import wandb
 from typing import Dict, List, Optional
-# from helper.engine import train_step, test_step
+from helper.augmentations import create_augmentation_pipeline, apply_augmentations
+
+import yaml
 
 
 class AudioDataset(Dataset):
@@ -29,12 +31,17 @@ class AudioDataset(Dataset):
         target_duration: int = 5,
         n_mels: int = 128,
         n_fft: int = 1024,
-        hop_length: int = 512
+        hop_length: int = 512,
+        augmentations_per_sample: int = 0,
+        augmentations: list[str] = None,
+        config: dict = None
     ):
         self.paths = data_paths
         self.target_sr = target_sr
         self.target_duration = target_duration
         self.target_length = target_duration * target_sr
+        self.augmentations_per_sample = augmentations_per_sample
+        self.config = config
         
         # Initialize mel spectrogram transform
         self.mel_transform = MelSpectrogram(
@@ -49,13 +56,65 @@ class AudioDataset(Dataset):
         self.classes = sorted(list(set(path.parent.name for path in data_paths)))
         self.class_to_idx = {cls: idx for idx, cls in enumerate(self.classes)}
         
+        # Setup augmentations if specified
+        if self.augmentations_per_sample > 0 and augmentations:
+            self.composed_transform = create_augmentation_pipeline(augmentations, self.config)
+        else:
+            self.composed_transform = None
+            
+        # Pre-load and process all audio samples
+        total_samples = (augmentations_per_sample + 1) * len(self.paths)
+        self.audio_tensors = torch.empty(total_samples, 1, target_sr * target_duration)
+        self.class_indices = []
+        
+        # Load original audio samples
+        for index, path in enumerate(self.paths):
+            audio_tensor, class_idx = self.load_audio(path)
+            self.audio_tensors[index] = audio_tensor
+            self.class_indices.append(class_idx)
+            
+        # Apply augmentations if specified
+        if self.augmentations_per_sample > 0 and self.composed_transform:
+            original_samples = len(self.paths)
+            for i in range(original_samples):
+                for j in range(self.augmentations_per_sample):
+                    new_index = original_samples + i * self.augmentations_per_sample + j
+                    self.class_indices.append(self.class_indices[i])
+                    augmented_audio = apply_augmentations(
+                        self.audio_tensors[i], 
+                        self.composed_transform,
+                        self.target_sr
+                    )
+                    self.audio_tensors[new_index] = augmented_audio
+
     def __len__(self) -> int:
+        if self.augmentations_per_sample > 0:
+            return len(self.paths) * (self.augmentations_per_sample + 1)
         return len(self.paths)
     
     def __getitem__(self, index) -> Tuple[torch.Tensor, int]:
-        path = self.paths[index]
+        """Get a sample from the dataset."""
+        # Get the preloaded audio tensor and class index
+        audio_tensor = self.audio_tensors[index]
+        class_idx = self.class_indices[index]
         
-        # Load and preprocess audio
+        # Extract mel spectrogram features
+        mel_spec = self.mel_transform(audio_tensor)  # Shape: [1, n_mels, time]
+        
+        # Convert to decibel scale
+        mel_spec = torch.log10(mel_spec + 1e-9)
+        
+        # Reshape to [n_mels, time]
+        mel_spec = mel_spec.squeeze(0)
+        
+        return mel_spec, class_idx
+    
+    def get_classes(self) -> List[str]:
+        return self.classes
+    
+    def load_audio(self, path: str) -> Tuple[torch.Tensor, int]:
+        """Load and preprocess audio file."""
+        # Load audio
         audio_tensor, sr = torchaudio.load(str(path))
         
         # Convert to mono if stereo
@@ -76,22 +135,10 @@ class AudioDataset(Dataset):
             audio_tensor = audio_tensor[:, :self.target_length]
             
         # Get class label
-        class_name = path.parent.name
+        class_name = Path(path).parent.name
         class_idx = self.class_to_idx[class_name]
         
-        # Extract mel spectrogram features
-        mel_spec = self.mel_transform(audio_tensor)  # Shape: [1, n_mels, time]
-        
-        # Convert to decibel scale
-        mel_spec = torch.log10(mel_spec + 1e-9)
-        
-        # Reshape to [n_mels, time]
-        mel_spec = mel_spec.squeeze(0)
-        
-        return mel_spec, class_idx
-    
-    def get_classes(self) -> List[str]:
-        return self.classes
+        return audio_tensor, class_idx
 
 def CNN_k_fold_split_custom(
     data_path: str,
@@ -101,14 +148,12 @@ def CNN_k_fold_split_custom(
     target_sr: int = 16000,
     n_mels: int = 128,
     n_fft: int = 1024,
-    hop_length: int = 512
+    hop_length: int = 512,
+    augmentations_per_sample: int = 0,
+    augmentations: list[str] = None,
+    config: dict = None
 ) -> list:
-    """
-    Creates k-fold splits of the dataset for cross validation.
-    Returns a tuple containing:
-    - List of (train_dataset, val_dataset) tuples for each fold
-    - Inference dataset
-    """
+    """Creates k-fold splits of the dataset with augmentation support."""
     # Get all paths
     all_paths = list(Path(data_path).glob("*/*.wav"))
     if len(all_paths) == 0:
@@ -131,20 +176,23 @@ def CNN_k_fold_split_custom(
     
     # Create datasets for each fold
     fold_datasets = []
-    start_time = timer()  # Start timer for dataset initialization
+    start_time = timer()
     
     for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
         # Get paths for this fold
         fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
         fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
         
-        # Create datasets
+        # Create datasets with augmentation support
         train_dataset = AudioDataset(
             fold_train_paths,
             target_sr=target_sr,
             n_mels=n_mels,
             n_fft=n_fft,
-            hop_length=hop_length
+            hop_length=hop_length,
+            augmentations_per_sample=augmentations_per_sample,
+            augmentations=augmentations,
+            config=config
         )
         
         val_dataset = AudioDataset(
@@ -172,7 +220,7 @@ def CNN_k_fold_split_custom(
     dataset_init_time = end_time - start_time
     print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
     
-    return fold_datasets
+    return fold_datasets, inference_dataset
 
 
 
@@ -574,32 +622,74 @@ def calculate_average_metrics(all_fold_results: List[Dict]) -> Dict:
         
 
 def main():
-    # Configuration
-    USE_KFOLD = True
-    USE_WANDB = True
-    # DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
-    DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
-    INFERENCE_SIZE = 0.2
-    SEED = 42
-    EPOCHS = 20
-    PATIENCE = 5
-    NUM_CLASSES = 31
+    # # Configuration
+    # USE_KFOLD = True
+    # USE_WANDB = True
+    # DATA_PATH = "/app/src/datasets/UAV_Dataset_31"
+    # INFERENCE_SIZE = 0.2
+    # SEED = 42
+    # EPOCHS = 20
+    # PATIENCE = 5
+    # NUM_CLASSES = 31
+    
+    # # Augmentation parameters
+    # AUGMENTATIONS_PER_SAMPLE = 3
+    # AUGMENTATIONS = ["time_stretch", "sin_distortion"]  # Match config.yaml
+    
+    # Load config for augmentation parameters
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+
+
+
+    general_config = config['general']
+    run_config = config['wandb']
+
+    DATA_PATH = general_config['data_path']
+    BATCH_SIZE = general_config['batch_size']
+    SEED = general_config['seed']
+    EPOCHS = general_config['epochs']
+    NUM_CUDA_WORKERS = general_config['num_cuda_workers']
+    PINNED_MEMORY = general_config['pinned_memory']
+    SHUFFLED = general_config['shuffled']
+    ACCUMULATION_STEPS = general_config['accumulation_steps']
+    LEARNING_RATE = general_config['learning_rate']
+    TRAIN_PATIENCE = general_config['patience']
+    INFERENCE_SIZE = general_config['inference_size']
+    
+    AUGMENTATIONS_PER_SAMPLE = general_config['augmentations_per_sample']
+    AUGMENTATIONS= general_config['augmentations']
+    USE_WANDB = general_config['use_wandb']
+    NUM_CLASSES = general_config['num_classes']
+
+
+    USE_KFOLD = general_config['use_kfold']
+    K_FOLDS = general_config['k_folds']
+
+
+    torch.manual_seed(SEED)
+    torch.cuda.manual_seed(SEED)
+    np.random.RandomState(SEED)
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
     if USE_WANDB:
         wandb_login()
 
-        wandb.init(project="CNN kfold test",
-                    name="") # run name
-    
+        wandb.init(project=run_config['project'],
+                    name=run_config['project'],
+                    config=general_config) 
+            
     if USE_KFOLD:
         # K-fold cross validation
-        fold_datasets = CNN_k_fold_split_custom(
+        fold_datasets, inference_dataset = CNN_k_fold_split_custom(
             DATA_PATH,
-            k_folds=5,
+            k_folds=K_FOLDS,
             inference_size=INFERENCE_SIZE,
-            seed=SEED
+            seed=SEED,
+            augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
+            augmentations=AUGMENTATIONS,
+            config=general_config
         )
         
         # Define model and optimizer creation functions
@@ -607,7 +697,7 @@ def main():
             return TorchCNN(num_classes=NUM_CLASSES).to(device)
         
         def optimizer_fn(parameters):
-            return Adam(parameters, lr=0.001)
+            return Adam(parameters, lr=LEARNING_RATE)
         
         def scheduler_fn(optimizer):
             return torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -624,14 +714,14 @@ def main():
             scheduler_fn=scheduler_fn,
             loss_fn=loss_fn,
             num_classes=NUM_CLASSES,
-            epochs= 20,
-            batch_size= 16,
-            num_workers= 4,
-            pin_memory= True,
-            shuffle= True,
-            accumulation_steps= 2,
+            epochs= EPOCHS,
+            batch_size= BATCH_SIZE,
+            num_workers= NUM_CUDA_WORKERS,
+            pin_memory= PINNED_MEMORY,
+            shuffle= SHUFFLED,
+            accumulation_steps= ACCUMULATION_STEPS,
             device=device,
-            patience=PATIENCE)
+            patience=TRAIN_PATIENCE)
         
         
         # Calculate and log average metrics
@@ -649,8 +739,8 @@ def main():
         train_dataset = AudioDataset(train_paths)
         test_dataset = AudioDataset(test_paths)
         
-        train_loader = DataLoader(train_dataset, batch_size=32, shuffle=True)
-        test_loader = DataLoader(test_dataset, batch_size=32)
+        train_loader = DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=SHUFFLED)
+        test_loader = DataLoader(test_dataset, batch_size=BATCH_SIZE)
         
         model = TorchCNN(num_classes=len(train_dataset.get_classes())).to(device)
         criterion = nn.CrossEntropyLoss()
@@ -664,7 +754,7 @@ def main():
             criterion=criterion,
             device=device,
             epochs=EPOCHS,
-            patience=PATIENCE
+            patience=TRAIN_PATIENCE
         )
         
         if USE_WANDB:
