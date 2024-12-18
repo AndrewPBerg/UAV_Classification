@@ -578,12 +578,12 @@ def main():
     USE_KFOLD = True
     USE_WANDB = True
     # DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
-    DATA_PATH ="/app/src/datasets/UAV_Dataset_9"
+    DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
     INFERENCE_SIZE = 0.2
     SEED = 42
     EPOCHS = 20
     PATIENCE = 5
-    NUM_CLASSES = 9
+    NUM_CLASSES = 31
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -625,7 +625,7 @@ def main():
             loss_fn=loss_fn,
             num_classes=NUM_CLASSES,
             epochs= 20,
-            batch_size= 32,
+            batch_size= 16,
             num_workers= 4,
             pin_memory= True,
             shuffle= True,
