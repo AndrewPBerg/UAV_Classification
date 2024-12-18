@@ -18,13 +18,13 @@ general:
   accumulation_steps: 2
   learning_rate: 0.006
   patience : 3
-  use_wandb: true
+  use_wandb: false
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5  # number of folds for k-fold cross validation
 
   # Augmentations Configuration (still under general config)
-  augmentations_per_sample: 4
+  augmentations_per_sample: 0
   # transform params must be inside list for augmentations.py to process corr
   # augmentations: ["pitch_shift", "time_stretch", "tanh_distortion", "sin_distortion", "add_noise", "polarity_inversion"]
   augmentations: ["time_stretch", "sin_distortion"]

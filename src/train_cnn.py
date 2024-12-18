@@ -18,6 +18,7 @@ from icecream import ic
 from helper.fold_engine import train_fold, k_fold_cross_validation
 import wandb
 from typing import Dict, List, Optional
+# from helper.engine import train_step, test_step
 
 
 class AudioDataset(Dataset):
@@ -484,7 +485,7 @@ def train_fold(
 
     return results
 
-def k_fold_cross_validation(
+def cnn_k_fold_cross_validation(
     model_fn,  # Function that creates a new model instance
     fold_datasets: list,
     optimizer_fn,  # Function that creates a new optimizer instance
@@ -535,8 +536,42 @@ def k_fold_cross_validation(
         )
         
         all_fold_results.append(fold_results)
-        
+    # Log final metrics for this fold
+        if wandb.run is not None:
+            wandb.log({
+                f"fold_{fold+1}_final_val_acc": fold_results["val_acc"][-1],
+                f"fold_{fold+1}_final_val_loss": fold_results["val_loss"][-1],
+                # f"fold_{fold+1}_final_val_f1": fold_results["val_f1"][-1]
+            })
+            
+    # Calculate and log average metrics across folds
+    avg_metrics = calculate_average_metrics(all_fold_results)
+    if wandb.run is not None:
+        wandb.log(avg_metrics)
+            
+    if wandb.run is not None:
+        wandb_table = wandb.Table(columns=["Metric", "Average", "Standard Deviation"])
+        for metric in ["val_acc", "val_f1", "val_loss", "val_precision", "val_recall"]:
+            avg_value = avg_metrics[f"average_{metric}"]
+            std_value = avg_metrics[f"std_{metric}"]
+            wandb_table.add_data(metric, avg_value, std_value)
+        wandb.log({"average_metrics_table": wandb_table})
+    
+    
     return all_fold_results
+
+def calculate_average_metrics(all_fold_results: List[Dict]) -> Dict:
+    """Calculate average metrics across all folds"""
+    avg_metrics = {}
+    metrics = ["val_acc", "val_loss", "val_f1", "val_precision", "val_recall"]
+    
+    for metric in metrics:
+        values = [fold[metric][-1] for fold in all_fold_results]  # Get final value for each fold
+        avg_metrics[f"average_{metric}"] = np.mean(values)
+        avg_metrics[f"std_{metric}"] = np.std(values)
+    
+    return avg_metrics 
+        
 
 def main():
     # Configuration
@@ -544,10 +579,11 @@ def main():
     USE_WANDB = True
     # DATA_PATH ="/app/src/datasets/UAV_Dataset_31"
     DATA_PATH ="/app/src/datasets/UAV_Dataset_9"
-    INFERENCE_SIZE = 0.1
+    INFERENCE_SIZE = 0.2
     SEED = 42
     EPOCHS = 20
     PATIENCE = 5
+    NUM_CLASSES = 9
     
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     
@@ -568,31 +604,43 @@ def main():
         
         # Define model and optimizer creation functions
         def model_fn():
-            return TorchCNN(num_classes=9).to(device)
+            return TorchCNN(num_classes=NUM_CLASSES).to(device)
         
         def optimizer_fn(parameters):
             return Adam(parameters, lr=0.001)
         
-        criterion = nn.CrossEntropyLoss()
+        def scheduler_fn(optimizer):
+            return torch.optim.lr_scheduler.ReduceLROnPlateau(
+                optimizer, mode='min', factor=0.1, patience=4
+            )
+        
+        loss_fn = nn.CrossEntropyLoss()
         
         # Perform k-fold cross validation
         fold_results = k_fold_cross_validation(
             model_fn=model_fn,
             fold_datasets=fold_datasets,
             optimizer_fn=optimizer_fn,
-            criterion=criterion,
+            scheduler_fn=scheduler_fn,
+            loss_fn=loss_fn,
+            num_classes=NUM_CLASSES,
+            epochs= 20,
+            batch_size= 32,
+            num_workers= 4,
+            pin_memory= True,
+            shuffle= True,
+            accumulation_steps= 2,
             device=device,
-            epochs=EPOCHS,
-            patience=PATIENCE
-        )
+            patience=PATIENCE)
+        
         
         # Calculate and log average metrics
-        if USE_WANDB:
-            final_metrics = {}
-            for metric in ["val_acc", "val_loss"]:
-                values = [fold[metric][-1] for fold in fold_results]
-                final_metrics[f"average_{metric}"] = sum(values) / len(values)
-            wandb.log(final_metrics)
+        # if USE_WANDB:
+        #     final_metrics = {}
+        #     for metric in ["val_acc", "val_loss"]:
+        #         values = [fold[metric][-1] for fold in fold_results]
+        #         final_metrics[f"average_{metric}"] = sum(values) / len(values)
+        #     wandb.log(final_metrics)
             
     else:
         # Original train-test split training
