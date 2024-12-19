@@ -185,24 +185,7 @@ def main():
             patience=TRAIN_PATIENCE,
             scaler=scaler
         )
-        
-        # Create inference dataloader
-        inference_dataloader = DataLoader(
-            dataset=inference_dataset,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED
-        )
-        
-        # Run inference after k-fold training
-        inference_loop(
-            model=model,
-            inference_loader=inference_dataloader,
-            loss_fn=loss_fn,
-            device=device,
-            num_classes=NUM_CLASSES
-        )
+
     else:
         # Original train-test split code
         train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
