@@ -9,6 +9,8 @@ import librosa
 from typing import Optional, Union
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 import warnings
+
+from helper.cnn_feature_extractor import CNNFeatureExtractor
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
 from typing import Union
@@ -95,14 +97,14 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, CNNFeatureExtractor],
                  standardize_audio_boolean: bool=True, 
-                 target_sr: int=16000,  # Changed to match Wav2Vec2 requirements
+                 target_sr: int=16000,
                  target_duration: int=5, 
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
-                 config: dict = None) -> Dataset: # type: ignore
+                 config: dict = None) -> Dataset:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -110,18 +112,23 @@ class AudioDataset(Dataset):
         self.sampling_rate = None  # current dataset sample rate
         self.resampler = None
         self.standardize_audio_boolean = standardize_audio_boolean
-        try:
-            self.target_sr = self.feature_extractor.sampling_rate or 16000
-        except:
-            self.target_sr = 16000
+        
+        # Get target sampling rate from feature extractor if available
+        if isinstance(feature_extractor, CNNFeatureExtractor):
+            self.target_sr = feature_extractor.sampling_rate
+        else:
+            try:
+                self.target_sr = feature_extractor.sampling_rate or target_sr
+            except:
+                self.target_sr = target_sr
+                
         self.target_duration = target_duration
-        self.target_length = target_duration * target_sr
+        self.target_length = target_duration * self.target_sr
         self.augmentations_per_sample = augmentations_per_sample
-        self.standardize_audio_boolean = standardize_audio_boolean
         self.config = config
 
         total_samples = (augmentations_per_sample + 1) * len(self.paths)
-        self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
+        self.audio_tensors = torch.empty(total_samples, num_channels, self.target_sr * target_duration)
         self.class_indices = []
 
         if self.augmentations_per_sample > 0:
@@ -133,9 +140,7 @@ class AudioDataset(Dataset):
             self.audio_tensors[index] = audio_to_append
             self.class_indices.append(class_idx)
 
-        # Apply augmentations 
-        # TODO refactor following this guide using torch.cat once after all augmentations are generated
-        # sourse https://discuss.pytorch.org/t/appending-to-a-tensor/2665/3 
+        # Apply augmentations
         if self.augmentations_per_sample > 0:
             original_samples = len(self.paths)
             for i in range(original_samples):
@@ -145,14 +150,8 @@ class AudioDataset(Dataset):
                     if len(augmentations) != 0:
                         augmented_audio = apply_augmentations(self.audio_tensors[i], self.composed_transform, self.target_sr)
                         self.audio_tensors[new_index] = augmented_audio
-                        # self.audio_tensors.append(augmented_audio())
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
-                        # self.audio_tensors.append(self.audio_tensors[i])
-
-        # if self.augmentations_per_sample > 0:
-        #     outputs = []
-
 
         # Ensure audio_tensors and class_indices have the same length
         assert len(self.audio_tensors) == len(self.class_indices), "Mismatch between audio_tensors and class_indices"
@@ -191,13 +190,20 @@ class AudioDataset(Dataset):
             return len(self.paths)
         
     def feature_extraction(self, audio_tensor):
-        """Process audio tensor for model input."""\
-        
+        """Process audio tensor for model input."""
         audio_np = audio_tensor.squeeze().numpy()
 
         try:
+            # For CNN feature extractor
+            if isinstance(self.feature_extractor, CNNFeatureExtractor):
+                features = self.feature_extractor(
+                    audio_tensor,  # Pass tensor directly for CNN
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt"
+                )
+                return features.input_values
             # For AST feature extractor
-            if isinstance(self.feature_extractor, ASTFeatureExtractor):
+            elif isinstance(self.feature_extractor, ASTFeatureExtractor):
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
@@ -205,7 +211,6 @@ class AudioDataset(Dataset):
                 )
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, SeamlessM4TFeatureExtractor):
-                # For Wav2Vec2 processor
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
@@ -214,25 +219,18 @@ class AudioDataset(Dataset):
                 )
                 return features.input_features.squeeze(0)
             elif isinstance(self.feature_extractor, Wav2Vec2FeatureExtractor):
-
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
-                    # sampling_rate=16000,
-                    return_tensors="pt",
-                    # padding=True
+                    return_tensors="pt"
                 )
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, BitImageProcessor):
-
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
-                    # sampling_rate=16000,
-                    return_tensors="pt",
-                    # padding=True
+                    return_tensors="pt"
                 )
-                print(features)
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
@@ -243,15 +241,15 @@ class AudioDataset(Dataset):
                     padding_length = target_length - len(audio_np)
                     audio_np = np.pad(audio_np, (0, padding_length), mode='constant')
                 
-                features = self.feature_extractor(audio_np, 
-                                                  sampling_rate = self.target_sr,
-                                                  return_tensors="pt",
-                                                  padding=True)
-        
+                features = self.feature_extractor(
+                    audio_np, 
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt",
+                    padding=True
+                )
                 return features.input_features.squeeze(0)
-
             else:
-                print(f"Feature Extractor is not implemented {self.feature_extractor}")
+                raise ValueError(f"Unsupported feature extractor type: {type(self.feature_extractor)}")
 
         except Exception as e:
             raise e
@@ -373,7 +371,7 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
 
 def train_test_split_custom(
     data_path: str, 
-    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
     test_size: float = 0.2, 
     val_size: float = 0.1,
     inference_size: float = 0.1,
@@ -476,7 +474,7 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 def k_fold_split_custom(
     data_path: str,
-    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
     k_folds: int = 5,
     inference_size: float = 0.1,
     seed: int = 42,
