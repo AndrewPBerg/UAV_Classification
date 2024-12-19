@@ -1,22 +1,23 @@
 # General configuration 
 general:
-  data_path: "/app/src/datasets/UAV_Dataset_31"
-  num_classes: 31 # must match dataset
-  model_name: "CNN"
-  batch_size: 16
+  data_path: "/app/src/datasets/UAV_Dataset_9"
+  num_classes: 9 # must match dataset
+  model_name: "AST"
+  batch_size: 8
   seed: 42
-  num_cuda_workers: 20
+  num_cuda_workers: 4
   pinned_memory: true
-  epochs: 100
+  epochs: 50
   save_model: false
-  project_name: "5-fold Cross-Validation"
+  project_name: "9 class 5-fold Cross-Validation"
   sweep_count: 200
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
-  shuffled : true
+  shuffled : false
   accumulation_steps: 2
   learning_rate: 0.001
+  # learning_rate: 0.001
   patience : 3
   use_wandb: true
   torch_viz: false
@@ -54,8 +55,8 @@ general:
 
 # Script Configuration (solo run)
 wandb:
-  project: "Kfold-Results"
-  name: ""
+  project: "9class-Kfold-Results"
+  name: "AST-5augs-ia3-LR=0.001"
   reinit: false
   notes: ""
   tags: ""
