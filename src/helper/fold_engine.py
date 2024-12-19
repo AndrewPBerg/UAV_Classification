@@ -1,9 +1,9 @@
 import torch 
 import torch.nn as nn
 from torch.utils.data import DataLoader
-from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score
+from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy
 from torch.amp.grad_scaler import GradScaler
-from torch.optim import AdamW
+from torch.optim.adamw import AdamW
 from timeit import default_timer as timer
 from tqdm.auto import tqdm
 import wandb
@@ -130,7 +130,10 @@ def train_fold(
             break
 
         # Step the scheduler
-        scheduler.step(val_loss)
+        if isinstance(scheduler, torch.optim.lr_scheduler.ReduceLROnPlateau):
+            scheduler.step(val_loss)
+        else:
+            scheduler.step()
 
     end = timer()
     train_time = end - start
@@ -166,6 +169,8 @@ def k_fold_cross_validation(
     Returns aggregated results across all folds
     """
     all_fold_results = []
+    best_model = None
+    best_val_loss = float('inf')
     
     for fold, (train_dataset, val_dataset) in enumerate(fold_datasets):
         print(f"\nTraining Fold {fold + 1}/{len(fold_datasets)}")
@@ -211,6 +216,12 @@ def k_fold_cross_validation(
         
         all_fold_results.append(fold_results)
         
+        # Keep track of best model based on validation loss
+        final_val_loss = fold_results["val_loss"][-1]
+        if final_val_loss < best_val_loss:
+            best_val_loss = final_val_loss
+            best_model = model
+        
         # Log final metrics for this fold
         if wandb.run is not None:
             wandb.log({
@@ -232,8 +243,7 @@ def k_fold_cross_validation(
             wandb_table.add_data(metric, avg_value, std_value)
         wandb.log({"average_metrics_table": wandb_table})
     
-    
-    return all_fold_results
+    return best_model
 
 def calculate_average_metrics(all_fold_results: List[Dict]) -> Dict:
     """Calculate average metrics across all folds"""
