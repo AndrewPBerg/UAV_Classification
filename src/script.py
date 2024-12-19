@@ -1,6 +1,6 @@
 # DESCRIPTION
 from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image, k_fold_split_custom
-from helper.engine import train
+from helper.engine import train, inference_loop
 from helper.fold_engine import k_fold_cross_validation
 from helper.ast import custom_AST
 from helper.cnn_engine import TorchCNN, train_cnn
@@ -46,7 +46,8 @@ def get_model_and_optimizer(config, device):
             hidden_units=config['cnn_config']['hidden_units']
         )
         optimizer = Adam(model.parameters(), lr=learning_rate)
-        train_fn = train_cnn
+        # train_fn = train_cnn
+        train_fn = train
         
         # Get feature extraction parameters from config
         fe_config = config['cnn_config']['feature_extraction']
@@ -167,7 +168,7 @@ def main():
             )
         
         # Perform k-fold cross validation
-        fold_results = k_fold_cross_validation(
+        k_fold_results = k_fold_cross_validation(
             model_fn=model_fn,
             fold_datasets=fold_datasets,
             optimizer_fn=optimizer_fn,
@@ -184,7 +185,24 @@ def main():
             patience=TRAIN_PATIENCE,
             scaler=scaler
         )
-            
+        
+        # Create inference dataloader
+        inference_dataloader = DataLoader(
+            dataset=inference_dataset,
+            batch_size=BATCH_SIZE,
+            num_workers=NUM_CUDA_WORKERS,
+            pin_memory=PINNED_MEMORY,
+            shuffle=SHUFFLED
+        )
+        
+        # Run inference after k-fold training
+        inference_loop(
+            model=model,
+            inference_loader=inference_dataloader,
+            loss_fn=loss_fn,
+            device=device,
+            num_classes=NUM_CLASSES
+        )
     else:
         # Original train-test split code
         train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
@@ -199,6 +217,7 @@ def main():
             config=general_config
         )
 
+        # Create data loaders
         train_dataloader = DataLoader(
             dataset=train_dataset,
             batch_size=BATCH_SIZE,
@@ -207,17 +226,17 @@ def main():
             shuffle=SHUFFLED
         )
         
-        test_dataloader = DataLoader(
-            dataset=test_dataset,
-            batch_size=BATCH_SIZE, 
+        val_dataloader = DataLoader(
+            dataset=val_dataset,
+            batch_size=BATCH_SIZE,
             num_workers=NUM_CUDA_WORKERS,
             pin_memory=PINNED_MEMORY,
             shuffle=SHUFFLED
         )
         
-        val_dataloader = DataLoader(
-            dataset=val_dataset,
-            batch_size=BATCH_SIZE, 
+        test_dataloader = DataLoader(
+            dataset=test_dataset,
+            batch_size=BATCH_SIZE,
             num_workers=NUM_CUDA_WORKERS,
             pin_memory=PINNED_MEMORY,
             shuffle=SHUFFLED
@@ -225,7 +244,7 @@ def main():
         
         inference_dataloader = DataLoader(
             dataset=inference_dataset,
-            batch_size=BATCH_SIZE, 
+            batch_size=BATCH_SIZE,
             num_workers=NUM_CUDA_WORKERS,
             pin_memory=PINNED_MEMORY,
             shuffle=SHUFFLED
@@ -237,7 +256,7 @@ def main():
         
         if wandb.run is not None:
             wandb.log({"load_time": total_load_time})
-            
+        
         train_fn(
             model=model,
             train_dataloader=train_dataloader,
@@ -252,6 +271,15 @@ def main():
             accumulation_steps=ACCUMULATION_STEPS,
             patience=TRAIN_PATIENCE,
             scaler=scaler
+        )
+        
+        # Run inference after training
+        inference_loop(
+            model=model,
+            inference_loader=inference_dataloader,
+            loss_fn=loss_fn,
+            device=device,
+            num_classes=NUM_CLASSES
         )
 
     if USE_WANDB:
