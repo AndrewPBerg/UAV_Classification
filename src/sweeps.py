@@ -224,7 +224,7 @@ def model_pipeline(config= None):
 def main():
     SEED = general_config['seed']
     PROJECT_NAME = config['wandb']['project']
-    SWEEP_COUNT = config['sweep']['count']
+    SWEEP_COUNT = general_config['sweep_count']
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
@@ -233,7 +233,7 @@ def main():
     wandb_login()
 
     sweep_id = wandb.sweep(config['sweep'], project=PROJECT_NAME)
-    wandb.agent(sweep_id, model_pipeline, count=SWEEP_COUNT)
+    wandb.agent(sweep_id, model_pipeline, count=int(SWEEP_COUNT))
 
 if __name__ == "__main__":
     main()

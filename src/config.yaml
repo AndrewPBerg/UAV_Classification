@@ -12,6 +12,7 @@ general:
   inference_size: 0.1
   val_size: 0.1
   shuffled: false
+  sweep_count: 500
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 5
@@ -42,7 +43,6 @@ wandb:
   tags: null
   dir: wandb
 sweep:
-  count: 1
   name: LR Tuning Test
   method: random
   metric:

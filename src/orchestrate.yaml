@@ -15,8 +15,9 @@ runs:
   - id: 0
     type: sweep
     changes:
+      general:
+        sweep_count: 500
       sweep:
-        count: 500
         name: LR Tuning Test
   
   # Additional runs can be added following the same structure...
