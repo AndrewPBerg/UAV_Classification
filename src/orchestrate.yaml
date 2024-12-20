@@ -16,8 +16,8 @@ runs:
     type: sweep
     changes:
       general:
-        sweep_count: 500
+        sweep_count: 200
       sweep:
-        name: LR Tuning Test
+        name: Augmentations/sample Tuning
   
   # Additional runs can be added following the same structure...
