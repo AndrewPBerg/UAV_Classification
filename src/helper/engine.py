@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.utils
 import torch.utils.data
 from torch.utils.data import DataLoader
-from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score
+from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy
 
 from tqdm.auto import tqdm
 from typing import Dict, List, Tuple
@@ -34,11 +34,10 @@ def train_step(model,
               f1_metric,
               accumulation_steps=1):
     model.train()
-    train_loss, train_acc = 0, 0
+    train_loss = 0
     
-    # Initialize metrics
-    y_pred_list = []
-    y_true_list = []
+    # Initialize accuracy metric
+    accuracy_metric = MulticlassAccuracy(num_classes=precision_metric.num_classes, average="weighted").to(device)
     
     len_dataloader = len(dataloader)
     optimizer.zero_grad()
@@ -49,7 +48,8 @@ def train_step(model,
         # Ensure input is float32 before forward pass
         X = X.float()
         
-        with autocast(enabled=True, dtype=torch.float16):
+        # Forward pass with autocast
+        with torch.autocast(device_type='cuda', dtype=torch.float16):
             outputs = model(X)
             if hasattr(outputs, "logits"):
                 y_pred = outputs.logits
@@ -58,29 +58,36 @@ def train_step(model,
             loss = loss_fn(y_pred, y)
             loss = loss / accumulation_steps
         
+        # Backward pass with gradient scaling
         scaler.scale(loss).backward()
         
         if ((batch_idx + 1) % accumulation_steps == 0) or (batch_idx + 1 == len_dataloader):
+            # Unscale gradients and clip them
+            scaler.unscale_(optimizer)
+            torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
+            
+            # Step optimizer and update scaler
             scaler.step(optimizer)
             scaler.update()
-            optimizer.zero_grad()
+            optimizer.zero_grad(set_to_none=True)
         
         train_loss += loss.item() * accumulation_steps
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        train_acc += (y_pred_class == y).sum().item() / len(y_pred_class)
 
         # Update metrics
+        accuracy_metric.update(y_pred_class, y)
         precision_metric.update(y_pred_class, y)
         recall_metric.update(y_pred_class, y)
         f1_metric.update(y_pred_class, y)
 
     train_loss /= len(dataloader)
-    train_acc /= len(dataloader)
-
+    train_acc = accuracy_metric.compute().item()
     train_precision = precision_metric.compute().item()
     train_recall = recall_metric.compute().item()
     train_f1 = f1_metric.compute().item()
 
+    # Reset metrics
+    accuracy_metric.reset()
     precision_metric.reset()
     recall_metric.reset()
     f1_metric.reset()
@@ -90,51 +97,52 @@ def train_step(model,
 
 def test_step(model, dataloader, loss_fn, device, precision_metric, recall_metric, f1_metric):
     model.eval()
-    test_loss, test_acc = 0, 0
+    test_loss = 0
+
+    # Initialize accuracy metric
+    accuracy_metric = MulticlassAccuracy(num_classes=precision_metric.num_classes, average="weighted").to(device)
 
     with torch.no_grad():
         for X, y in dataloader:
             X, y = X.to(device), y.to(device)
-            outputs = model(X)
-            if hasattr(outputs, "logits"):
-                y_pred = outputs.logits
-            else:
-                y_pred = outputs # for custom MoA AST model
+            X = X.float()
+            
+            with torch.autocast(device_type='cuda', dtype=torch.float16):
+                outputs = model(X)
+                if hasattr(outputs, "logits"):
+                    y_pred = outputs.logits
+                else:
+                    y_pred = outputs
+                loss = loss_fn(y_pred, y)
 
-            loss = loss_fn(y_pred, y)
             test_loss += loss.item()
-
             y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-            test_acc += (y_pred_class == y).sum().item() / len(y_pred)
 
-            # Update torchmetrics for test set
+            # Update metrics
+            accuracy_metric.update(y_pred_class, y)
             precision_metric.update(y_pred_class, y)
             recall_metric.update(y_pred_class, y)
             f1_metric.update(y_pred_class, y)
 
-            ground_truth_all.extend(y.cpu().numpy())
-            predictions_all.extend(y_pred_class.cpu().numpy())
-
     test_loss /= len(dataloader)
-    test_acc /= len(dataloader)
-
-    # Compute metrics
+    test_acc = accuracy_metric.compute().item()
     test_precision = precision_metric.compute().item()
     test_recall = recall_metric.compute().item()
     test_f1 = f1_metric.compute().item()
 
-    # Reset metrics for the next epoch
+    # Reset metrics
+    accuracy_metric.reset()
     precision_metric.reset()
     recall_metric.reset()
     f1_metric.reset()
 
-    return test_loss, test_acc, test_precision, test_recall, test_f1, 
+    return test_loss, test_acc, test_precision, test_recall, test_f1
 
 
 def train(model: torch.nn.Module, 
           train_dataloader: DataLoader, 
           val_dataloader: DataLoader,
-          test_dataloader: DataLoader, 
+          test_dataloader: DataLoader | None, 
           optimizer: AdamW, 
           scheduler: torch.optim.lr_scheduler._LRScheduler,  
           loss_fn: nn.Module, 
@@ -199,16 +207,22 @@ def train(model: torch.nn.Module,
             f1_metric=f1_metric_val
         )
         
-        # Test step
-        test_loss, test_acc, test_precision, test_recall, test_f1 = test_step(
-            model=model,
-            dataloader=test_dataloader,
-            loss_fn=loss_fn,
-            device=device,
-            precision_metric=precision_metric_test,
-            recall_metric=recall_metric_test,
-            f1_metric=f1_metric_test
-        )
+        # Test step (only if test_dataloader is provided)
+        if test_dataloader is not None:
+            test_loss, test_acc, test_precision, test_recall, test_f1 = test_step(
+                model=model,
+                dataloader=test_dataloader,
+                loss_fn=loss_fn,
+                device=device,
+                precision_metric=precision_metric_test,
+                recall_metric=recall_metric_test,
+                f1_metric=f1_metric_test
+            )
+            results["test_loss"].append(test_loss)
+            results["test_acc"].append(test_acc)
+            results["test_f1"].append(test_f1)
+            results["test_precision"].append(test_precision)
+            results["test_recall"].append(test_recall)
 
         # Print metrics
         print(
@@ -289,13 +303,23 @@ def train(model: torch.nn.Module,
     return results
 
 def inference_loop(model: torch.nn.Module, 
-                   inference_loader: DataLoader,
-                   loss_fn: nn.CrossEntropyLoss,
-                   device: str) -> None:
-    """Performs inference on a trained model using mixed precision."""
+                  inference_loader: DataLoader,
+                  loss_fn: nn.CrossEntropyLoss,
+                  device: str,
+                  num_classes: int) -> None:
+    """
+    Performs inference on a trained model using mixed precision.
+    Uses torchmetrics for accurate metric calculation.
+    """
     
-    total_loss, correct, total = 0.0, 0, 0
-
+    # Initialize metrics
+    accuracy_metric = MulticlassAccuracy(num_classes=num_classes, average="weighted").to(device)
+    precision_metric = MulticlassPrecision(num_classes=num_classes, average="weighted").to(device)
+    recall_metric = MulticlassRecall(num_classes=num_classes, average="weighted").to(device)
+    f1_metric = MulticlassF1Score(num_classes=num_classes, average="weighted").to(device)
+    
+    total_loss = 0.0
+    
     # Set model to evaluation mode
     model.eval()
     
@@ -306,7 +330,7 @@ def inference_loop(model: torch.nn.Module,
 
             # Enable autocast for mixed precision
             with torch.cuda.amp.autocast():
-                # Forward pass (extract logits)
+                # Forward pass
                 outputs = model(X_batch)
                 # Get logits from the model
                 if hasattr(outputs, "logits"):
@@ -319,18 +343,41 @@ def inference_loop(model: torch.nn.Module,
                 total_loss += loss.item()
 
                 # Get predictions
-                _, predicted = torch.max(y_pred, 1)
-                correct += (predicted == y_batch).sum().item()
-                total += y_batch.size(0)
+                y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+                
+                # Update metrics
+                accuracy_metric.update(y_pred_class, y_batch)
+                precision_metric.update(y_pred_class, y_batch)
+                recall_metric.update(y_pred_class, y_batch)
+                f1_metric.update(y_pred_class, y_batch)
 
-    # Average loss and accuracy
+    # Calculate final metrics
     average_loss = total_loss / len(inference_loader)
-    accuracy = correct / total
+    accuracy = accuracy_metric.compute().item()
+    precision = precision_metric.compute().item()
+    recall = recall_metric.compute().item()
+    f1 = f1_metric.compute().item()
 
-    print(f"Inference Loss: {average_loss:.4f}, Accuracy: {accuracy * 100:.2f}%")
+    # Reset metrics
+    accuracy_metric.reset()
+    precision_metric.reset()
+    recall_metric.reset()
+    f1_metric.reset()
+
+    print(
+        f"Inference Results:\n"
+        f"Loss: {average_loss:.4f}\n"
+        f"Accuracy: {accuracy * 100:.2f}%\n"
+        f"Precision: {precision * 100:.2f}%\n"
+        f"Recall: {recall * 100:.2f}%\n"
+        f"F1 Score: {f1 * 100:.2f}%"
+    )
 
     if wandb.run is not None:
         wandb.log({
             "inference_loss": average_loss,
-            "inference_accuracy": accuracy
+            "inference_accuracy": accuracy,
+            "inference_precision": precision,
+            "inference_recall": recall,
+            "inference_f1": f1
         })

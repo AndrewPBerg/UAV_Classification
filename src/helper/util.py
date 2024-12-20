@@ -9,14 +9,20 @@ import librosa
 from typing import Optional, Union
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 import warnings
+
+from helper.cnn_feature_extractor import CNNFeatureExtractor
 from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
 from torchaudio.transforms import Resample
 from typing import Union
 import numpy as np
-from torchviz import make_dot
+# from torchviz import make_dot
 import os
 from torch.cuda.amp import autocast
 import wandb
+from sklearn.model_selection import KFold
+from icecream import ic
+from time import time as timer
+from dotenv import load_dotenv
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
@@ -53,7 +59,7 @@ def get_mixed_params(sweep_config, general_config):
     for key, value in general_config.items():
         # just like LeetCode isDuplicate problem
         if key in result:
-            passs
+            pass
         else:
             # if not already occupied by sweep config value add the current general parameter
             result[key] = value
@@ -71,6 +77,8 @@ def calculated_load_time(start, end) -> str:
     return formatted_time
 
 def wandb_login():
+    load_dotenv()
+
     api_key = os.environ.get('WANDB_API_KEY')
     if not api_key:
         raise ValueError("WANDB_API_KEY environment variable is not set")
@@ -89,14 +97,14 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, CNNFeatureExtractor],
                  standardize_audio_boolean: bool=True, 
-                 target_sr: int=16000,  # Changed to match Wav2Vec2 requirements
+                 target_sr: int=16000,
                  target_duration: int=5, 
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
-                 config: dict = None) -> Dataset: # type: ignore
+                 config: dict = None) -> Dataset:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -104,18 +112,23 @@ class AudioDataset(Dataset):
         self.sampling_rate = None  # current dataset sample rate
         self.resampler = None
         self.standardize_audio_boolean = standardize_audio_boolean
-        try:
-            self.target_sr = self.feature_extractor.sampling_rate or 16000
-        except:
-            self.target_sr = 16000
+        
+        # Get target sampling rate from feature extractor if available
+        if isinstance(feature_extractor, CNNFeatureExtractor):
+            self.target_sr = feature_extractor.sampling_rate
+        else:
+            try:
+                self.target_sr = feature_extractor.sampling_rate or target_sr
+            except:
+                self.target_sr = target_sr
+                
         self.target_duration = target_duration
-        self.target_length = target_duration * target_sr
+        self.target_length = target_duration * self.target_sr
         self.augmentations_per_sample = augmentations_per_sample
-        self.standardize_audio_boolean = standardize_audio_boolean
         self.config = config
 
         total_samples = (augmentations_per_sample + 1) * len(self.paths)
-        self.audio_tensors = torch.empty(total_samples, num_channels, target_sr * target_duration)
+        self.audio_tensors = torch.empty(total_samples, num_channels, self.target_sr * target_duration)
         self.class_indices = []
 
         if self.augmentations_per_sample > 0:
@@ -127,9 +140,7 @@ class AudioDataset(Dataset):
             self.audio_tensors[index] = audio_to_append
             self.class_indices.append(class_idx)
 
-        # Apply augmentations 
-        # TODO refactor following this guide using torch.cat once after all augmentations are generated
-        # sourse https://discuss.pytorch.org/t/appending-to-a-tensor/2665/3 
+        # Apply augmentations
         if self.augmentations_per_sample > 0:
             original_samples = len(self.paths)
             for i in range(original_samples):
@@ -139,14 +150,8 @@ class AudioDataset(Dataset):
                     if len(augmentations) != 0:
                         augmented_audio = apply_augmentations(self.audio_tensors[i], self.composed_transform, self.target_sr)
                         self.audio_tensors[new_index] = augmented_audio
-                        # self.audio_tensors.append(augmented_audio())
                     else:
                         self.audio_tensors[new_index] = self.audio_tensors[i]
-                        # self.audio_tensors.append(self.audio_tensors[i])
-
-        # if self.augmentations_per_sample > 0:
-        #     outputs = []
-
 
         # Ensure audio_tensors and class_indices have the same length
         assert len(self.audio_tensors) == len(self.class_indices), "Mismatch between audio_tensors and class_indices"
@@ -185,13 +190,20 @@ class AudioDataset(Dataset):
             return len(self.paths)
         
     def feature_extraction(self, audio_tensor):
-        """Process audio tensor for model input."""\
-        
+        """Process audio tensor for model input."""
         audio_np = audio_tensor.squeeze().numpy()
 
         try:
+            # For CNN feature extractor
+            if isinstance(self.feature_extractor, CNNFeatureExtractor):
+                features = self.feature_extractor(
+                    audio_tensor,  # Pass tensor directly for CNN
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt"
+                )
+                return features.input_values
             # For AST feature extractor
-            if isinstance(self.feature_extractor, ASTFeatureExtractor):
+            elif isinstance(self.feature_extractor, ASTFeatureExtractor):
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
@@ -199,7 +211,6 @@ class AudioDataset(Dataset):
                 )
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, SeamlessM4TFeatureExtractor):
-                # For Wav2Vec2 processor
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
@@ -208,25 +219,18 @@ class AudioDataset(Dataset):
                 )
                 return features.input_features.squeeze(0)
             elif isinstance(self.feature_extractor, Wav2Vec2FeatureExtractor):
-
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
-                    # sampling_rate=16000,
-                    return_tensors="pt",
-                    # padding=True
+                    return_tensors="pt"
                 )
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, BitImageProcessor):
-
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
-                    # sampling_rate=16000,
-                    return_tensors="pt",
-                    # padding=True
+                    return_tensors="pt"
                 )
-                print(features)
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
@@ -237,15 +241,15 @@ class AudioDataset(Dataset):
                     padding_length = target_length - len(audio_np)
                     audio_np = np.pad(audio_np, (0, padding_length), mode='constant')
                 
-                features = self.feature_extractor(audio_np, 
-                                                  sampling_rate = self.target_sr,
-                                                  return_tensors="pt",
-                                                  padding=True)
-        
+                features = self.feature_extractor(
+                    audio_np, 
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt",
+                    padding=True
+                )
                 return features.input_features.squeeze(0)
-
             else:
-                print(f"Feature Extractor is not implemented {self.feature_extractor}")
+                raise ValueError(f"Unsupported feature extractor type: {type(self.feature_extractor)}")
 
         except Exception as e:
             raise e
@@ -367,7 +371,7 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
 
 def train_test_split_custom(
     data_path: str, 
-    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor],
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
     test_size: float = 0.2, 
     val_size: float = 0.1,
     inference_size: float = 0.1,
@@ -468,7 +472,78 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
     model.load_state_dict(torch.load(model_path))
     return model
 
+def k_fold_split_custom(
+    data_path: str,
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
+    k_folds: int = 5,
+    inference_size: float = 0.1,
+    seed: int = 42,
+    augmentations_per_sample: int = 3,
+    augmentations: list[str] = None,
+    config: dict = None
+) -> list[tuple]:
+    """
+    Creates k-fold splits of the dataset for cross validation.
+    Returns a list of tuples containing (train_dataset, val_dataset) for each fold.
+    """
+    # Get all paths
+    all_paths = list(Path(data_path).glob("*/*.wav"))
+    if len(all_paths) == 0:
+        raise ValueError(f"No .wav files found in {data_path}")
 
+    # First separate inference set
+    n_samples = len(all_paths)
+    n_inference = int(n_samples * inference_size)
+    
+    # Create random state for reproducibility
+    rng = np.random.RandomState(seed)
+    indices = rng.permutation(n_samples)
+    
+    # Split off inference set
+    train_val_indices = indices[:-n_inference]
+    inference_indices = indices[-n_inference:]
+    
+    # Create KFold object
+    kfold = KFold(n_splits=k_folds, shuffle=True, random_state=seed)
+    
+    # Create datasets for each fold
+    fold_datasets = []
+    start_time = timer()  # Start timer for dataset initialization
+    
+    for fold, (train_idx, val_idx) in enumerate(kfold.split(train_val_indices)):
+        # Get paths for this fold
+        fold_train_paths = [all_paths[i] for i in train_val_indices[train_idx]]
+        fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
+        
+        # Create datasets
+        train_dataset = AudioDataset(
+            data_path,
+            fold_train_paths,
+            feature_extractor,
+            augmentations_per_sample=augmentations_per_sample,
+            augmentations=augmentations,
+            config=config
+        )
+        
+        val_dataset = AudioDataset(
+            data_path,
+            fold_val_paths,
+            feature_extractor,
+            config=config
+        )
+        
+        fold_datasets.append((train_dataset, val_dataset))
+        ic(f"Fold {fold+1} datasets loaded")  # Show progression of folds datasets loading
+    
+    # Create inference dataset
+    inference_paths = [all_paths[i] for i in inference_indices]
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
+    
+    end_time = timer()  # End timer for dataset initialization
+    dataset_init_time = end_time - start_time
+    print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
+    
+    return fold_datasets, inference_dataset
 
 
 
