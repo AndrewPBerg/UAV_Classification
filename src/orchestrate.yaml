@@ -4,20 +4,53 @@
 SEND_MESSAGE: true
 
 runs:
-  # - id: 0
-  #   type: script
-  #   changes:
-  #     general:
-  #       batch_size: 16
-  #       model_type: CNN
-  #       use_kfold: false
-    
   - id: 0
-    type: sweep
+    type: script
+    changes:
+      wandb:
+        project: CNN-0augs-LR=0.002
+      general:
+        batch_size: 32
+        learning_rate: 0.002
+        model_type: CNN
+        augmentations_per_sample: 0
+        epochs: 30
+        patience: 5
+        use_wandb: true
+        use_kfold: true
+        
+
+  - id: 1
+    type: script
+    changes:
+      wandb:
+        project: CNN-1augs-LR=0.002
+      general:
+        augmentations_per_sample: 1
+
+  - id: 2
+    type: script
+    changes:
+      wandb:
+        project: CNN-2augs-LR=0.002
+      general:
+        augmentations_per_sample: 2
+        
+  - id: 3
+    type: script
     changes:
       general:
-        sweep_count: 200
-      sweep:
-        name: Augmentations/sample Tuning
+        augmentations_per_sample: 3
+      wandb:
+        project: CNN-3augs-LR=0.002
+
+  - id: 4
+    type: script
+    changes:
+      general:
+        augmentations_per_sample: 4
+      wandb:
+        project: CNN-4augs-LR=0.002
+
   
   # Additional runs can be added following the same structure...
