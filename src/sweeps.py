@@ -12,7 +12,6 @@ import wandb
 import random
 from torch.cuda.amp import GradScaler, autocast
 import sys
-from helper.teleBot import send_message
 from helper.util import count_parameters
 import numpy as np
 
@@ -172,11 +171,6 @@ def main():
 
     sweep_id = wandb.sweep(config['sweep'], project=PROJECT_NAME)
     wandb.agent(sweep_id, model_pipeline, count=SWEEP_COUNT)
-    send_message(f"Your Run has finished cooking...\n"
-                 f"Project: {PROJECT_NAME}\n"
-                 f"Sweep Count: {SWEEP_COUNT}\n"
-                 f"Sweep Name: {sweep_name}\n"
-                 f"Link to Your Wandb Project's page: https://wandb.ai/andberg9-self/projects")
 
 if __name__ == "__main__":
     main()

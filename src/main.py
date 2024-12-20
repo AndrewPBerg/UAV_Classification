@@ -4,6 +4,7 @@ import yaml
 from typing import Any
 from icecream import ic
 import sys
+from helper.teleBot import send_message
 
 def change_config_value(file_path: str, key: str, value: Any) -> None:
     """
@@ -132,6 +133,7 @@ def main():
     
     ic('Orchestrate validation passed.')
 
+    run_count = 0
     # Process valid runs
     for run in oc.get('runs'):
         
@@ -147,6 +149,12 @@ def main():
         else:
             ic(f'{id}: running sweep...')
             pass  # sweep_main()
+    
+        run_count += 1
+    if oc.get('SEND_MESSAGE'):
+        send_message(f'f"Your Symphony has stopped playing\n" {run_count} runs completed.')
+        
+    ic('All runs completed.')
 
 if __name__ == "__main__":
     main()
