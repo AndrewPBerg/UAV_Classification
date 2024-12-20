@@ -17,8 +17,8 @@ general:
   val_size: 0.1
   shuffled : false
   accumulation_steps: 2
-  learning_rate: 0.001
-  patience : 15
+  learning_rate: 0.006
+  patience : 5
   use_wandb: false
   torch_viz: false
   use_kfold: true

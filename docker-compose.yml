@@ -27,7 +27,8 @@ services:
               count: all
               capabilities: [gpu]
     # command: python3 train_cnn.py
-    command: python3 script.py
+    # command: python3 script.py
+    command: python3 main.py
     # command: python3 sweeps.py
     # command: /bin/bash # interactive shell new
     stdin_open: true
