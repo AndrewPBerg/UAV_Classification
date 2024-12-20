@@ -8,7 +8,7 @@ runs:
     type: script
     changes:
       wandb:
-        project: CNN-0augs-LR=0.002
+        name: CNN-0augs-LR=0.002
       general:
         batch_size: 32
         learning_rate: 0.002
@@ -24,7 +24,7 @@ runs:
     type: script
     changes:
       wandb:
-        project: CNN-1augs-LR=0.002
+        name: CNN-1augs-LR=0.002
       general:
         augmentations_per_sample: 1
 
@@ -32,7 +32,7 @@ runs:
     type: script
     changes:
       wandb:
-        project: CNN-2augs-LR=0.002
+        name: CNN-2augs-LR=0.002
       general:
         augmentations_per_sample: 2
         
@@ -42,7 +42,7 @@ runs:
       general:
         augmentations_per_sample: 3
       wandb:
-        project: CNN-3augs-LR=0.002
+        name: CNN-3augs-LR=0.002
 
   - id: 4
     type: script
@@ -50,7 +50,7 @@ runs:
       general:
         augmentations_per_sample: 4
       wandb:
-        project: CNN-4augs-LR=0.002
+        name: CNN-4augs-LR=0.002
 
   
   # Additional runs can be added following the same structure...

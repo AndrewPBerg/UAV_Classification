@@ -16,9 +16,9 @@ general:
   accumulation_steps: 2
   learning_rate: 0.002
   patience: 5
-  use_wandb: false
+  use_wandb: true
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5
   cnn_config:
     hidden_units: 256
@@ -36,8 +36,8 @@ general:
   time_stretch_min_rate: 0.9
   time_stretch_max_rate: 1.0
 wandb:
-  project: CNN H tuning
-  name: ''
+  project: 9class-Kfold-Results
+  name: CNN-0augs-LR=0.002
   reinit: false
   notes: null
   tags: null
