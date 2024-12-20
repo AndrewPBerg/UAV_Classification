@@ -224,7 +224,7 @@ def model_pipeline(config= None):
 def main():
     SEED = general_config['seed']
     PROJECT_NAME = config['wandb']['project']
-    SWEEP_COUNT = general_config['sweep_count']
+    SWEEP_COUNT = config['sweep']['count']
 
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)

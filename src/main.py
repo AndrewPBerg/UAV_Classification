@@ -1,5 +1,5 @@
-# from script import main as script_main
-# from sweeps import main as sweep_main
+from script import main as script_main
+from sweeps import main as sweep_main
 import yaml
 from typing import Any
 from icecream import ic
@@ -83,7 +83,7 @@ def is_valid(run: dict) -> tuple[bool, str]:
     
     # Validate changes against config structure
     try:
-        with open('src/config.yaml', 'r') as f:
+        with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
             
         def validate_nested_dict(changes: dict, config: dict, path: str = '') -> tuple[bool, str]:
@@ -107,13 +107,13 @@ def is_valid(run: dict) -> tuple[bool, str]:
         return validate_nested_dict(changes, config)
         
     except FileNotFoundError:
-        return False, "Config file not found: src/config.yaml"
+        return False, "Config file not found: config.yaml"
     except yaml.YAMLError:
         return False, "Error parsing config.yaml"
 
 def main():
     # Load the orchestrate.yaml file
-    with open('src/orchestrate.yaml', 'r') as f:
+    with open('orchestrate.yaml', 'r') as f:
         oc = yaml.safe_load(f)
     
     # Validate all runs first
@@ -140,19 +140,19 @@ def main():
         id, changes, type = run.get('id'), run.get('changes'), run.get('type')
         
         ic(f'{id}: applying changes to config.yaml...')
-        alter(changes, 'src/config.yaml')
+        alter(changes, 'config.yaml')
 
         if type == 'script':
             ic(f'{id}: running script...')
-            pass  # script_main()
+            script_main()
 
         else:
             ic(f'{id}: running sweep...')
-            pass  # sweep_main()
+            sweep_main()
     
         run_count += 1
     if oc.get('SEND_MESSAGE'):
-        send_message(f'f"Your Symphony has stopped playing\n" {run_count} runs completed.')
+        send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
         
     ic('All runs completed.')
 
