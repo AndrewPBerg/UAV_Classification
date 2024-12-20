@@ -15,6 +15,7 @@ from peft import (
     TaskType  # Change PeftType to TaskType
 )
 import traceback
+import torch.nn.functional as F
 
 @dataclass
 class ModelConfig:
@@ -81,6 +82,82 @@ MODEL_CONFIGS = {
         extra_model_kwargs={"trust_remote_code": True}
     )
 }
+
+class TorchCNN(nn.Module):
+    def __init__(self, num_classes: int = 9, hidden_units: int = 256):
+        """
+        Initialize the CNN model with configurable hidden units for the fully connected layers.
+        
+        Args:
+            num_classes (int): Number of output classes
+            hidden_units (int): Number of hidden units in the fully connected layer
+        """
+        super(TorchCNN, self).__init__()
+        
+        # First convolutional block
+        self.conv1 = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(16)
+        )
+        
+        # Second convolutional block
+        self.conv2 = nn.Sequential(
+            nn.Conv2d(16, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(32)
+        )
+        
+        # Third convolutional block
+        self.conv3 = nn.Sequential(
+            nn.Conv2d(32, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(2),
+            nn.BatchNorm2d(64)
+        )
+        
+        # Calculate the size of flattened features
+        self._to_linear = None
+        self._get_conv_output_size((128, 157))  # Initialize _to_linear
+        
+        # Dense layers with configurable hidden units
+        self.fc1 = nn.Linear(self._to_linear, hidden_units)
+        self.dropout = nn.Dropout(p=0.5)
+        self.fc2 = nn.Linear(hidden_units, num_classes)
+
+    def _get_conv_output_size(self, shape):
+        """Helper function to calculate conv output size"""
+        bs = 1
+        x = torch.rand(bs, *shape)
+        x = x.unsqueeze(1)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = x.flatten(1)
+        self._to_linear = x.shape[1]
+        return self._to_linear
+
+    def forward(self, x):
+        # Add channel dimension if not present
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+            
+        # Convolutional layers
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        
+        # Flatten
+        x = x.flatten(1)
+        
+        # Dense layers
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        
+        return x
 
 class ModelFactory:
     @staticmethod

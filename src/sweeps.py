@@ -3,8 +3,9 @@ from helper.util import train_test_split_custom, wandb_login
 from helper.engine import train, inference_loop
 from helper.ast import custom_AST
 from helper.util import get_mixed_params
-from helper.cnn_engine import TorchCNN
+from helper.models import TorchCNN
 from helper.cnn_feature_extractor import CNNFeatureExtractor
+from helper.fold_engine import k_fold_cross_validation
 
 import torch
 from torch.utils.data import DataLoader

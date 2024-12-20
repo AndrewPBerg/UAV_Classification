@@ -3,7 +3,7 @@ from helper.util import train_test_split_custom, save_model, wandb_login, calcul
 from helper.engine import train, inference_loop
 from helper.fold_engine import k_fold_cross_validation
 from helper.ast import custom_AST
-from helper.cnn_engine import TorchCNN, train_cnn
+from helper.models import TorchCNN
 from helper.cnn_feature_extractor import CNNFeatureExtractor
 from transformers import ASTFeatureExtractor
 
@@ -46,7 +46,7 @@ def get_model_and_optimizer(config, device):
             hidden_units=config['cnn_config']['hidden_units']
         )
         optimizer = Adam(model.parameters(), lr=learning_rate)
-        # train_fn = train_cnn
+    
         train_fn = train
         
         # Get feature extraction parameters from config
