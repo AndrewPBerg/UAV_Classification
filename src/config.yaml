@@ -14,7 +14,7 @@ general:
   shuffled: false
   sweep_count: 200
   accumulation_steps: 2
-  learning_rate: 0.002
+  learning_rate: 0.001
   patience: 5
   use_wandb: true
   torch_viz: false
@@ -29,7 +29,7 @@ general:
       hop_length: 512
       power: 2.0
   adaptor_type: ia3
-  augmentations_per_sample: 0
+  augmentations_per_sample: 4
   augmentations:
   - time_stretch
   - sin_distortion
@@ -37,7 +37,7 @@ general:
   time_stretch_max_rate: 1.0
 wandb:
   project: 9class-Kfold-Results
-  name: CNN-0augs-LR=0.002
+  name: CNN-4augs-LR=0.001
   reinit: false
   notes: null
   tags: null
