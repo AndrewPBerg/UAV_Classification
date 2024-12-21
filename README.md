@@ -2,6 +2,12 @@
 
 This repository contains a machine learning project for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
 
+# **NOTE**
+
+The Datasets used in this project are not included in the repository due to their visibility -> We have decided not to open-source the datasets.
+
+If you would like to use the codebase, please use this example directory to store your datasets. and update the `config.yaml` file to point to your datasets.
+
 ## Project Structure
 
 ```
