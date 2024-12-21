@@ -84,13 +84,14 @@ MODEL_CONFIGS = {
 }
 
 class TorchCNN(nn.Module):
-    def __init__(self, num_classes: int = 9, hidden_units: int = 256):
+    def __init__(self, num_classes: int = 9, hidden_units: int = 256, input_shape: tuple = (128, 157)):
         """
         Initialize the CNN model with configurable hidden units for the fully connected layers.
         
         Args:
             num_classes (int): Number of output classes
             hidden_units (int): Number of hidden units in the fully connected layer
+            input_shape (tuple): Expected input shape (height, width) for feature maps
         """
         super(TorchCNN, self).__init__()
         
@@ -120,7 +121,7 @@ class TorchCNN(nn.Module):
         
         # Calculate the size of flattened features
         self._to_linear = None
-        self._get_conv_output_size((128, 157))  # Initialize _to_linear
+        self._get_conv_output_size(input_shape)  # Initialize _to_linear
         
         # Dense layers with configurable hidden units
         self.fc1 = nn.Linear(self._to_linear, hidden_units)
