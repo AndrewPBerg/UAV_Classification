@@ -4,7 +4,7 @@ from helper.engine import train, inference_loop
 from helper.ast import custom_AST
 from helper.util import get_mixed_params
 from helper.models import TorchCNN
-from helper.cnn_feature_extractor import CNNFeatureExtractor
+from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from helper.fold_engine import k_fold_cross_validation
 
 import torch
@@ -90,13 +90,26 @@ def get_model_and_optimizer(config: Dict[str, Any], device: torch.device) -> Tup
         
         # Get feature extraction parameters from config
         fe_config = config['cnn_config']['feature_extraction']
-        feature_extractor = CNNFeatureExtractor(
-            sampling_rate=fe_config['sampling_rate'],
-            n_mels=fe_config['n_mels'],
-            n_fft=fe_config['n_fft'],
-            hop_length=fe_config['hop_length'],
-            power=fe_config['power']
-        )
+        feature_type = fe_config.get('type', 'melspectrogram')  # Default to melspectrogram if not specified
+        
+        if feature_type == 'melspectrogram':
+            feature_extractor = MelSpectrogramFeatureExtractor(
+                sampling_rate=fe_config['sampling_rate'],
+                n_mels=fe_config['n_mels'],
+                n_fft=fe_config['n_fft'],
+                hop_length=fe_config['hop_length'],
+                power=fe_config['power']
+            )
+        elif feature_type == 'mfcc':
+            feature_extractor = MFCCFeatureExtractor(
+                sampling_rate=fe_config['sampling_rate'],
+                n_mfcc=fe_config.get('n_mfcc', 40),  # Default to 40 MFCCs if not specified
+                n_mels=fe_config.get('n_mels', 128),
+                n_fft=fe_config.get('n_fft', 1024),
+                hop_length=fe_config.get('hop_length', 512)
+            )
+        else:
+            raise ValueError(f"Unknown feature extraction type: {feature_type}")
     else:
         raise ValueError(f"Unknown model type: {model_type}")
     

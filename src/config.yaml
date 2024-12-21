@@ -23,11 +23,13 @@ general:
   cnn_config:
     hidden_units: 256
     feature_extraction:
+      type: mfcc
       sampling_rate: 16000
+      n_mfcc: 40
       n_mels: 128
       n_fft: 1024
       hop_length: 512
-      power: 2.0
+      # power: 2.0
   adaptor_type: ia3
   augmentations_per_sample: 4
   augmentations:
