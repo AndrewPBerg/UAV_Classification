@@ -10,12 +10,11 @@ from typing import Optional, Union
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 import warnings
 
-from helper.cnn_feature_extractor import CNNFeatureExtractor
-from .augmentations import create_augmentation_pipeline, apply_augmentations      # Assume this function exists
+from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
+from .augmentations import create_augmentation_pipeline, apply_augmentations
 from torchaudio.transforms import Resample
 from typing import Union
 import numpy as np
-# from torchviz import make_dot
 import os
 from torch.cuda.amp import autocast
 import wandb
@@ -97,7 +96,7 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, CNNFeatureExtractor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor],
                  standardize_audio_boolean: bool=True, 
                  target_sr: int=16000,
                  target_duration: int=5, 
@@ -114,7 +113,7 @@ class AudioDataset(Dataset):
         self.standardize_audio_boolean = standardize_audio_boolean
         
         # Get target sampling rate from feature extractor if available
-        if isinstance(feature_extractor, CNNFeatureExtractor):
+        if isinstance(feature_extractor, MelSpectrogramFeatureExtractor) or isinstance(feature_extractor, MFCCFeatureExtractor):
             self.target_sr = feature_extractor.sampling_rate
         else:
             try:
@@ -194,10 +193,18 @@ class AudioDataset(Dataset):
         audio_np = audio_tensor.squeeze().numpy()
 
         try:
-            # For CNN feature extractor
-            if isinstance(self.feature_extractor, CNNFeatureExtractor):
+            # For MelSpectrogram feature extractor
+            if isinstance(self.feature_extractor, MelSpectrogramFeatureExtractor):
                 features = self.feature_extractor(
-                    audio_tensor,  # Pass tensor directly for CNN
+                    audio_tensor,  # Pass tensor directly
+                    sampling_rate=self.target_sr,
+                    return_tensors="pt"
+                )
+                return features.input_values
+            # For MFCC feature extractor
+            elif isinstance(self.feature_extractor, MFCCFeatureExtractor):
+                features = self.feature_extractor(
+                    audio_tensor,  # Pass tensor directly
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
@@ -371,14 +378,14 @@ def find_classes(directory: str) -> tuple[list[str], dict[str,int]]:
 
 def train_test_split_custom(
     data_path: str, 
-    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor],
     test_size: float = 0.2, 
     val_size: float = 0.1,
     inference_size: float = 0.1,
     seed: int = 42, 
     augmentations_per_sample: int = 3,
     augmentations: list[str] = None,
-    config: dict = None # type: ignore
+    config: dict = None
 ):
     def split_dataset(data, val_size, test_size, inference_size, random_state=None):
         train_size = 1.0 - (val_size + test_size + inference_size)
@@ -474,7 +481,7 @@ def load_model(model_path:str, model): #TODO type hinting for HGFace transformer
 
 def k_fold_split_custom(
     data_path: str,
-    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, CNNFeatureExtractor],
+    feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor],
     k_folds: int = 5,
     inference_size: float = 0.1,
     seed: int = 42,

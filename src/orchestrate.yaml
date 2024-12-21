@@ -1,7 +1,7 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
 
-SEND_MESSAGE: true
+SEND_MESSAGE: false
 
 runs:
   - id: 0
@@ -16,41 +16,9 @@ runs:
         augmentations_per_sample: 0
         epochs: 30
         patience: 5
-        use_wandb: true
-        use_kfold: true
-        
+        use_wandb: false
+        use_kfold: false
 
-  - id: 1
-    type: script
-    changes:
-      wandb:
-        name: CNN-1augs-LR=0.001
-      general:
-        augmentations_per_sample: 1
-
-  - id: 2
-    type: script
-    changes:
-      wandb:
-        name: CNN-2augs-LR=0.001
-      general:
-        augmentations_per_sample: 2
-        
-  - id: 3
-    type: script
-    changes:
-      general:
-        augmentations_per_sample: 3
-      wandb:
-        name: CNN-3augs-LR=0.001
-
-  - id: 4
-    type: script
-    changes:
-      general:
-        augmentations_per_sample: 4
-      wandb:
-        name: CNN-4augs-LR=0.001
 
   
   # Additional runs can be added following the same structure...

@@ -4,7 +4,7 @@ from helper.engine import train, inference_loop
 from helper.fold_engine import k_fold_cross_validation
 from helper.ast import custom_AST
 from helper.models import TorchCNN
-from helper.cnn_feature_extractor import CNNFeatureExtractor
+from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor
 
 import torch
@@ -41,23 +41,39 @@ def get_model_and_optimizer(config, device):
         optimizer = AdamW(model.parameters(), lr=learning_rate)
         train_fn = train
     elif model_type == "CNN":
-        model = TorchCNN(
-            num_classes=num_classes,
-            hidden_units=config['cnn_config']['hidden_units']
-        )
-        optimizer = Adam(model.parameters(), lr=learning_rate)
-    
-        train_fn = train
-        
         # Get feature extraction parameters from config
         fe_config = config['cnn_config']['feature_extraction']
-        feature_extractor = CNNFeatureExtractor(
-            sampling_rate=fe_config['sampling_rate'],
-            n_mels=fe_config['n_mels'],
-            n_fft=fe_config['n_fft'],
-            hop_length=fe_config['hop_length'],
-            power=fe_config['power']
+        feature_type = fe_config.get('type', 'melspectrogram')  # Default to melspectrogram if not specified
+        
+        # Determine input shape based on feature type
+        if feature_type == 'melspectrogram':
+            input_shape = (fe_config['n_mels'], 157)  # Keep original width for mel spectrograms
+            feature_extractor = MelSpectrogramFeatureExtractor(
+                sampling_rate=fe_config['sampling_rate'],
+                n_mels=fe_config['n_mels'],
+                n_fft=fe_config['n_fft'],
+                hop_length=fe_config['hop_length'],
+                power=fe_config['power']
+            )
+        elif feature_type == 'mfcc':
+            input_shape = (fe_config.get('n_mfcc', 40), 157)  # Use n_mfcc for height, keep same width
+            feature_extractor = MFCCFeatureExtractor(
+                sampling_rate=fe_config['sampling_rate'],
+                n_mfcc=fe_config.get('n_mfcc', 40),
+                n_mels=fe_config.get('n_mels', 128),
+                n_fft=fe_config.get('n_fft', 1024),
+                hop_length=fe_config.get('hop_length', 512)
+            )
+        else:
+            raise ValueError(f"Unknown feature extraction type: {feature_type}")
+            
+        model = TorchCNN(
+            num_classes=num_classes,
+            hidden_units=config['cnn_config']['hidden_units'],
+            input_shape=input_shape
         )
+        optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
     else:
         raise ValueError(f"Unknown model type: {model_type}")
         
