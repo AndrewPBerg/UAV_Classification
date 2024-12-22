@@ -14,7 +14,7 @@ runs:
         learning_rate: 0.001
         model_type: CNN
         augmentations_per_sample: 0
-        epochs: 30
+        epochs: 1
         patience: 5
         use_wandb: false
         use_kfold: false

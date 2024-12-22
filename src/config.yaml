@@ -6,7 +6,7 @@ general:
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
-  epochs: 30
+  epochs: 1
   save_model: false
   test_size: 0.2
   inference_size: 0.1
@@ -17,7 +17,7 @@ general:
   learning_rate: 0.001
   patience: 5
   use_wandb: false
-  torch_viz: false
+  torch_viz: true
   use_kfold: false
   k_folds: 5
   cnn_config:

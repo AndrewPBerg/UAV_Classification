@@ -9,6 +9,7 @@ import librosa
 from typing import Optional, Union
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 import warnings
+from torchviz import make_dot
 
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from .augmentations import create_augmentation_pipeline, apply_augmentations
@@ -25,23 +26,23 @@ from dotenv import load_dotenv
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
-    try:
-        x = torch.randn(1024,128, requires_grad=True).to(device)
-        x = x.float()
-        x = x.unsqueeze(0)
-        
-        with autocast(enabled=True, dtype=torch.float16):
-            y = model(x)
-            if hasattr(y, "logits"):
-                y_pred = y.logits
-            else:
-                y_pred = y
+    # try:
+    x = torch.randn(128, 157, requires_grad=True).to(device)
+    x = x.float()
+    x = x.unsqueeze(0)
+    
+    with autocast(enabled=True, dtype=torch.float16):
+        y = model(x)
+        if hasattr(y, "logits"):
+            y_pred = y.logits
+        else:
+            y_pred = y
 
-        dot = make_dot(y_pred.mean(), params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
-        dot.render("images/model_graph", format="png")  # Save the visualization as PNG
-    except:
-        print(f"exception e")
-        pass
+    dot = make_dot(y_pred.mean(), params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
+    dot.render("images/model_graph", format="svg")  # Save the visualization as PNG
+    # except:
+    #     ic(f"exception e")
+    #     pass
         
     
 
