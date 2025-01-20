@@ -1,12 +1,12 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_9
-  num_classes: 9
-  model_type: CNN
+  data_path: /app/src/datasets/UAV_Dataset_31
+  num_classes: 31
+  model_type: resnet34
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
-  epochs: 1
+  epochs: 100
   save_model: false
   test_size: 0.2
   inference_size: 0.1
@@ -15,9 +15,9 @@ general:
   sweep_count: 200
   accumulation_steps: 2
   learning_rate: 0.001
-  patience: 5
+  patience: 10
   use_wandb: false
-  torch_viz: true
+  torch_viz: false
   use_kfold: false
   k_folds: 5
   cnn_config:
@@ -31,7 +31,7 @@ general:
       hop_length: 512
       power: 2
   adaptor_type: ia3
-  augmentations_per_sample: 0
+  augmentations_per_sample: 2
   augmentations:
   - time_stretch
   - sin_distortion

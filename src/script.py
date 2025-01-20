@@ -6,6 +6,7 @@ from helper.ast import custom_AST
 from helper.models import TorchCNN
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor
+from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights, resnet50, ResNet50_Weights, resnet101, ResNet101_Weights, resnet152, ResNet152_Weights
 
 
 import torch
@@ -21,6 +22,53 @@ from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
 import numpy as np
+import torch.hub
+torch.hub.set_dir('UAV_Classification/model_cache/torch/hub')  # Set custom cache directory
+
+
+def get_feature_config(config):
+    """
+    Get feature extraction configuration from config.
+    
+    Args:
+        config (dict): Configuration dictionary
+        
+    Returns:
+        tuple: (input_shape, feature_extractor)
+    """
+    fe_config = config['cnn_config']['feature_extraction']
+    feature_type = fe_config.get('type', 'melspectrogram')
+
+    if feature_type == 'melspectrogram':
+        input_shape = (fe_config['n_mels'], 157)
+        feature_extractor = MelSpectrogramFeatureExtractor(
+            sampling_rate=fe_config['sampling_rate'],
+            n_mels=fe_config['n_mels'],
+            n_fft=fe_config['n_fft'],
+            hop_length=fe_config['hop_length'],
+            power=fe_config['power']
+        )
+    elif feature_type == 'mfcc':
+        input_shape = (fe_config.get('n_mfcc', 40), 157)
+        feature_extractor = MFCCFeatureExtractor(
+            sampling_rate=fe_config['sampling_rate'],
+            n_mfcc=fe_config.get('n_mfcc', 40),
+            n_mels=fe_config.get('n_mels', 128),
+            n_fft=fe_config.get('n_fft', 1024),
+            hop_length=fe_config.get('hop_length', 512)
+        )
+    else:
+        raise ValueError(f"Unknown feature extraction type: {feature_type}")
+        
+    return input_shape, feature_extractor
+
+def parse_resnet_size(model_string):
+    """Parse ResNet size from model string"""
+    model_string = model_string.lower()
+    if "resnet" not in model_string:
+        return None
+    size = ''.join(filter(str.isdigit, model_string))
+    return size
 
 def get_model_and_optimizer(config, device):
     """
@@ -37,36 +85,13 @@ def get_model_and_optimizer(config, device):
     num_classes = config['num_classes']
     learning_rate = config['learning_rate']
     
-    if model_type == "AST":
+    if model_type == "AST" or model_type == "ast":
         model, feature_extractor, adaptor_config = custom_AST(num_classes, config['adaptor_type'])
         optimizer = AdamW(model.parameters(), lr=learning_rate)
         train_fn = train
-    elif model_type == "CNN":
-        # Get feature extraction parameters from config
-        fe_config = config['cnn_config']['feature_extraction']
-        feature_type = fe_config.get('type', 'melspectrogram')  # Default to melspectrogram if not specified
+    elif model_type == "CNN" or model_type == "cnn":
         
-        # Determine input shape based on feature type
-        if feature_type == 'melspectrogram':
-            input_shape = (fe_config['n_mels'], 157)  # Keep original width for mel spectrograms
-            feature_extractor = MelSpectrogramFeatureExtractor(
-                sampling_rate=fe_config['sampling_rate'],
-                n_mels=fe_config['n_mels'],
-                n_fft=fe_config['n_fft'],
-                hop_length=fe_config['hop_length'],
-                power=fe_config['power']
-            )
-        elif feature_type == 'mfcc':
-            input_shape = (fe_config.get('n_mfcc', 40), 157)  # Use n_mfcc for height, keep same width
-            feature_extractor = MFCCFeatureExtractor(
-                sampling_rate=fe_config['sampling_rate'],
-                n_mfcc=fe_config.get('n_mfcc', 40),
-                n_mels=fe_config.get('n_mels', 128),
-                n_fft=fe_config.get('n_fft', 1024),
-                hop_length=fe_config.get('hop_length', 512)
-            )
-        else:
-            raise ValueError(f"Unknown feature extraction type: {feature_type}")
+        input_shape, feature_extractor = get_feature_config(config)
             
         model = TorchCNN(
             num_classes=num_classes,
@@ -75,6 +100,47 @@ def get_model_and_optimizer(config, device):
         )
         optimizer = Adam(model.parameters(), lr=learning_rate)
         train_fn = train
+
+    elif model_type.lower().startswith("resnet"):
+        input_shape, feature_extractor = get_feature_config(config)
+        
+        # Parse ResNet size
+        size = parse_resnet_size(model_type)
+        
+        # Select appropriate ResNet model
+        if size == "18":
+            model = resnet18(weights=ResNet18_Weights.DEFAULT)
+        elif size == "34":
+            model = resnet34(weights=ResNet34_Weights.DEFAULT)
+        elif size == "50":
+            model = resnet50(weights=ResNet50_Weights.DEFAULT)
+        elif size == "101":
+            model = resnet101(weights=ResNet101_Weights.DEFAULT)
+        elif size == "152":
+            model = resnet152(weights=ResNet152_Weights.DEFAULT)
+        else:
+            raise ValueError(f"Please add the resnet weight to: {model_type}")
+        
+        # Modify first conv layer for 1-channel input
+        model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # Modify the final layer for your number of classes
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        
+        # Optionally freeze pretrained layers
+        for param in model.parameters():
+            # param.requires_grad = False
+            param.requires_grad = True
+        # Unfreeze final layers
+        for param in model.layer4.parameters():
+            param.requires_grad = True
+        for param in model.fc.parameters():
+            param.requires_grad = True
+            
+        # optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
+
     else:
         raise ValueError(f"Unknown model type: {model_type}")
         

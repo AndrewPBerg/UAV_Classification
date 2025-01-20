@@ -12,12 +12,14 @@ runs:
       general:
         batch_size: 32
         learning_rate: 0.001
-        model_type: CNN
-        augmentations_per_sample: 0
-        epochs: 1
-        patience: 5
+        model_type: resnet34
+        augmentations_per_sample: 2
+        epochs: 100
+        patience: 10
         use_wandb: false
         use_kfold: false
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
 
 
   
