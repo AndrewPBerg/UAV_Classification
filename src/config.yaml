@@ -1,7 +1,7 @@
 general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
-  model_type: resnet34
+  model_type: test
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -31,7 +31,7 @@ general:
       hop_length: 512
       power: 2
   adaptor_type: ia3
-  augmentations_per_sample: 2
+  augmentations_per_sample: 0
   augmentations:
   - time_stretch
   - sin_distortion

@@ -12,8 +12,8 @@ runs:
       general:
         batch_size: 32
         learning_rate: 0.001
-        model_type: resnet34
-        augmentations_per_sample: 2
+        model_type: test
+        augmentations_per_sample: 0
         epochs: 100
         patience: 10
         use_wandb: false

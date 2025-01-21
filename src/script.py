@@ -23,6 +23,10 @@ from torch.cuda.amp import GradScaler, autocast
 import sys
 import numpy as np
 import torch.hub
+from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
+from icecream import ic
+
+
 torch.hub.set_dir('UAV_Classification/model_cache/torch/hub')  # Set custom cache directory
 
 
@@ -85,11 +89,11 @@ def get_model_and_optimizer(config, device):
     num_classes = config['num_classes']
     learning_rate = config['learning_rate']
     
-    if model_type == "AST" or model_type == "ast":
+    if model_type.lower() == "AST":
         model, feature_extractor, adaptor_config = custom_AST(num_classes, config['adaptor_type'])
         optimizer = AdamW(model.parameters(), lr=learning_rate)
         train_fn = train
-    elif model_type == "CNN" or model_type == "cnn":
+    elif model_type.lower() == "CNN":
         
         input_shape, feature_extractor = get_feature_config(config)
             
@@ -100,6 +104,65 @@ def get_model_and_optimizer(config, device):
         )
         optimizer = Adam(model.parameters(), lr=learning_rate)
         train_fn = train
+
+    elif model_type.lower() == "test":
+        input_shape, feature_extractor = get_feature_config(config)
+        ic(input_shape)
+        ic(feature_extractor)
+
+        # Initialize the base model
+        model = resnet18(weights=ResNet18_Weights.DEFAULT)
+        
+        
+        # Configure LoRA
+        peft_config = LoraConfig(
+            task_type=TaskType.FEATURE_EXTRACTION,  # or TaskType.IMAGE_CLASSIFICATION
+            inference_mode=False,
+            r=8,  # rank of the update matrices
+            lora_alpha=16,  # alpha scaling factor
+            lora_dropout=0.1,
+            target_modules=["layer4.0.conv1", "layer4.0.conv2", "layer4.1.conv1", "layer4.1.conv2", "fc"],
+        )
+        
+        # Convert to PEFT model
+        model = get_peft_model(model, peft_config)
+        
+        # Modify first conv layer for 1-channel input
+        model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        # Freeze all parameters except LoRA parameters
+        model.requires_grad_(False)
+        for name, param in model.named_parameters():
+            if "lora" in name:
+                param.requires_grad = True
+        
+        # Modify the final layer for your number of classes
+        # Note: This should be done after PEFT conversion to ensure proper parameter handling
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        for param in model.fc.parameters():
+            param.requires_grad = True
+        
+        # Initialize optimizer with only trainable parameters
+        optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        
+        # # Print trainable parameters
+        # def print_trainable_parameters(model):
+        #     trainable_params = 0
+        #     all_param = 0
+        #     for _, param in model.named_parameters():
+        #         all_param += param.numel()
+        #         if param.requires_grad:
+        #             trainable_params += param.numel()
+        #     print(
+        #         f"trainable params: {trainable_params:,d} || "
+        #         f"all params: {all_param:,d} || "
+        #         f"trainable%: {100 * trainable_params / all_param:.2f}%"
+        #     )
+        
+        # print_trainable_parameters(model)
+        
+        # Training function remains the same
+        train_fn = train
+
 
     elif model_type.lower().startswith("resnet"):
         input_shape, feature_extractor = get_feature_config(config)
@@ -120,6 +183,7 @@ def get_model_and_optimizer(config, device):
             model = resnet152(weights=ResNet152_Weights.DEFAULT)
         else:
             raise ValueError(f"Please add the resnet weight to: {model_type}")
+        
         
         # Modify first conv layer for 1-channel input
         model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
