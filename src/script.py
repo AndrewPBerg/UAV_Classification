@@ -7,8 +7,10 @@ from helper.models import TorchCNN
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor
 from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights, resnet50, ResNet50_Weights, resnet101, ResNet101_Weights, resnet152, ResNet152_Weights
-
-
+from torchvision.models import efficientnet, EfficientNet_V2_M_Weights, EfficientNet_V2_S_Weights, EfficientNet_V2_L_Weights
+from torchvision.models import MobileNet_V3_Large_Weights, MobileNet_V3_Small_Weights
+from torchvision.models import Inception_V3_Weights
+import torchvision.models as models
 import torch
 from torch.utils.data import DataLoader
 from torch.optim.adamw import AdamW
@@ -24,7 +26,16 @@ import sys
 import numpy as np
 import torch.hub
 from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
-from icecream import ic
+from peft import (
+    get_peft_model,
+    LoraConfig,
+    IA3Config,
+    AdaLoraConfig,
+    XLoraConfig,
+    OFTConfig,
+    FourierFTConfig,
+    LNTuningConfig
+)
 
 
 torch.hub.set_dir('UAV_Classification/model_cache/torch/hub')  # Set custom cache directory
@@ -66,10 +77,10 @@ def get_feature_config(config):
         
     return input_shape, feature_extractor
 
-def parse_resnet_size(model_string):
+def parse_model_size(model_string, target):
     """Parse ResNet size from model string"""
     model_string = model_string.lower()
-    if "resnet" not in model_string:
+    if target not in model_string:
         return None
     size = ''.join(filter(str.isdigit, model_string))
     return size
@@ -110,57 +121,49 @@ def get_model_and_optimizer(config, device):
         ic(input_shape)
         ic(feature_extractor)
 
-        # Initialize the base model
-        model = resnet18(weights=ResNet18_Weights.DEFAULT)
-        
+        # Initialize the base model and modify conv1 BEFORE applying LoRA
+        model = resnet152(weights=ResNet152_Weights.DEFAULT)
+        # Modify first conv layer for 1-channel input
+        model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         
         # Configure LoRA
         peft_config = LoraConfig(
-            task_type=TaskType.FEATURE_EXTRACTION,  # or TaskType.IMAGE_CLASSIFICATION
+            task_type="AUDIO_CLASSIFICATION",
             inference_mode=False,
-            r=8,  # rank of the update matrices
-            lora_alpha=16,  # alpha scaling factor
+            r=8,
+            lora_alpha=16,
             lora_dropout=0.1,
             target_modules=["layer4.0.conv1", "layer4.0.conv2", "layer4.1.conv1", "layer4.1.conv2", "fc"],
         )
+
+        peft_config = IA3Config( 
+                target_modules=["conv","fc"],
+                feedforward_modules=["conv","fc"],
+                task_type = "AUDIO_CLASSIFICATION"
+                )
+        peft_config = IA3Config( 
+                target_modules=["fc"],
+                feedforward_modules=["fc"],
+                task_type = "AUDIO_CLASSIFICATION"
+                )
         
         # Convert to PEFT model
         model = get_peft_model(model, peft_config)
         
-        # Modify first conv layer for 1-channel input
-        model.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
-        # Freeze all parameters except LoRA parameters
-        model.requires_grad_(False)
-        for name, param in model.named_parameters():
-            if "lora" in name:
-                param.requires_grad = True
+        # # Freeze all parameters except LoRA parameters
+        # model.requires_grad_(False)
+        # for name, param in model.named_parameters():
+        #     if "lora" in name:
+        #         param.requires_grad = True
         
         # Modify the final layer for your number of classes
-        # Note: This should be done after PEFT conversion to ensure proper parameter handling
-        model.fc = nn.Linear(model.fc.in_features, num_classes)
-        for param in model.fc.parameters():
-            param.requires_grad = True
+        model.base_model.model.fc = nn.Linear(model.base_model.model.fc.in_features, num_classes)
+        # for param in model.base_model.model.fc.parameters():
+        #     param.requires_grad = True
         
         # Initialize optimizer with only trainable parameters
         optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
         
-        # # Print trainable parameters
-        # def print_trainable_parameters(model):
-        #     trainable_params = 0
-        #     all_param = 0
-        #     for _, param in model.named_parameters():
-        #         all_param += param.numel()
-        #         if param.requires_grad:
-        #             trainable_params += param.numel()
-        #     print(
-        #         f"trainable params: {trainable_params:,d} || "
-        #         f"all params: {all_param:,d} || "
-        #         f"trainable%: {100 * trainable_params / all_param:.2f}%"
-        #     )
-        
-        # print_trainable_parameters(model)
-        
-        # Training function remains the same
         train_fn = train
 
 
@@ -168,7 +171,7 @@ def get_model_and_optimizer(config, device):
         input_shape, feature_extractor = get_feature_config(config)
         
         # Parse ResNet size
-        size = parse_resnet_size(model_type)
+        size = parse_model_size(model_type, target="resnet")
         
         # Select appropriate ResNet model
         if size == "18":
@@ -203,6 +206,186 @@ def get_model_and_optimizer(config, device):
             
         # optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
         optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
+
+    elif model_type.lower().startswith("densenet"):
+        input_shape, feature_extractor = get_feature_config(config)
+
+        size = parse_model_size(model_type, target="densenet")
+
+        if size == "121":
+            model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet121', pretrained=True)
+        elif size == "161":
+            model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet161', pretrained=True)
+        elif size == "169":
+            model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet169', pretrained=True)
+        elif size == "201":
+            model = torch.hub.load('pytorch/vision:v0.10.0', 'densenet201', pretrained=True)
+        else:
+            raise ValueError(f"Please add the densenet weight to: {model_type}")
+        
+
+        # # Modify first conv layer for 1-channel input
+        # model.conv0 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # # Modify the final layer for your number of classes
+            
+
+
+        # Modify first conv layer for 1-channel input
+        first_conv = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        
+        # If using pretrained weights, adapt them for 1-channel input
+        if True:  # assuming we always want to use pretrained weights
+            # Average the weights across the 3 channels
+            with torch.no_grad():
+                new_weights = model.features.conv0.weight.data.mean(dim=1, keepdim=True)
+                first_conv.weight.data = new_weights
+        
+        # Replace the first conv layer
+        model.features.conv0 = first_conv
+        model.classifier = nn.Linear(model.classifier.in_features, num_classes)
+        
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        # optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
+        print(model)
+        # sys.exit()
+    elif model_type.lower().startswith("efficientnet"):
+        input_shape, feature_extractor = get_feature_config(config)
+
+        size = parse_model_size(model_type, target="efficientnet")
+
+        if size == "1": # this cooresponds to s
+            model = models.efficientnet_v2_s(weights=EfficientNet_V2_S_Weights.DEFAULT)
+        elif size == "2": #  this cooresponds to m
+            model = models.efficientnet_v2_m(weights=EfficientNet_V2_M_Weights.DEFAULT)
+        elif size == "3": #  this cooresponds to l
+            model = models.efficientnet_v2_l(weights=EfficientNet_V2_L_Weights.DEFAULT)
+        else:
+            raise ValueError(f"Please add the efficientnet weight to: {model_type}")
+
+        
+        model.classifier = nn.Sequential(
+            nn.Dropout(p=0.2, inplace=True),
+            nn.Linear(1280, num_classes)
+        )
+
+        # Assuming input_channels = 1 for audio spectrograms
+        first_conv = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        
+        # Adapt pretrained weights for new input channels
+        with torch.no_grad():
+            # Average the weights across original 3 channels
+            new_weights = model.features[0][0].weight.data.mean(dim=1, keepdim=True)
+            first_conv.weight.data = new_weights
+        
+        # Replace first conv layer
+        model.features[0][0] = first_conv
+        
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        
+        # print(model)
+        # sys.exit()
+        # optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
+
+    elif model_type.lower().startswith("mobilenet"):
+        input_shape, feature_extractor = get_feature_config(config)
+
+        size = parse_model_size(model_type, target="mobilenet")
+
+        if size == "1": # this cooresponds to small
+            model = models.mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
+        elif size == "2": #  this cooresponds to large
+            model = models.mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+
+        else:
+            raise ValueError(f"Please add the mobilenet weight to: {model_type}")
+
+        
+        model.classifier[3] = nn.Linear(model.classifier[3].in_features, num_classes)
+        # # Assuming input_channels = 1 for audio spectrograms
+        first_conv = nn.Conv2d(1, 24, kernel_size=(3, 3), stride=(2, 2), padding=(1, 1), bias=False)
+        
+        # # Adapt pretrained weights for new input channels
+        with torch.no_grad():
+            # Average the weights across original 3 channels
+            new_weights = model.features[0][0].weight.data.mean(dim=1, keepdim=True)
+            first_conv.weight.data = new_weights
+        
+        # # Replace first conv layer
+        model.features[0][0] = first_conv
+        
+        for param in model.classifier.parameters():
+            param.requires_grad = True
+        
+
+        # print(model)
+        # sys.exit()
+        optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        # optimizer = Adam(model.parameters(), lr=learning_rate)
+        train_fn = train
+    elif model_type.lower().startswith("inception"):
+        input_shape, feature_extractor = get_feature_config(config)
+
+        # size = parse_model_size(model_type, target="mobilenet")
+
+        # if size == "1": # this cooresponds to small
+        # elif size == "2": #  this cooresponds to large
+        #     model = models.mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+
+        # else:
+        #     raise ValueError(f"Please add the mobilenet weight to: {model_type}")
+
+        model = models.inception.inception_v3(weights=Inception_V3_Weights.DEFAULT)
+
+        model.fc = nn.Linear(model.fc.in_features, num_classes)
+        
+        # # Assuming input_channels = 1 for audio spectrograms
+       # Create new first conv layer with 1 input channel
+        # first_conv = nn.Conv2d(1, 32, kernel_size=(3, 3), stride=(2, 2), bias=False)
+
+        # # Adapt pretrained weights
+        # with torch.no_grad():
+        #     # Average RGB channels -> grayscale
+        #     new_weights = model.Conv2d_1a_3x3.conv.weight.data.mean(dim=1, keepdim=True)
+        #     first_conv.weight.data = new_weights
+
+        # # Replace first conv layer
+        # model.Conv2d_1a_3x3.conv = first_conv
+        
+        # Modify first conv layer to accept 1 channel
+        # model.Conv2d_1a_3x3.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, bias=False)
+
+        model.Conv2d_1a_3x3.conv = nn.Conv2d(1, 32, kernel_size=3, stride=2, bias=False)
+
+        with torch.no_grad():
+            # Average the weights across the 3 input channels
+            new_weights = model.Conv2d_1a_3x3.conv.weight.data.mean(dim=1, keepdim=True)
+            model.Conv2d_1a_3x3.conv.weight.data = new_weights
+            
+        def _transform_input_grayscale(self, x):
+            # Normalize grayscale input
+            x = x * 0.5 + 0.5  # Scale to [0, 1]
+            x = x * 0.224 + 0.456  # Apply normalization
+            return x
+        
+        # Replace the original _transform_input method
+        model._transform_input = _transform_input_grayscale.__get__(model)
+        
+        for param in model.fc.parameters():
+            param.requires_grad = True
+        # print(input_shape)        
+        # print(model)
+        # sys.exit()
+
+        optimizer = Adam(filter(lambda p: p.requires_grad, model.parameters()), lr=learning_rate)
+        # optimizer = Adam(model.parameters(), lr=learning_rate)
         train_fn = train
 
     else:

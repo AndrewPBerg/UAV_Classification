@@ -51,8 +51,8 @@ def train_step(model,
         # Forward pass with autocast
         with torch.autocast(device_type='cuda', dtype=torch.float16):
             # print(f"X shape: {X.shape}")
-            print(f"X: {X}")
-            print(f"X.shape: {X.shape}")
+            # print(f"X: {X}")
+            # print(f"X.shape: {X.shape}")
             outputs = model(X)
             if hasattr(outputs, "logits"):
                 y_pred = outputs.logits
