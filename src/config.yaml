@@ -1,7 +1,8 @@
 general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
-  model_type: vit116
+  save_dataloader: true
+  model_type: resnet34
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -31,7 +32,7 @@ general:
       hop_length: 512
       power: 2
   adaptor_type: ia3
-  augmentations_per_sample: 0
+  augmentations_per_sample: 6
   augmentations:
   - time_stretch
   - sin_distortion

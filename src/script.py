@@ -22,6 +22,7 @@ from torchinfo import summary
 import yaml
 from timeit import default_timer as timer 
 import wandb
+import os
 from icecream import ic
 from torch.cuda.amp import GradScaler, autocast
 import sys
@@ -488,6 +489,8 @@ def main():
 
     # Extract configuration
     DATA_PATH = general_config['data_path']
+    NUM_CLASSES = general_config['num_classes']
+    SAVE_DATALOADER = general_config['save_dataloader']
     BATCH_SIZE = general_config['batch_size']
     SEED = general_config['seed']
     EPOCHS = general_config['epochs']
@@ -503,7 +506,6 @@ def main():
     AUGMENTATIONS_PER_SAMPLE = general_config['augmentations_per_sample']
     AUGMENTATIONS = general_config['augmentations']
     USE_WANDB = general_config['use_wandb']
-    NUM_CLASSES = general_config['num_classes']
     TORCH_VIZ = general_config['torch_viz']
     USE_KFOLD = general_config['use_kfold']
     K_FOLDS = general_config['k_folds']
@@ -597,51 +599,109 @@ def main():
         )
 
     else:
+        # DATA_PATH : str
+        # if DATA_PATH has static in the name then load the dataset from the path
+        # if save flag is passed then save the dataset to the path 
         # Original train-test split code
-        train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
-            DATA_PATH,
-            feature_extractor=feature_extractor,
-            test_size=TEST_SIZE,
-            seed=SEED,
-            inference_size=INFERENCE_SIZE,
-            augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
-            val_size=VAL_SIZE,
-            augmentations=AUGMENTATIONS,
-            config=general_config
-        )
+        # if loading from static dataset:
+        """
+        train_dataloader = torch.load('path1')
+        test_dataloader = torch.load('path2')
+        val_dataloader = torch.load('path3')
+        inference_dataloader = torch.load('path4')
+        
+        # Save the dataset to a .pth file
+        torch.save(dataset, 'dataset.pth')
+        
+        # Later, you can load the dataset back
+        loaded_dataset = torch.load('dataset.pth')
+        
+        """
+        if "static" in DATA_PATH:
+            ic(DATA_PATH)
+            train_dataloader = torch.load(DATA_PATH+'/train_dataloader.pth', weights_only=False)
+            test_dataloader = torch.load(DATA_PATH+'/test_dataloader.pth', weights_only=False)
+            val_dataloader = torch.load(DATA_PATH+'/val_dataloader.pth', weights_only=False)
+            inference_dataloader = torch.load(DATA_PATH+'/inference_dataloader.pth', weights_only=False)
 
-        # Create data loaders
-        train_dataloader = DataLoader(
-            dataset=train_dataset,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED
-        )
-        
-        val_dataloader = DataLoader(
-            dataset=val_dataset,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED
-        )
-        
-        test_dataloader = DataLoader(
-            dataset=test_dataset,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED
-        )
-        
-        inference_dataloader = DataLoader(
-            dataset=inference_dataset,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED
-        )
+            ic(train_dataloader.dataset.classes)
+            ic(train_dataloader.dataset.augmentations_per_sample)
+            # ic(test_dataloader)
+            # ic(val_dataloader)
+            # ic(inference_dataloader)
+
+            # sys.exit()
+        else:
+            if AUGMENTATIONS_PER_SAMPLE > 0:
+                ic("Augmenting the dataset, this might take a while...")
+                
+            train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
+                DATA_PATH,
+                feature_extractor=feature_extractor,
+                test_size=TEST_SIZE,
+                seed=SEED,
+                inference_size=INFERENCE_SIZE,
+                augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
+                val_size=VAL_SIZE,
+                augmentations=AUGMENTATIONS,
+                config=general_config
+            )
+
+            # Create data loaders
+            train_dataloader = DataLoader(
+                dataset=train_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+            
+            val_dataloader = DataLoader(
+                dataset=val_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+            
+            test_dataloader = DataLoader(
+                dataset=test_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+            
+            inference_dataloader = DataLoader(
+                dataset=inference_dataset,
+                batch_size=BATCH_SIZE,
+                num_workers=NUM_CUDA_WORKERS,
+                pin_memory=PINNED_MEMORY,
+                shuffle=SHUFFLED
+            )
+        if SAVE_DATALOADER:
+            ic("saving the dataloaders, this might take a while...")
+            fixed_pathing = '/app/src/datasets/static/'
+            # TODO naming convention with Augmentations list is broken
+            distinct_name = f"{NUM_CLASSES}"+f"-augs-{AUGMENTATIONS_PER_SAMPLE}"
+
+            # add augmenatations to end of the path string
+            all_together_now = f"{fixed_pathing}"+f"{distinct_name}"
+            for s in AUGMENTATIONS:
+                all_together_now += f"-{s.replace(' ', '-')}" #remove-white-space-from-the-string
+            ic(all_together_now)
+
+            os.makedirs(all_together_now, exist_ok=True)
+
+
+            torch.save(train_dataloader, all_together_now+'/train_dataloader.pth')
+            torch.save(val_dataloader, all_together_now+'/val_dataloader.pth')
+            torch.save(test_dataloader, all_together_now+'/test_dataloader.pth')
+            torch.save(inference_dataloader, all_together_now+'/inference_dataloader.pth')
+            ic("Saved the dataloaders to the above path!")
+            # TODO find a way to skip training and jump to end of main
+            # sys.exit()
+            return
         
         end = timer()
         total_load_time = calculated_load_time(start, end)
