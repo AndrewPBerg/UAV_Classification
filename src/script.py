@@ -632,6 +632,9 @@ def main():
 
             # sys.exit()
         else:
+            if AUGMENTATIONS_PER_SAMPLE > 0:
+                ic("Augmenting the dataset, this might take a while...")
+                
             train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
                 DATA_PATH,
                 feature_extractor=feature_extractor,
@@ -696,7 +699,9 @@ def main():
             torch.save(test_dataloader, all_together_now+'/test_dataloader.pth')
             torch.save(inference_dataloader, all_together_now+'/inference_dataloader.pth')
             ic("Saved the dataloaders to the above path!")
-            sys.exit()
+            # TODO find a way to skip training and jump to end of main
+            # sys.exit()
+            return
         
         end = timer()
         total_load_time = calculated_load_time(start, end)

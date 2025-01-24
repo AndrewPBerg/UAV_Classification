@@ -32,7 +32,7 @@ general:
       hop_length: 512
       power: 2
   adaptor_type: ia3
-  augmentations_per_sample: 4
+  augmentations_per_sample: 6
   augmentations:
   - time_stretch
   - sin_distortion
