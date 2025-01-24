@@ -1,7 +1,7 @@
 general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
-  model_type: inception
+  model_type: vit116
   batch_size: 32
   seed: 42
   num_cuda_workers: 10

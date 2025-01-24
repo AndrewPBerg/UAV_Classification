@@ -1,4 +1,5 @@
 # DESCRIPTION
+import types
 from helper.util import train_test_split_custom, save_model, wandb_login, calculated_load_time, generate_model_image, k_fold_split_custom
 from helper.engine import train, inference_loop
 from helper.fold_engine import k_fold_cross_validation
@@ -9,6 +10,7 @@ from transformers import ASTFeatureExtractor
 from torchvision.models import resnet18, ResNet18_Weights, resnet34, ResNet34_Weights, resnet50, ResNet50_Weights, resnet101, ResNet101_Weights, resnet152, ResNet152_Weights
 from torchvision.models import efficientnet, EfficientNet_V2_M_Weights, EfficientNet_V2_S_Weights, EfficientNet_V2_L_Weights
 from torchvision.models import MobileNet_V3_Large_Weights, MobileNet_V3_Small_Weights
+from torchvision.models import ViT_B_16_Weights, ViT_B_32_Weights, ViT_L_16_Weights, ViT_L_32_Weights, ViT_H_14_Weights
 from torchvision.models import Inception_V3_Weights
 import torchvision.models as models
 import torch
@@ -100,11 +102,84 @@ def get_model_and_optimizer(config, device):
     num_classes = config['num_classes']
     learning_rate = config['learning_rate']
     
-    if model_type.lower() == "AST":
+    if model_type.lower() == "ast":
         model, feature_extractor, adaptor_config = custom_AST(num_classes, config['adaptor_type'])
         optimizer = AdamW(model.parameters(), lr=learning_rate)
         train_fn = train
-    elif model_type.lower() == "CNN":
+    if model_type.lower().startswith("vit"):
+        # from torchvision.models import ViT_B_16_Weights, ViT_B_32_Weights, ViT_L_16_Weights, ViT_L_32_Weights, ViT_H_14_Weights
+        input_shape, feature_extractor = get_feature_config(config)
+        size = parse_model_size(model_type, target="vit")
+        if size == "116": # short for Base-16
+            model = models.vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
+        elif size == "132": # short for base-32
+            model = models.vit_b_32(weights=ViT_B_32_Weights.DEFAULT)
+        elif size == "216": # short for Large-16
+            model = models.vit_l_16(weights=ViT_L_16_Weights.DEFAULT)
+        elif size == "232": # short for Large-32
+            model = models.vit_l_32(weights=ViT_L_32_Weights.DEFAULT)
+        elif size == "3": # short for Huge-14
+            model = models.vit_h_14(weights=ViT_H_14_Weights.DEFAULT)
+
+        else:
+            raise ValueError(f"Please add the Vit net weight to: {model_type}")
+
+
+
+        # Add resize layer to match ViT's expected input size
+            # Modify input processing
+        model.image_size = 224  # Set fixed size expected by ViT
+        resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
+        
+        # Configure model dimensions
+        model.image_size = 224
+        hidden_dim = model.hidden_dim  # Get model's hidden dimension
+        resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
+        
+        def new_forward(self, x):
+            # Handle input
+            x = x.float()
+            if x.dim() == 3:
+                x = x.unsqueeze(1)
+            
+            # Process through layers
+            x = resize_layer(x)
+            x = self.conv_proj(x)  # Now outputs correct hidden_dim
+            
+            # Shape for transformer
+            x = x.flatten(2).transpose(1, 2)
+            
+            # Add class token
+            n = x.shape[0]
+            batch_class_token = self.class_token.expand(n, -1, -1)
+            x = torch.cat([batch_class_token, x], dim=1)
+            
+            # Forward through transformer and classification
+            x = self.encoder(x)
+            x = x[:, 0]
+            x = self.heads(x)
+            return x
+        
+        # Update model components
+        model.forward = types.MethodType(new_forward, model)
+        model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
+        model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
+        
+        # Freeze all except head
+        for param in model.parameters():
+            param.requires_grad = False
+        for param in model.heads.parameters():
+            param.requires_grad = True
+
+        # print(model)
+        # sys.exit()
+
+
+
+
+        optimizer = AdamW(model.parameters(), lr=learning_rate)
+        train_fn = train
+    elif model_type.lower() == "cnn":
         
         input_shape, feature_extractor = get_feature_config(config)
             
@@ -211,6 +286,7 @@ def get_model_and_optimizer(config, device):
     elif model_type.lower().startswith("densenet"):
         input_shape, feature_extractor = get_feature_config(config)
 
+        
         size = parse_model_size(model_type, target="densenet")
 
         if size == "121":
@@ -368,6 +444,10 @@ def get_model_and_optimizer(config, device):
             # Average the weights across the 3 input channels
             new_weights = model.Conv2d_1a_3x3.conv.weight.data.mean(dim=1, keepdim=True)
             model.Conv2d_1a_3x3.conv.weight.data = new_weights
+
+        # Modify auxiliary classifier for 1 color channel input
+        model.AuxLogits.conv0 = nn.Conv2d(768, 128, kernel_size=1, stride=1)
+        model.AuxLogits.conv1 = nn.Conv2d(128, 768, kernel_size=3, stride=1, padding=1)
             
         def _transform_input_grayscale(self, x):
             # Normalize grayscale input

@@ -12,7 +12,7 @@ runs:
       general:
         batch_size: 32
         learning_rate: 0.001
-        model_type: inception
+        model_type: vit116
         augmentations_per_sample: 0
         epochs: 100
         patience: 10
