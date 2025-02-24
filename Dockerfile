@@ -66,3 +66,4 @@ CMD ["/bin/bash"]
 # prune commands
     # sudo docker image prune
     # sudo docker container prune
+    # sudo docker builder prune -a

@@ -4,7 +4,7 @@
 SEND_MESSAGE: true
 
 runs:
-  - id: 2
+  - id: 0
     type: script
     changes:
       wandb:
@@ -12,8 +12,8 @@ runs:
       general:
         batch_size: 32
         learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
+        model_type: vit232
+        epochs: 10
         patience: 10
         use_wandb: false
         use_kfold: false
@@ -22,114 +22,10 @@ runs:
         # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
         # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
         # save_dataloader: true
-        save_dataloader: true
+        save_dataloader: false
         num_classes: 31
-        augmentations_per_sample: 3
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        name: CNN-0augs-LR=0.001
-      general:
-        batch_size: 32
-        learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
-        patience: 10
-        use_wandb: false
-        use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        # data_path: /app/src/datasets/static/31-augs-4-['time_stretch', 'sin_distortion']
-        # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        # save_dataloader: true
-        save_dataloader: true
-        num_classes: 9
         augmentations_per_sample: 0
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        name: CNN-0augs-LR=0.001
-      general:
-        batch_size: 32
-        learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
-        patience: 10
-        use_wandb: false
-        use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        # data_path: /app/src/datasets/static/31-augs-4-['time_stretch', 'sin_distortion']
-        # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        # save_dataloader: true
-        save_dataloader: true
-        num_classes: 9
-        augmentations_per_sample: 2
-  - id: 5
-    type: script
-    changes:
-      wandb:
-        name: CNN-0augs-LR=0.001
-      general:
-        batch_size: 32
-        learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
-        patience: 10
-        use_wandb: false
-        use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        # data_path: /app/src/datasets/static/31-augs-4-['time_stretch', 'sin_distortion']
-        # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        # save_dataloader: true
-        save_dataloader: true
-        num_classes: 9
-        augmentations_per_sample: 3
-  - id: 6
-    type: script
-    changes:
-      wandb:
-        name: CNN-0augs-LR=0.001
-      general:
-        batch_size: 32
-        learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
-        patience: 10
-        use_wandb: false
-        use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        # data_path: /app/src/datasets/static/31-augs-4-['time_stretch', 'sin_distortion']
-        # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        # save_dataloader: true
-        save_dataloader: true
-        num_classes: 9
-        augmentations_per_sample: 4
-  - id: 7
-    type: script
-    changes:
-      wandb:
-        name: CNN-0augs-LR=0.001
-      general:
-        batch_size: 32
-        learning_rate: 0.001
-        model_type: resnet34
-        epochs: 100
-        patience: 10
-        use_wandb: false
-        use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_31
-        # data_path: /app/src/datasets/static/31-augs-4-['time_stretch', 'sin_distortion']
-        # data_path: /app/src/datasets/static/31-augs-1-time_stretch-sin_distortion
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        # save_dataloader: true
-        save_dataloader: true
-        num_classes: 31
-        augmentations_per_sample: 6
+ 
 
 
   

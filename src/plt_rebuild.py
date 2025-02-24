@@ -280,9 +280,9 @@ def main():
     
     # Configuration
     config = {
-        "data_path": "/path/to/your/data",  # Update this with your data path
-        "batch_size": 32,
-        "num_workers": 4,
+        "data_path": "/app/src/datasets/UAV_Dataset_31",  # Update this with your data path
+        "batch_size": 16,
+        "num_workers": 10,
         "learning_rate": 3e-4,
         "weight_decay": 0.01,
         "max_epochs": 100,
@@ -314,6 +314,7 @@ def main():
     train_dataset, val_dataset, test_dataset = train_test_split_custom(
         data_path=config["data_path"],
         feature_extractor=feature_extractor,
+        augmentations_per_sample=0,
         test_size=0.2,
         val_size=0.1,
         seed=42
