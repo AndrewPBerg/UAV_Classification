@@ -132,11 +132,6 @@ def get_model_and_optimizer(config, device):
         model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         
-        # Configure model dimensions
-        model.image_size = 224
-        hidden_dim = model.hidden_dim  # Get model's hidden dimension
-        resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
-        
         def new_forward(self, x):
             # Handle input
             x = x.float()
@@ -164,6 +159,7 @@ def get_model_and_optimizer(config, device):
         # Update model components
         model.forward = types.MethodType(new_forward, model)
         model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
+        hidden_dim = model.conv_proj.out_channels
         model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
         
         # Freeze all except head

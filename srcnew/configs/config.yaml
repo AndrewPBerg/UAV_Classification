@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: vit232
+  model_type: vit_l_32
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -21,48 +21,31 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  cnn_config:
-    hidden_units: 256
-    feature_extraction:
-      type: melspectrogram
-      sampling_rate: 16000
-      n_mfcc: 40
-      n_mels: 128
-      n_fft: 1024
-      hop_length: 512
-      power: 2
-  adaptor_type: ia3
+  adaptor_type: none-classifier
+
+augmentations:
   augmentations_per_sample: 0
   augmentations:
   - time_stretch
   - sin_distortion
   time_stretch_min_rate: 0.9
   time_stretch_max_rate: 1.0
-wandb:
-  project: 9class-Kfold-Results
-  name: CNN-0augs-LR=0.001
-  reinit: false
-  notes: null
-  tags: null
-  dir: wandb
-sweep:
-  name: Augmentations/sample Tuning
-  method: random
-  metric:
-    name: test_acc
-    goal: maximize
-  parameters:
-    augmentations_per_sample:
-      values:
-      - 1
-      - 2
-      - 3
-      - 4
-      - 5
-none-classifier:
-  none: none
-none-full:
-  none: none
+  sin_distortion_min_rate: 0.01
+  sin_distortion_max_rate: 0.7
+  sin_distortion_p: 1
+
+cnn_config:
+  hidden_units: 256
+  feature_extraction:
+    type: melspectrogram
+    sampling_rate: 16000
+    n_mfcc: 40
+    n_mels: 128
+    n_fft: 1024
+    hop_length: 512
+    power: 2
+
+
 lora:
   r: 1000
   lora_alpha: 16
@@ -121,3 +104,33 @@ layernorm:
   - layernorm
   task_type: AUDIO_CLASSIFICATION
 
+
+wandb:
+  project: 9class-Kfold-Results
+  name: CNN-0augs-LR=0.001
+  reinit: false
+  notes: null
+  tags: null
+  dir: wandb
+sweep:
+  name: Augmentations/sample Tuning
+  method: random
+  metric:
+    name: test_acc
+    goal: maximize
+  parameters:
+    augmentations_per_sample:
+      values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+    num_augmentations:
+      values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5

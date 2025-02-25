@@ -7,7 +7,7 @@ from audiomentations.core.transforms_interface import BaseWaveformTransform
 from audiomentations.core.utils import calculate_rms
 
 def create_augmentation_pipeline(augmentations: list[str], config: dict):
-    if len(augmentations) == 0:
+    if not augmentations or len(augmentations) == 0:
         print("No augmentations selected, returning original audio. Traceback: Augmentations.py, apply_random_augmentation()")
         return None
 
