@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
+from peft_configs import get_peft_config
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -72,6 +73,8 @@ class GeneralConfig(BaseModel):
     use_kfold: bool = False
     k_folds: int = 5
 
+    adapter_type: str = "none-classifier"
+
 class FeatureExtractionConfig(BaseModel):
     """
     nested pydantic model for general run configs
@@ -120,7 +123,6 @@ def main():
         ic("Validation error occurred:")
         ic(e)
 
-    # need to create FeatureExtractionConfig before CnnConfig to pass in!
 
     try:
         feature_extraction_config = FeatureExtractionConfig(**config["cnn_config"]["feature_extraction"])
@@ -134,6 +136,14 @@ def main():
         cnn_config = CnnConfig(**config["cnn_config"], feature_extraction_config=feature_extraction_config)
         ic("CnnConfig instance created successfully:")
         # ic(cnn_config)
+    except ValidationError as e:
+        ic("Validation error occurred:")
+        ic(e)
+
+    try:
+        peft_config = get_peft_config()
+        ic("PeftConfig instance created successfully:")
+        ic(peft_config)
     except ValidationError as e:
         ic("Validation error occurred:")
         ic(e)

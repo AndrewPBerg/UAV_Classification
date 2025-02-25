@@ -21,6 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
+  adaptor_type: none-classifier
 
 cnn_config:
   hidden_units: 256
@@ -91,3 +92,34 @@ layernorm:
   target_modules:
   - layernorm
   task_type: AUDIO_CLASSIFICATION
+
+
+wandb:
+  project: 9class-Kfold-Results
+  name: CNN-0augs-LR=0.001
+  reinit: false
+  notes: null
+  tags: null
+  dir: wandb
+sweep:
+  name: Augmentations/sample Tuning
+  method: random
+  metric:
+    name: test_acc
+    goal: maximize
+  parameters:
+    augmentations_per_sample:
+      values:
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
+    num_augmentations:
+      values:
+      - 0
+      - 1
+      - 2
+      - 3
+      - 4
+      - 5
