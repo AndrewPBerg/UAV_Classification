@@ -1,0 +1,12 @@
+[project]
+name = "srcnew"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "icecream>=2.1.4",
+    "pip>=25.0.1",
+    "pydantic>=2.10.6",
+    "pyyaml>=6.0.2",
+]

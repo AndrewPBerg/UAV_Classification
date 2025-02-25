@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: vit232
+  model_type: vit_l_32
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
