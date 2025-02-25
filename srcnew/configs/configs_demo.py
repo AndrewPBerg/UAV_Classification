@@ -78,6 +78,9 @@ class GeneralConfig(BaseModel):
     adapter_type: str = "none-classifier"
 
 
+class _FeatureExtractionType(BaseModel):
+    type: List[str] = ['melspectrogram','mfcc'] 
+
 class FeatureExtractionConfig(BaseModel):
     """
     nested pydantic model for general run configs
@@ -91,7 +94,15 @@ class FeatureExtractionConfig(BaseModel):
     class Config:
         strict = True
 
-    type: str = 'melspectrogram' #TODO isinstance of melspectrogram and mfcc
+    type: str = 'melspectrogram' 
+
+    @field_validator('type')
+    @classmethod
+    def type_must_be_in_list(cls, v):
+        if v not in _FeatureExtractionType().type:
+            raise ValueError(f'type must be one of {_FeatureExtractionType().type}')
+        return v
+        
     sampling_rate: int = 16000
     n_mfcc: int = 40
     n_mels: int = 128
