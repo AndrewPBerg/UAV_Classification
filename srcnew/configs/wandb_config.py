@@ -28,11 +28,9 @@ class SweepConfig(BaseModel):
     parameters: Dict[str, Any] = {}
     
 
-def get_wandb_config() -> Tuple[WandbConfig, SweepConfig]:
+def get_wandb_config(config: dict) -> Tuple[WandbConfig, SweepConfig]:
 
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
-        
+
     try:
         wandb_config = WandbConfig(**config["wandb"])
         
@@ -50,7 +48,10 @@ def get_wandb_config() -> Tuple[WandbConfig, SweepConfig]:
     return wandb_config, sweep_config
 
 def main():
-    wandb_config, sweep_config = get_wandb_config()
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+        
+    wandb_config, sweep_config = get_wandb_config(config)
     ic(wandb_config)
     ic(sweep_config)
 

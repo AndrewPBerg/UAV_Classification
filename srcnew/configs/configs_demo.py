@@ -5,6 +5,7 @@ from icecream import ic
 import sys
 from peft_config import get_peft_config
 from wandb_config import get_wandb_config
+from augmentation_config import create_augmentation_configs
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -76,6 +77,7 @@ class GeneralConfig(BaseModel):
 
     adapter_type: str = "none-classifier"
 
+
 class FeatureExtractionConfig(BaseModel):
     """
     nested pydantic model for general run configs
@@ -111,6 +113,7 @@ class CnnConfig(BaseModel):
 
 
 
+
 def main():
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -127,13 +130,17 @@ def main():
         cnn_config = CnnConfig(**config["cnn_config"], feature_extraction_config=feature_extraction_config)
         ic("CnnConfig instance created successfully:")
 
-        peft_config = get_peft_config()
+        peft_config = get_peft_config(config)
         ic("PeftConfig instance created successfully:")
 
-        wandb_config, sweep_config = get_wandb_config()
+        wandb_config, sweep_config = get_wandb_config(config)
         ic("WandbConfig instance created successfully:")
         ic("SweepConfig instance created successfully:")
-    
+
+        augmentation_config = create_augmentation_configs(config)
+        ic("AugmentationConfig instance created successfully:")
+
+
     except ValidationError as e:
         ic("Validation error occurred: ")
         ic(e)

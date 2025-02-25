@@ -4,7 +4,7 @@ import yaml
 from icecream import ic
 import sys
 
-class AdapterChoice(BaseModel):
+class _AdapterChoice(BaseModel):
     """
     valid PEFT choices
     """
@@ -76,9 +76,8 @@ class LayernormConfig(BaseModel):
         strict = True
 
 
-def get_peft_config() -> BaseModel:
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
+def get_peft_config(config: dict) -> BaseModel:
+
 
     match config["general"]["adaptor_type"]:
         case "lora":
@@ -116,7 +115,9 @@ def get_peft_config() -> BaseModel:
 
 
 def main():
-    peft_config = get_peft_config()
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+    peft_config = get_peft_config(config)
     ic(peft_config)
 
 
