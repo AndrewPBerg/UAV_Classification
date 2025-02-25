@@ -1,4 +1,4 @@
-from typing import Optional, Literal, Dict, Any, List
+from typing import Optional, Literal, Dict, Any, List, Tuple
 from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
@@ -28,28 +28,32 @@ class SweepConfig(BaseModel):
     parameters: Dict[str, Any] = {}
     
 
-def main():
+def get_wandb_config() -> Tuple[WandbConfig, SweepConfig]:
+
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
-
-    ic(config["wandb"])
-    ic(config["sweep"])
-
+        
     try:
         wandb_config = WandbConfig(**config["wandb"])
-        ic("WandbConfig instance created successfully:")
-        ic(wandb_config)
+        
     except ValidationError as e:
         ic("Validation error occurred:")
         ic(e)
 
     try:
         sweep_config = SweepConfig(**config["sweep"])
-        ic("SweepConfig instance created successfully:")
-        ic(sweep_config)
+        
     except ValidationError as e:
         ic("Validation error occurred:")
         ic(e)
+    
+    return wandb_config, sweep_config
+
+def main():
+    wandb_config, sweep_config = get_wandb_config()
+    ic(wandb_config)
+    ic(sweep_config)
+
 
 if __name__ == '__main__':
     main()

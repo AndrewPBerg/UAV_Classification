@@ -3,7 +3,8 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
-from peft_configs import get_peft_config
+from peft_config import get_peft_config
+from wandb_config import get_wandb_config
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -118,98 +119,32 @@ def main():
     try:
         general_config = GeneralConfig(**config["general"])
         ic("GeneralConfig instance created successfully:")
-        # ic(general_config)
-    except ValidationError as e:
-        ic("Validation error occurred:")
-        ic(e)
 
-
-    try:
         feature_extraction_config = FeatureExtractionConfig(**config["cnn_config"]["feature_extraction"])
         ic("FeatureExtractionConfig instance created successfully:")
-        # ic(feature_extraction_config)
-    except ValidationError as e:
-        ic("Validation error occurred:")
-        ic(e)
-    
-    try:
+
+
         cnn_config = CnnConfig(**config["cnn_config"], feature_extraction_config=feature_extraction_config)
         ic("CnnConfig instance created successfully:")
-        # ic(cnn_config)
-    except ValidationError as e:
-        ic("Validation error occurred:")
-        ic(e)
 
-    try:
         peft_config = get_peft_config()
         ic("PeftConfig instance created successfully:")
-        ic(peft_config)
+
+        wandb_config, sweep_config = get_wandb_config()
+        ic("WandbConfig instance created successfully:")
+        ic("SweepConfig instance created successfully:")
+    
     except ValidationError as e:
-        ic("Validation error occurred:")
+        ic("Validation error occurred: ")
         ic(e)
+    
+    except ValueError as e:
+        ic("ValueError occurred: ")
+        ic(e)
+
 
 
 
 
 if __name__ == '__main__':
     main()
-
-
-
-
-
-
-
-
-
-"""
-@dataclass
-class PeftArgs:
-    Arguments for PEFT configuration
-    adapter_type: Literal["lora", "ia3"] = "lora"
-    r: int = 8  # LoRA rank
-    alpha: int = 16  # LoRA alpha scaling
-    dropout: float = 0.1
-    bias: str = "none"
-    target_modules: Optional[list] = None
-    modules_to_save: Optional[list] = None
-    init_lora_weights: bool = True
-
-@dataclass
-class TrainingConfig
-    Training configuration
-    batch_size: int = 32
-    num_workers: int = 4
-    learning_rate: float = 3e-4
-    weight_decay: float = 0.01
-    max_epochs: int = 100
-    early_stopping_patience: int = 10
-    gradient_clip_val: float = 1.0
-
-@dataclass
-class ModelConfig:
-    Model configuration"
-    model_size: str = "resnet18"
-    num_classes: int = None
-    image_size: int = 224
-    project_name: str = "uav_classification"
-    model_name: Optional[str] = None
-    peft_args: Optional[PeftArgs] = None
-
-@dataclass
-class FeatureExtractorConfig:
-    Feature extractor configuration
-    n_mels: int = 64
-    n_fft: int = 1024
-    hop_length: int = 512
-    power: float = 2.0
-
-def get_default_config() -> Dict[str, Any]:
-    Returns the default configuration dictionary
-    return {
-        "data_path": "/path/to/your/data",
-        "training": TrainingConfig(),
-        "model": ModelConfig(),
-        "feature_extractor": FeatureExtractorConfig(),
-    }
-"""
