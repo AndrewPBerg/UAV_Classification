@@ -32,3 +32,62 @@ cnn_config:
     n_fft: 1024
     hop_length: 512
     power: 2
+
+
+lora:
+  r: 1000
+  lora_alpha: 16
+  target_modules:
+  - query
+  - key
+  - value
+  - dense
+  lora_dropout: 0
+  bias: lora_only
+  task_type: AUDIO_CLASSIFICATION
+  use_rslora: false
+  use_dora: false
+ia3:
+  target_modules:
+  - query
+  - key
+  - value
+  - dense
+  feedforward_modules:
+  - dense
+  - query
+  - key
+  - value
+  task_type: AUDIO_CLASSIFICATION
+adalora:
+  init_r: 100
+  target_r: 16
+  target_modules:
+  - query
+  - key
+  - value
+  - dense
+  lora_alpha: 8
+  task_type: AUDIO_CLASSIFICATION
+oft:
+  r: 768
+  target_modules:
+  - query
+  - key
+  - value
+  - dense
+  module_dropout: 0.0
+  init_weights: true
+fourier:
+  scaling: 100
+  n_frequency: 1000
+  target_modules:
+  - query
+  - key
+  - value
+  - dense
+  task_type: AUDIO_CLASSIFICATION
+layernorm:
+  target_modules:
+  - layernorm
+  task_type: AUDIO_CLASSIFICATION

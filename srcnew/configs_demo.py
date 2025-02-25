@@ -11,7 +11,7 @@ def handle_exception(exc_type, exc_value, exc_traceback):
     sys.exit(1)
 
 
-class ModelNames(BaseModel):
+class _ModelNames(BaseModel):
     """
     pydantic model for listing available model names
     """
@@ -46,8 +46,8 @@ class GeneralConfig(BaseModel):
     @field_validator('model_type')
     @classmethod
     def model_type_must_be_in_model_list(cls, v):
-        if v not in ModelNames().model_list:
-            raise ValueError(f'model_type must be one of {ModelNames().model_list}')
+        if v not in _ModelNames().model_list:
+            raise ValueError(f'model_type must be one of {_ModelNames().model_list}')
         return v
         
     batch_size: int = 32

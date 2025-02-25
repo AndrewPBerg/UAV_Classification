@@ -120,21 +120,4 @@ layernorm:
   target_modules:
   - layernorm
   task_type: AUDIO_CLASSIFICATION
-moa:
-  max_length: 1024
-  final_output: CLS
-  reduction_rate: 128
-  adapter_type: Pfeiffer
-  location: MHSA
-  adapter_module: bottleneck
-  num_adapters: 3
-soft-moa:
-  max_length: 1024
-  final_output: CLS
-  reduction_rate: 128
-  adapter_type: Pfeiffer
-  location: MHSA
-  adapter_module: bottleneck
-  num_adapters: 3
-  num_slots: 8
-  normalize: true
+
