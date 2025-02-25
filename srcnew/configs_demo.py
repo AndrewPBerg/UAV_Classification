@@ -1,6 +1,74 @@
-from dataclasses import dataclass
 from typing import Optional, Literal, Dict, Any
+from pydantic import BaseModel, Field, ValidationError
+import yaml
+from icecream import ic
 
+
+class GeneralConfig(BaseModel):
+    data_path: str # "/app/src/datasets/UAV_Dataset_31"
+    num_classes: int = 31
+    save_dataloader: bool = False
+
+    model_type: str # "vit232"
+    batch_size: int = 32
+    seed: int = 42
+    num_cuda_workers: int = 10
+    pinned_memory: bool = True
+    epochs: int = 10
+    save_model: bool = False
+
+    test_size: float = 0.2
+    inference_size: float = 0.1
+    val_size: float = 0.1
+
+    shuffled: bool = False
+    sweep_count: int = 200
+    accumulation_steps: int = 2
+    learning_rate: float = 0.001
+    patience: int = 10
+    use_wandb: bool = False
+    torch_viz: bool = False
+
+    use_kfold: bool = False
+    k_folds: int = 5
+
+class FeatureExtractionConfig(BaseModel):
+    type: str = 'melspectrogram'
+    sampling_rate: int = 16000
+    n_mfcc: int = 40
+    n_mels: int = 128
+    n_fft: int = 1024
+    hop_length: int = 512
+    power: float = 2.0
+
+class CnnConfig(BaseModel):
+    hidden_units: int = 256
+    feature_extraction: FeatureExtractionConfig = FeatureExtractionConfig()
+
+
+
+def main():
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+
+    ic(config.general)
+    ic(config.cnn_config)
+    
+
+
+
+if __name__ == '__main__':
+    main()
+
+
+
+
+
+
+
+
+
+"""
 @dataclass
 class PeftArgs:
     """Arguments for PEFT configuration"""
@@ -50,3 +118,4 @@ def get_default_config() -> Dict[str, Any]:
         "model": ModelConfig(),
         "feature_extractor": FeatureExtractorConfig(),
     }
+"""
