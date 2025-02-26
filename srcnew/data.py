@@ -20,34 +20,6 @@ from configs.augmentation_config import AugmentationConfig
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, CnnConfig, WandbConfig, SweepConfig
 
 
-
-"""
-Core functionality of current AudioDataset?
-
-1. load audio from datapath=
-2. feature extraction
-3. apply & inflate w/ augmentations (naunce with static augmentations data paths):
-    [not sure yet how to handle, might just force creation of new augmentation dataset with each new augmentation permutation]
-4. iterable
-5. getter helper methods
-6. show sepctrogram of i
-"""
-
-
-
-"""
-What should the new PL AudioDataset look like?
-
-1. maintain and speed up above functionality 
-2. higher readibility, maintainability, and modularity
-3. ...
-
-"""
-
-"""
-Audio dataset implementation using PyTorch Lightning
-"""
-
 class AudioDataModule(pl.LightningDataModule):
     """
     PyTorch Lightning DataModule for audio data.
@@ -149,8 +121,23 @@ class AudioDataModule(pl.LightningDataModule):
         Args:
             stage: Current stage ('fit', 'validate', 'test', or 'predict')
         """
+        # Check if we're trying to save dataloaders with k-fold, which is not supported
+        if self.use_kfold and self.save_dataloader:
+            raise ValueError("Saving dataloaders is not supported when using k-fold cross-validation. "
+                             "Please set either use_kfold=False or save_dataloader=False in your configuration.")
+        
         # Check if we should load from static dataset
         if "static" in self.data_path:
+            # Check if we're trying to use k-fold with static dataset, which is not supported
+            if self.use_kfold:
+                raise ValueError("Loading from static dataset is not supported when using k-fold cross-validation. "
+                                 "Please set use_kfold=False in your configuration when using a static dataset path.")
+            
+            # Check if we're trying to save dataloaders when loading from static dataset, which is redundant
+            if self.save_dataloader:
+                raise ValueError("Saving dataloaders is redundant when loading from a static dataset. "
+                                 "Please set save_dataloader=False in your configuration when using a static dataset path.")
+            
             ic(f"Loading from static dataset: {self.data_path}")
             self.load_dataloaders(self.data_path)
             return
@@ -160,11 +147,12 @@ class AudioDataModule(pl.LightningDataModule):
         
         if self.use_kfold:
             self._setup_kfold(all_paths)
+            # Don't save dataloaders when using k-fold
         else:
             self._setup_train_val_test(all_paths)
             
-        if self.save_dataloader:
-            self.save_dataloaders()
+            if self.save_dataloader:
+                self.save_dataloaders()
         # Save dataloaders if configured - MOVED AFTER dataset initialization
             
     def _setup_train_val_test(self, all_paths: List[Path]):
@@ -512,7 +500,7 @@ class AudioDataModule(pl.LightningDataModule):
                 fold_dir = f"{save_path}/fold_{fold_idx}"
                 os.makedirs(fold_dir, exist_ok=True)
                 
-                train_loader, val_loader = self.get_fold_dataloaders(fold)
+                train_loader, val_loader = self.get_fold_dataloaders(fold_idx)
                 torch.save(train_loader, f"{fold_dir}/train_dataloader.pth")
                 torch.save(val_loader, f"{fold_dir}/val_dataloader.pth")
                 
@@ -560,16 +548,22 @@ class AudioDataModule(pl.LightningDataModule):
 
             
             ic(f"Loaded dataloaders from {path}")
-            ic(f"Train loader samples: {len(train_loader.dataset)}")
-            ic(f"Val loader samples: {len(val_loader.dataset)}")
-            ic(f"Test loader samples: {len(test_loader.dataset)}")
-            ic(f"Inference loader samples: {len(inference_loader.dataset)}")
+            # Fixed: Check if dataset has __len__ before calling len()
+            train_samples = getattr(train_loader.dataset, "__len__", lambda: "unknown")()
+            val_samples = getattr(val_loader.dataset, "__len__", lambda: "unknown")()
+            test_samples = getattr(test_loader.dataset, "__len__", lambda: "unknown")()
+            inference_samples = getattr(inference_loader.dataset, "__len__", lambda: "unknown")()
+            
+            ic(f"Train loader samples: {train_samples}")
+            ic(f"Val loader samples: {val_samples}")
+            ic(f"Test loader samples: {test_samples}")
+            ic(f"Inference loader samples: {inference_samples}")
 
+            # Fixed: Don't try to call len() on an integer
             ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}")
 
             return train_loader, val_loader, test_loader, inference_loader
 
-        
 
 # Example usage
 def example_usage():
@@ -602,8 +596,10 @@ def example_usage():
             for fold in range(general_config.k_folds):
                 fold_train_loader, fold_val_loader = data_module.get_fold_dataloaders(fold)
                 # Use fold_train_loader and fold_val_loader for training
-                ic(f"Fold {fold} train loader: {len(fold_train_loader.dataset)} samples")
-                ic(f"Fold {fold} val loader: {len(fold_val_loader.dataset)} samples")
+                train_samples = getattr(fold_train_loader.dataset, "__len__", lambda: "unknown")()
+                val_samples = getattr(fold_val_loader.dataset, "__len__", lambda: "unknown")()
+                ic(f"Fold {fold} train loader: {train_samples} samples")
+                ic(f"Fold {fold} val loader: {val_samples} samples")
         elif "static" in general_config.data_path:
             ic("Loading from static dataloaders")
             data_module.load_dataloaders(general_config.data_path)
@@ -611,9 +607,13 @@ def example_usage():
             train_loader = data_module.train_dataloader()
             val_loader = data_module.val_dataloader()
             test_loader = data_module.test_dataloader()
-            ic(f"Train loader: {len(train_loader.dataset)} samples")
-            ic(f"Val loader: {len(val_loader.dataset)} samples")
-            ic(f"Test loader: {len(test_loader.dataset)} samples")
+            # Fixed: Check if dataset has __len__ before calling len()
+            train_samples = getattr(train_loader.dataset, "__len__", lambda: "unknown")()
+            val_samples = getattr(val_loader.dataset, "__len__", lambda: "unknown")()
+            test_samples = getattr(test_loader.dataset, "__len__", lambda: "unknown")()
+            ic(f"Train loader: {train_samples} samples")
+            ic(f"Val loader: {val_samples} samples")
+            ic(f"Test loader: {test_samples} samples")
         
         # Get class information
         classes, class_to_idx, idx_to_class = data_module.get_class_info()
