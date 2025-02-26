@@ -232,7 +232,7 @@ class AudioDataModule(pl.LightningDataModule):
         end_time = timer()
         dataset_init_time = end_time - start_time
         
-        ic(f"Datasets created in {dataset_init_time:.2f} seconds - Train: {len(self.train_dataset)}, Val: {len(self.val_dataset)}, "
+        print(f"Datasets created in {dataset_init_time:.2f} seconds - Train: {len(self.train_dataset)}, Val: {len(self.val_dataset)}, "
            f"Test: {len(self.test_dataset)}, Inference: {len(self.inference_dataset)}")
             
     def _setup_kfold(self, all_paths: List[Path]):
@@ -607,13 +607,18 @@ def example_usage():
             train_loader = data_module.train_dataloader()
             val_loader = data_module.val_dataloader()
             test_loader = data_module.test_dataloader()
+            inference_loader = data_module.predict_dataloader()
+
             # Fixed: Check if dataset has __len__ before calling len()
             train_samples = getattr(train_loader.dataset, "__len__", lambda: "unknown")()
             val_samples = getattr(val_loader.dataset, "__len__", lambda: "unknown")()
             test_samples = getattr(test_loader.dataset, "__len__", lambda: "unknown")()
+            inference_samples = getattr(inference_loader.dataset, "__len__", lambda: "unknown")()
             ic(f"Train loader: {train_samples} samples")
             ic(f"Val loader: {val_samples} samples")
             ic(f"Test loader: {test_samples} samples")
+            ic(f"Inference loader: {inference_samples} samples")
+            ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}")
         
         # Get class information
         classes, class_to_idx, idx_to_class = data_module.get_class_info()
