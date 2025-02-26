@@ -1,5 +1,5 @@
-
 import os
+import sys
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -24,7 +24,7 @@ from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, CnnConf
 """
 Core functionality of current AudioDataset?
 
-1. load audio from datapath
+1. load audio from datapath=
 2. feature extraction
 3. apply & inflate w/ augmentations (naunce with static augmentations data paths):
     [not sure yet how to handle, might just force creation of new augmentation dataset with each new augmentation permutation]
@@ -83,6 +83,8 @@ class AudioDataModule(pl.LightningDataModule):
         self.use_kfold = general_config.use_kfold
         self.k_folds = general_config.k_folds
         self.pin_memory = general_config.pinned_memory
+        self.save_dataloader = general_config.save_dataloader
+        self.num_classes = general_config.num_classes
         
         # Unpack feature extraction config
         self.target_sr = feature_extraction_config.sampling_rate
@@ -90,7 +92,11 @@ class AudioDataModule(pl.LightningDataModule):
         # Set other parameters
         self.target_duration = 5  # Default value, could be added to config
         self.num_channels = num_channels
-        self.augmentation_config = augmentation_config or AugmentationConfig(augmentations_per_sample=0, augmentations=[])
+        self.augmentation_config = augmentation_config or AugmentationConfig(
+            augmentations_per_sample=0, 
+            augmentations=[],
+            aug_configs={}
+        )
         
         # Create feature extractor if not provided
         if feature_extractor is None:
@@ -143,6 +149,12 @@ class AudioDataModule(pl.LightningDataModule):
         Args:
             stage: Current stage ('fit', 'validate', 'test', or 'predict')
         """
+        # Check if we should load from static dataset
+        if "static" in self.data_path:
+            ic(f"Loading from static dataset: {self.data_path}")
+            self.load_dataloaders(self.data_path)
+            return
+            
         # Get all audio file paths
         all_paths = list(Path(self.data_path).glob("*/*.wav"))
         
@@ -150,6 +162,10 @@ class AudioDataModule(pl.LightningDataModule):
             self._setup_kfold(all_paths)
         else:
             self._setup_train_val_test(all_paths)
+            
+        if self.save_dataloader:
+            self.save_dataloaders()
+        # Save dataloaders if configured - MOVED AFTER dataset initialization
             
     def _setup_train_val_test(self, all_paths: List[Path]):
         """
@@ -195,7 +211,7 @@ class AudioDataModule(pl.LightningDataModule):
             target_sr=self.target_sr,
             target_duration=self.target_duration,
             num_channels=self.num_channels,
-            config=self.augmentation_config.aug_configs
+            config=self.augmentation_config.aug_configs or {}
         )
         
         self.val_dataset = AudioDataset(
@@ -271,7 +287,7 @@ class AudioDataModule(pl.LightningDataModule):
                 target_sr=self.target_sr,
                 target_duration=self.target_duration,
                 num_channels=self.num_channels,
-                config=self.augmentation_config.aug_configs
+                config=self.augmentation_config.aug_configs or {}
             )
             
             val_dataset = AudioDataset(
@@ -310,6 +326,9 @@ class AudioDataModule(pl.LightningDataModule):
         Returns:
             Training dataloader
         """
+        if self.train_dataset is None:
+            raise ValueError("Training dataset is not initialized. Call setup() first.")
+        
         return DataLoader(
             self.train_dataset,
             batch_size=self.batch_size,
@@ -325,6 +344,9 @@ class AudioDataModule(pl.LightningDataModule):
         Returns:
             Validation dataloader
         """
+        if self.val_dataset is None:
+            raise ValueError("Validation dataset is not initialized. Call setup() first.")
+        
         return DataLoader(
             self.val_dataset,
             batch_size=self.batch_size,
@@ -340,6 +362,9 @@ class AudioDataModule(pl.LightningDataModule):
         Returns:
             Test dataloader
         """
+        if self.test_dataset is None:
+            raise ValueError("Test dataset is not initialized. Call setup() first.")
+        
         return DataLoader(
             self.test_dataset,
             batch_size=self.batch_size,
@@ -355,6 +380,9 @@ class AudioDataModule(pl.LightningDataModule):
         Returns:
             Inference dataloader
         """
+        if self.inference_dataset is None:
+            raise ValueError("Inference dataset is not initialized. Call setup() first.")
+        
         return DataLoader(
             self.inference_dataset,
             batch_size=self.batch_size,
@@ -375,6 +403,9 @@ class AudioDataModule(pl.LightningDataModule):
         """
         if not self.use_kfold:
             raise ValueError("K-fold cross validation is not enabled")
+            
+        if self.fold_datasets is None:
+            raise ValueError("Fold datasets are not initialized. Call setup() first.")
             
         if fold_idx < 0 or fold_idx >= self.k_folds:
             raise ValueError(f"Fold index {fold_idx} out of range (0-{self.k_folds-1})")
@@ -420,6 +451,125 @@ class AudioDataModule(pl.LightningDataModule):
         else:
             raise ValueError("No datasets available")
 
+    def save_dataloaders(self, base_path: Optional[str] = None):
+        """
+        Save dataloaders to disk.
+        
+        Args:
+            base_path: Base path to save dataloaders. If None, a default path will be used.
+        
+        Returns:
+            str: Path where dataloaders were saved
+        """
+        if not self.save_dataloader:
+            return None
+            
+        # Check if datasets are initialized
+        if not self.use_kfold and (self.train_dataset is None or self.val_dataset is None):
+            ic("Cannot save dataloaders: datasets not initialized yet")
+            return None
+        
+        if self.use_kfold and not self.fold_datasets:
+            ic("Cannot save dataloaders: fold datasets not initialized yet")
+            return None
+            
+        ic("Saving the dataloaders, this might take a while...")
+        
+        # Use default path if none provided
+        if base_path is None:
+            # base_path = '/app/src/datasets/static/' # TODO change for server dev
+            base_path = '/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/'
+            
+        
+        # Create a distinct name based on configuration
+        distinct_name = f"static-{self.num_classes}-augs-{self.augmentation_config.augmentations_per_sample}"
+        
+        # Add augmentations to the path string
+        save_path = f"{base_path}{distinct_name}"
+        for aug in self.augmentation_config.augmentations:
+            save_path += f"-{aug.replace(' ', '-')}"  # Remove white space from the string
+            
+        ic(f"Saving dataloaders to: {save_path}")
+        
+        # Create directory if it doesn't exist
+        os.makedirs(save_path, exist_ok=True)
+        
+        # Save dataloaders
+        if not self.use_kfold:
+            # Save standard dataloaders
+            train_loader = self.train_dataloader()
+            val_loader = self.val_dataloader()
+            test_loader = self.test_dataloader()
+            inference_loader = self.predict_dataloader()
+            
+            torch.save(train_loader, f"{save_path}/train_dataloader.pth")
+            torch.save(val_loader, f"{save_path}/val_dataloader.pth")
+            torch.save(test_loader, f"{save_path}/test_dataloader.pth")
+            torch.save(inference_loader, f"{save_path}/inference_dataloader.pth")
+        else:
+            # Save k-fold dataloaders
+            for fold_idx in range(self.k_folds):
+                fold_dir = f"{save_path}/fold_{fold_idx}"
+                os.makedirs(fold_dir, exist_ok=True)
+                
+                train_loader, val_loader = self.get_fold_dataloaders(fold)
+                torch.save(train_loader, f"{fold_dir}/train_dataloader.pth")
+                torch.save(val_loader, f"{fold_dir}/val_dataloader.pth")
+                
+            # Save inference dataloader
+            inference_loader = self.predict_dataloader()
+            torch.save(inference_loader, f"{save_path}/inference_dataloader.pth")
+            
+        ic(f"Saved the dataloaders to: {save_path}")
+        sys.exit() # TODO decide if this is needed
+        return save_path
+        
+    def load_dataloaders(self, path: str):
+        """
+        Load dataloaders from disk.
+        
+        Args:
+            path: Path to load dataloaders from
+        """
+        ic(f"Loading dataloaders from: {path}")
+        
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Dataloader path {path} does not exist")
+            
+        if not self.use_kfold:
+            # Load standard dataloaders
+            train_path = f"{path}/train_dataloader.pth"
+            val_path = f"{path}/val_dataloader.pth"
+            test_path = f"{path}/test_dataloader.pth"
+            inference_path = f"{path}/inference_dataloader.pth"
+            
+            if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path]):
+                raise FileNotFoundError(f"One or more dataloader files not found in {path}")
+
+            
+            # Load dataloaders
+            train_loader = torch.load(train_path, weights_only=False)
+            val_loader = torch.load(val_path, weights_only=False)
+            test_loader = torch.load(test_path, weights_only=False)
+            inference_loader = torch.load(inference_path, weights_only=False)
+
+            self.train_dataset = train_loader.dataset
+            self.val_dataset = val_loader.dataset
+            self.test_dataset = test_loader.dataset
+            self.inference_dataset = inference_loader.dataset
+
+            
+            ic(f"Loaded dataloaders from {path}")
+            ic(f"Train loader samples: {len(train_loader.dataset)}")
+            ic(f"Val loader samples: {len(val_loader.dataset)}")
+            ic(f"Test loader samples: {len(test_loader.dataset)}")
+            ic(f"Inference loader samples: {len(inference_loader.dataset)}")
+
+            ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}")
+
+            return train_loader, val_loader, test_loader, inference_loader
+
+        
 
 # Example usage
 def example_usage():
@@ -432,6 +582,7 @@ def example_usage():
         config = yaml.safe_load(file)
     
     general_config, feature_extraction_config, cnn_config, peft_config, wandb_config, sweep_config, augmentation_config = load_configs(config)
+
     
     # Create data module directly from configs
     data_module = AudioDataModule(
@@ -439,28 +590,39 @@ def example_usage():
         feature_extraction_config=feature_extraction_config,
         augmentation_config=augmentation_config
     )
-    ic("created the audio data module")
+    ic("Created the audio data module")
     
-    # Setup data module
+    # Setup data module (this will also save dataloaders if save_dataloader is True)
     data_module.setup()
-    ic("setup the data module")
+    ic("Setup the data module")
+    
     # Get dataloaders
-    train_loader = data_module.train_dataloader()
-    val_loader = data_module.val_dataloader()
-    test_loader = data_module.test_dataloader()
-    
-    ic("got the dataloaders")
-    
-    # For k-fold cross validation
-    if general_config.use_kfold:
-        for fold in range(general_config.k_folds):
-            fold_train_loader, fold_val_loader = data_module.get_fold_dataloaders(fold)
-            # Use fold_train_loader and fold_val_loader for training
-    
-    # Get class information
-    classes, class_to_idx, idx_to_class = data_module.get_class_info()
-    print(f"Classes: {classes}")
-    print(f"Number of classes: {len(classes)}")
+    try:
+        if general_config.use_kfold:
+            for fold in range(general_config.k_folds):
+                fold_train_loader, fold_val_loader = data_module.get_fold_dataloaders(fold)
+                # Use fold_train_loader and fold_val_loader for training
+                ic(f"Fold {fold} train loader: {len(fold_train_loader.dataset)} samples")
+                ic(f"Fold {fold} val loader: {len(fold_val_loader.dataset)} samples")
+        elif "static" in general_config.data_path:
+            ic("Loading from static dataloaders")
+            data_module.load_dataloaders(general_config.data_path)
+        else:
+            train_loader = data_module.train_dataloader()
+            val_loader = data_module.val_dataloader()
+            test_loader = data_module.test_dataloader()
+            ic(f"Train loader: {len(train_loader.dataset)} samples")
+            ic(f"Val loader: {len(val_loader.dataset)} samples")
+            ic(f"Test loader: {len(test_loader.dataset)} samples")
+        
+        # Get class information
+        classes, class_to_idx, idx_to_class = data_module.get_class_info()
+        print(f"Classes: {classes}")
+        print(f"Number of classes: {len(classes)}")
+    except Exception as e:
+        ic(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
 
 
 def main():
