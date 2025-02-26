@@ -61,7 +61,7 @@ class TimeStretchConfig(BaseModel):
     p: float = 1.0
 
 
-def create_augmentation_configs(config: dict) -> Dict[str, BaseModel]:
+def create_augmentation_configs(config: dict) -> AugmentationConfig:
     """
     Dynamically create augmentation configs based on the YAML config file
     """
