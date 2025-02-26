@@ -3,9 +3,9 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
-from peft_config import * # noqa: F403
-from wandb_config import get_wandb_config, WandbConfig, SweepConfig
-from augmentation_config import create_augmentation_configs, AugmentationConfig
+from .peft_config import * # noqa: F403
+from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
+from .augmentation_config import create_augmentation_configs, AugmentationConfig
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):

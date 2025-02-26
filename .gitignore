@@ -10,6 +10,8 @@ server_login.txt
 .research_tables/
 model_cache/
 instructions.md
+.cursor
+.cursorrules
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
