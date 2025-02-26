@@ -1,4 +1,4 @@
-from typing import Optional, Literal, Dict, Any, List
+from typing import Optional, Literal, Dict, Any, List, Union
 from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
@@ -76,7 +76,7 @@ class LayernormConfig(BaseModel):
         strict = True
 
 
-def get_peft_config(config: dict) -> BaseModel:
+def get_peft_config(config: dict) -> Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]]:
 
 
     match config["general"]["adaptor_type"]:
@@ -125,5 +125,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-
-

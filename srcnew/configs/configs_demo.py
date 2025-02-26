@@ -3,9 +3,9 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
-from peft_config import get_peft_config
-from wandb_config import get_wandb_config
-from augmentation_config import create_augmentation_configs
+from peft_config import *
+from wandb_config import get_wandb_config, WandbConfig, SweepConfig
+from augmentation_config import create_augmentation_configs, AugmentationConfig
 
 
 def handle_exception(exc_type, exc_value, exc_traceback):
@@ -123,11 +123,9 @@ class CnnConfig(BaseModel):
     feature_extraction_config: FeatureExtractionConfig = FeatureExtractionConfig()
 
 
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, CnnConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]:
 
-
-def main():
-    with open('config.yaml', 'r') as file:
-        config = yaml.safe_load(file)
+    
 
     # Create GeneralConfig instance from the dictionary
     try:
@@ -141,7 +139,7 @@ def main():
         cnn_config = CnnConfig(**config["cnn_config"], feature_extraction_config=feature_extraction_config)
         ic("CnnConfig instance created successfully:")
 
-        peft_config = get_peft_config(config)
+        peft_config = get_peft_config(config) # noqa: F405
         ic("PeftConfig instance created successfully:")
 
         wandb_config, sweep_config = get_wandb_config(config)
@@ -151,7 +149,7 @@ def main():
         augmentation_config = create_augmentation_configs(config)
         ic("AugmentationConfig instance created successfully:")
 
-
+        return general_config, feature_extraction_config, cnn_config, peft_config, wandb_config, sweep_config, augmentation_config
     except ValidationError as e:
         ic("Validation error occurred: ")
         ic(e)
@@ -159,8 +157,23 @@ def main():
     except ValueError as e:
         ic("ValueError occurred: ")
         ic(e)
+    
 
 
+
+def main():
+    with open('config.yaml', 'r') as file:
+        config = yaml.safe_load(file)
+
+    (
+        general_config,
+        feature_extraction_config,
+        cnn_config,
+        peft_config,
+        wandb_config,
+        sweep_config,
+        augmentation_config
+    ) = load_configs(config)
 
 
 
