@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
-from peft_config import *
+from peft_config import * # noqa: F403
 from wandb_config import get_wandb_config, WandbConfig, SweepConfig
 from augmentation_config import create_augmentation_configs, AugmentationConfig
 
@@ -123,7 +123,7 @@ class CnnConfig(BaseModel):
     feature_extraction_config: FeatureExtractionConfig = FeatureExtractionConfig()
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, CnnConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]:
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, CnnConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
 
     
 
