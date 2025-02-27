@@ -1,14 +1,18 @@
 from configs.configs_demo import load_configs
 import yaml
-from srcnew.datamodule import AudioDataModule
+from datamodule import AudioDataModule
 from icecream import ic
+import torch
+import numpy as np
+import sys
 
 
 
 
 
 def main():
-    
+
+    print("_"*40+"\n")
     # Load configuration
     with open('configs/config.yaml', 'r') as file:
         config = yaml.safe_load(file)
@@ -23,6 +27,10 @@ def main():
     
     print("_"*40+"\n")
 
+    torch.manual_seed(general_config.seed)
+    torch.cuda.manual_seed(general_config.seed)
+    np.random.RandomState(general_config.seed)
+    
     
     # Create data module directly from configs
     data_module = AudioDataModule(
@@ -40,16 +48,23 @@ def main():
     try:
         if general_config.use_kfold:
             for fold in range(general_config.k_folds):
+
                 fold_train_loader, fold_val_loader = data_module.get_fold_dataloaders(fold)
+
                 # Use fold_train_loader and fold_val_loader for training
                 train_samples = getattr(fold_train_loader.dataset, "__len__", lambda: "unknown")()
                 val_samples = getattr(fold_val_loader.dataset, "__len__", lambda: "unknown")()
+
                 ic(f"Fold {fold} train loader: {train_samples} samples")
                 ic(f"Fold {fold} val loader: {val_samples} samples")
+
         elif "static" in general_config.data_path:
+
             ic("Loading from static dataloaders")
             data_module.load_dataloaders(general_config.data_path)
+
         else:
+
             train_loader = data_module.train_dataloader()
             val_loader = data_module.val_dataloader()
             test_loader = data_module.test_dataloader()
@@ -64,7 +79,7 @@ def main():
             ic(f"Val loader: {val_samples} samples")
             ic(f"Test loader: {test_samples} samples")
             ic(f"Inference loader: {inference_samples} samples")
-            ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}")
+            ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}") # type: ignore
         
         # Get class information
         classes, class_to_idx, idx_to_class = data_module.get_class_info()
@@ -76,10 +91,31 @@ def main():
         import traceback
         traceback.print_exc()
 
-    torch.manual_seed(SEED)
-    torch.cuda.manual_seed(SEED)
-    np.random.RandomState(SEED)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+    sys.exit()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+"""
+
+OLD CODE: 
     # Get model, optimizer, training function and feature extractor
     model, optimizer, train_fn, feature_extractor = get_model_and_optimizer(general_config, device)
 
@@ -170,7 +206,7 @@ def main():
         # if save flag is passed then save the dataset to the path 
         # Original train-test split code
         # if loading from static dataset:
-        """
+        
         train_dataloader = torch.load('path1')
         test_dataloader = torch.load('path2')
         val_dataloader = torch.load('path3')
@@ -182,7 +218,7 @@ def main():
         # Later, you can load the dataset back
         loaded_dataset = torch.load('dataset.pth')
         
-        """
+        
         if "static" in DATA_PATH:
             ic(DATA_PATH)
             train_dataloader = torch.load(DATA_PATH+'/train_dataloader.pth', weights_only=False)
@@ -311,6 +347,8 @@ def main():
             target_dir="saved_models",
             model_name=model_name
         )
+
+"""
 
 if __name__ == "__main__":
     main()
