@@ -12,6 +12,8 @@ model_cache/
 instructions.md
 .cursor
 .cursorrules
+lightning_logs/
+checkpoints/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

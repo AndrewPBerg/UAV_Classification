@@ -5,7 +5,11 @@ from icecream import ic
 import torch
 import numpy as np
 import sys
-
+from model_factory import ModelFactory
+from ptl_trainer import PTLTrainer
+from pathlib import Path
+from ast_model import ASTModel  # Import the new ASTModel class
+from torchinfo import summary
 
 
 
@@ -27,10 +31,10 @@ def main():
     
     print("_"*40+"\n")
 
+    # Set random seeds for reproducibility
     torch.manual_seed(general_config.seed)
     torch.cuda.manual_seed(general_config.seed)
-    np.random.RandomState(general_config.seed)
-    
+    np.random.seed(general_config.seed)
     
     # Create data module directly from configs
     data_module = AudioDataModule(
@@ -44,7 +48,7 @@ def main():
     data_module.setup()
     ic("Setup the data module")
     
-    # Get dataloaders
+    # Get dataloaders and print information
     try:
         if general_config.use_kfold:
             for fold in range(general_config.k_folds):
@@ -90,265 +94,95 @@ def main():
         ic(f"Error: {str(e)}")
         import traceback
         traceback.print_exc()
+        sys.exit(1)
 
+    # Set up device
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    ic(f"Using device: {device}")
 
-    sys.exit()
+    # Create model factory function
+    model_factory = ModelFactory.get_model_factory(
+        general_config=general_config,
+        feature_extraction_config=feature_extraction_config,
+        cnn_config=cnn_config,
+        peft_config=peft_config
+    )
 
+    ic("model_factory created")
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-"""
-
-OLD CODE: 
-    # Get model, optimizer, training function and feature extractor
-    model, optimizer, train_fn, feature_extractor = get_model_and_optimizer(general_config, device)
-
+    # Unpack the tuple correctly
+    model, feature_extractor = model_factory(device)
+    
+    # Now we can call parameters() on the model
+    #print(model.parameters())
+    #sys.exit(1)
+    
     summary(model,
             col_names=["num_params","trainable"],
             col_width=20,
             row_settings=["var_names"])
+
     print(model)
-    
-    if TORCH_VIZ:
-        generate_model_image(model, device)
-
-    # Initialize gradient scaler for mixed precision
-    scaler = torch.amp.GradScaler()
-
-    # Enable cudnn benchmarking for faster training
-    torch.backends.cudnn.benchmark = True
-
-    if USE_WANDB:
-        wandb_login()
-        
-        wandb.init(
-            project=run_config['project'],
-            name=run_config['name'],
-            reinit=run_config['reinit'],
-            notes=run_config['notes'],
-            tags=run_config['tags'],
-            dir=run_config['dir'],
-            config=general_config
-        )
-    
-    loss_fn = nn.CrossEntropyLoss()
-    scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
-        optimizer, mode='min', factor=0.1, patience=2
+    # sys.exit(1)
+    # Create PyTorch Lightning trainer
+    trainer = PTLTrainer(
+        general_config=general_config,
+        feature_extraction_config=feature_extraction_config,
+        cnn_config=cnn_config,
+        peft_config=peft_config,
+        wandb_config=wandb_config,
+        sweep_config=sweep_config,
+        data_module=data_module,
+        model_factory=model_factory
     )
     
-    if USE_KFOLD:
-        # K-fold cross validation
-        fold_datasets, inference_dataset = k_fold_split_custom(
-            DATA_PATH,
-            feature_extractor=feature_extractor,
-            k_folds=K_FOLDS,
-            inference_size=INFERENCE_SIZE,
-            seed=SEED,
-            augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
-            augmentations=AUGMENTATIONS,
-            config=general_config
-        )
-        
-        # Define model and optimizer creation functions
-        def model_fn():
-            model, optimizer, _, _ = get_model_and_optimizer(general_config, device)
-            return model
-        
-        def optimizer_fn(parameters):
-            if general_config['model_type'] == "AST":
-                return AdamW(parameters, lr=general_config['learning_rate'])
-            else:
-                return Adam(parameters, lr=general_config['learning_rate'])
-        
-        def scheduler_fn(optimizer):
-            return torch.optim.lr_scheduler.ReduceLROnPlateau(
-                optimizer, mode='min', factor=0.1, patience=2
-            )
-        
-        # Perform k-fold cross validation
-        k_fold_results = k_fold_cross_validation(
-            model_fn=model_fn,
-            fold_datasets=fold_datasets,
-            optimizer_fn=optimizer_fn,
-            scheduler_fn=scheduler_fn,
-            loss_fn=loss_fn,
-            device=device,
-            num_classes=NUM_CLASSES,
-            epochs=EPOCHS,
-            batch_size=BATCH_SIZE,
-            num_workers=NUM_CUDA_WORKERS,
-            pin_memory=PINNED_MEMORY,
-            shuffle=SHUFFLED,
-            accumulation_steps=ACCUMULATION_STEPS,
-            patience=TRAIN_PATIENCE,
-            scaler=scaler
-        )
-
-    else:
-        # DATA_PATH : str
-        # if DATA_PATH has static in the name then load the dataset from the path
-        # if save flag is passed then save the dataset to the path 
-        # Original train-test split code
-        # if loading from static dataset:
-        
-        train_dataloader = torch.load('path1')
-        test_dataloader = torch.load('path2')
-        val_dataloader = torch.load('path3')
-        inference_dataloader = torch.load('path4')
-        
-        # Save the dataset to a .pth file
-        torch.save(dataset, 'dataset.pth')
-        
-        # Later, you can load the dataset back
-        loaded_dataset = torch.load('dataset.pth')
-        
-        
-        if "static" in DATA_PATH:
-            ic(DATA_PATH)
-            train_dataloader = torch.load(DATA_PATH+'/train_dataloader.pth', weights_only=False)
-            test_dataloader = torch.load(DATA_PATH+'/test_dataloader.pth', weights_only=False)
-            val_dataloader = torch.load(DATA_PATH+'/val_dataloader.pth', weights_only=False)
-            inference_dataloader = torch.load(DATA_PATH+'/inference_dataloader.pth', weights_only=False)
-
-            ic(train_dataloader.dataset.classes)
-            ic(train_dataloader.dataset.augmentations_per_sample)
-            # ic(test_dataloader)
-            # ic(val_dataloader)
-            # ic(inference_dataloader)
-
-            # sys.exit()
+    ic("trainer created")
+    
+    # Train model
+    try:
+        if general_config.use_kfold:
+            ic("Starting k-fold cross-validation training")
+            results = trainer.k_fold_cross_validation()
+            
+            # Print k-fold results
+            print("\nK-fold Cross-Validation Results:")
+            print("-" * 40)
+            
+            for i, fold_result in enumerate(results["fold_results"]):
+                print(f"Fold {i+1}:")
+                print(f"  Val Loss: {fold_result['val_loss']:.4f}")
+                print(f"  Val Accuracy: {fold_result['val_acc']:.4f}")
+                print(f"  Val F1: {fold_result['val_f1']:.4f}")
+                print(f"  Val Precision: {fold_result['val_precision']:.4f}")
+                print(f"  Val Recall: {fold_result['val_recall']:.4f}")
+            
+            print("\nAverage Metrics:")
+            print(f"  Val Loss: {results['avg_metrics']['average_val_loss']:.4f} ± {results['avg_metrics']['std_val_loss']:.4f}")
+            print(f"  Val Accuracy: {results['avg_metrics']['average_val_acc']:.4f} ± {results['avg_metrics']['std_val_acc']:.4f}")
+            print(f"  Val F1: {results['avg_metrics']['average_val_f1']:.4f} ± {results['avg_metrics']['std_val_f1']:.4f}")
+            
         else:
-            if AUGMENTATIONS_PER_SAMPLE > 0:
-                ic("Augmenting the dataset, this might take a while...")
-                
-            train_dataset, val_dataset, test_dataset, inference_dataset = train_test_split_custom(
-                DATA_PATH,
-                feature_extractor=feature_extractor,
-                test_size=TEST_SIZE,
-                seed=SEED,
-                inference_size=INFERENCE_SIZE,
-                augmentations_per_sample=AUGMENTATIONS_PER_SAMPLE,
-                val_size=VAL_SIZE,
-                augmentations=AUGMENTATIONS,
-                config=general_config
-            )
-
-            # Create data loaders
-            train_dataloader = DataLoader(
-                dataset=train_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
+            ic("Starting regular training")
+            model, test_results = trainer.train()
             
-            val_dataloader = DataLoader(
-                dataset=val_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
+            # Print test results
+            print("\nTest Results:")
+            print("-" * 40)
+            print(f"Test Loss: {test_results.get('test_loss', 'N/A')}")
+            print(f"Test Accuracy: {test_results.get('test_acc', 'N/A')}")
+            print(f"Test F1: {test_results.get('test_f1', 'N/A')}")
+            print(f"Test Precision: {test_results.get('test_precision', 'N/A')}")
+            print(f"Test Recall: {test_results.get('test_recall', 'N/A')}")
             
-            test_dataloader = DataLoader(
-                dataset=test_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
-            
-            inference_dataloader = DataLoader(
-                dataset=inference_dataset,
-                batch_size=BATCH_SIZE,
-                num_workers=NUM_CUDA_WORKERS,
-                pin_memory=PINNED_MEMORY,
-                shuffle=SHUFFLED
-            )
-        if SAVE_DATALOADER:
-            ic("saving the dataloaders, this might take a while...")
-            fixed_pathing = '/app/src/datasets/static/'
-            # TODO naming convention with Augmentations list is broken
-            distinct_name = f"{NUM_CLASSES}"+f"-augs-{AUGMENTATIONS_PER_SAMPLE}"
+    except Exception as e:
+        ic(f"Error during training: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+    
+    print("\nTraining completed successfully!")
+    sys.exit(0)
 
-            # add augmenatations to end of the path string
-            all_together_now = f"{fixed_pathing}"+f"{distinct_name}"
-            for s in AUGMENTATIONS:
-                all_together_now += f"-{s.replace(' ', '-')}" #remove-white-space-from-the-string
-            ic(all_together_now)
-
-            os.makedirs(all_together_now, exist_ok=True)
-
-
-            torch.save(train_dataloader, all_together_now+'/train_dataloader.pth')
-            torch.save(val_dataloader, all_together_now+'/val_dataloader.pth')
-            torch.save(test_dataloader, all_together_now+'/test_dataloader.pth')
-            torch.save(inference_dataloader, all_together_now+'/inference_dataloader.pth')
-            ic("Saved the dataloaders to the above path!")
-            # TODO find a way to skip training and jump to end of main
-            # sys.exit()
-            return
-        
-        end = timer()
-        total_load_time = calculated_load_time(start, end)
-        print(f"Load time in on path: {DATA_PATH} --> {total_load_time}")
-        
-        if wandb.run is not None:
-            wandb.log({"load_time": total_load_time})
-        
-        train_fn(
-            model=model,
-            train_dataloader=train_dataloader,
-            test_dataloader=test_dataloader,
-            val_dataloader=val_dataloader,
-            optimizer=optimizer,
-            scheduler=scheduler,
-            loss_fn=loss_fn,
-            epochs=EPOCHS,
-            device=device,
-            num_classes=NUM_CLASSES,
-            accumulation_steps=ACCUMULATION_STEPS,
-            patience=TRAIN_PATIENCE,
-            scaler=scaler
-        )
-        
-        # Run inference after training
-        inference_loop(
-            model=model,
-            inference_loader=inference_dataloader,
-            loss_fn=loss_fn,
-            device=device,
-            num_classes=NUM_CLASSES
-        )
-
-    if USE_WANDB:
-        wandb.finish()
-
-    if SAVE_MODEL:
-        model_name = f"{general_config['model_type']}_classifier.pt"
-        save_model(
-            model=model,
-            target_dir="saved_models",
-            model_name=model_name
-        )
-
-"""
 
 if __name__ == "__main__":
     main()

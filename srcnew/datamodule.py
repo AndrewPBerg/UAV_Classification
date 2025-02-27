@@ -341,7 +341,8 @@ class AudioDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=True,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
+            persistent_workers= True
         )
         
     def val_dataloader(self):
@@ -359,7 +360,8 @@ class AudioDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
+            persistent_workers=True
         )
         
     def test_dataloader(self):
@@ -377,7 +379,8 @@ class AudioDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
+            persistent_workers=True
         )
         
     def predict_dataloader(self):
@@ -395,7 +398,8 @@ class AudioDataModule(pl.LightningDataModule):
             batch_size=self.batch_size,
             shuffle=False,
             num_workers=self.num_workers,
-            pin_memory=self.pin_memory
+            pin_memory=self.pin_memory,
+            persistent_workers=True
         )
         
     def get_fold_dataloaders(self, fold_idx: int):

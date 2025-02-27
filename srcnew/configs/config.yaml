@@ -4,7 +4,7 @@ general:
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/static-31-augs-1-time_stretch-sin_distortion
   num_classes: 9
   save_dataloader: false
-  model_type: vit_l_32
+  model_type: resnet18
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -25,7 +25,7 @@ general:
   adaptor_type: none-classifier
 
 augmentations:
-  augmentations_per_sample: 1
+  augmentations_per_sample: 0
   augmentations:
   - time_stretch
   - sin_distortion
