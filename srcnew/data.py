@@ -521,24 +521,7 @@ class AudioDataModule(pl.LightningDataModule):
                 "aug_configs": {}
             }
 
-            metadata = {}
-            
-            # Convert each Pydantic model in aug_configs to a dictionary
-            if self.augmentation_config.aug_configs and self.augmentation_config.augmentations_per_sample != 0:
-                for aug_name, aug_config in self.augmentation_config.aug_configs.items():
-                    if hasattr(aug_config, "model_dump"):
-                        # For newer Pydantic v2
-                        serializable_aug_config["aug_configs"][aug_name] = aug_config.model_dump()
-                    elif hasattr(aug_config, "dict"):
-                        # For older Pydantic v1
-                        serializable_aug_config["aug_configs"][aug_name] = aug_config.dict()
-                    else:
-                        # Fallback for non-Pydantic objects
-                        serializable_aug_config["aug_configs"][aug_name] = vars(aug_config)
-            
-                metadata["augmentation_config"] = serializable_aug_config
-            
-            # Save metadata
+            # metadata dict
             metadata = {
                 "data_path": self.data_path,
                 "batch_size": self.batch_size,
@@ -551,7 +534,24 @@ class AudioDataModule(pl.LightningDataModule):
                 "seed": self.seed,
                 "pin_memory": self.pin_memory
             }
-
+            
+            # Convert each Pydantic model in aug_configs to a dictionary
+            if self.augmentation_config.aug_configs and self.augmentation_config.augmentations_per_sample > 0:
+                for aug_name, aug_config in self.augmentation_config.aug_configs.items():
+                    if hasattr(aug_config, "model_dump"):
+                        # For newer Pydantic v2
+                        serializable_aug_config["aug_configs"][aug_name] = aug_config.model_dump()
+                    elif hasattr(aug_config, "dict"):
+                        # For older Pydantic v1
+                        serializable_aug_config["aug_configs"][aug_name] = aug_config.dict()
+                    else:
+                        # Fallback for non-Pydantic objects
+                        serializable_aug_config["aug_configs"][aug_name] = vars(aug_config)
+            
+                # add the serializable augmentation config to the metadata
+                metadata["augmentation_config"] = serializable_aug_config
+            
+            # ic(f"Metadata: {metadata}")
             with open(f"{save_path}/metadata.json", 'w') as f:
                 json.dump(metadata, f, indent=4)  # Use indent for better formatting
         else:
@@ -628,6 +628,7 @@ def example_usage():
         config = yaml.safe_load(file)
     
     general_config, feature_extraction_config, cnn_config, peft_config, wandb_config, sweep_config, augmentation_config = load_configs(config)
+    print("_"*40+"\n")
 
     
     # Create data module directly from configs

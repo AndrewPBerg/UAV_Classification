@@ -25,7 +25,7 @@ general:
   adaptor_type: none-classifier
 
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 1
   augmentations:
   - time_stretch
   - sin_distortion
