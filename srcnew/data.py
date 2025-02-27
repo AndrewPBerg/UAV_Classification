@@ -206,9 +206,12 @@ class AudioDataModule(pl.LightningDataModule):
             data_path=self.data_path,
             data_paths=val_paths,
             feature_extractor=self.feature_extractor,
+            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+            augmentations=self.augmentation_config.augmentations,
             target_sr=self.target_sr,
             target_duration=self.target_duration,
-            num_channels=self.num_channels
+            num_channels=self.num_channels,
+            config=self.augmentation_config.aug_configs or {}
         )
         
         self.test_dataset = AudioDataset(

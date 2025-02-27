@@ -11,7 +11,7 @@ general:
   pinned_memory: true
   epochs: 10
   save_model: false
-  test_size: 0.85
+  test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
   shuffled: false
@@ -26,7 +26,7 @@ general:
   adaptor_type: none-classifier
 
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 1
   augmentations:
   - time_stretch
   - sin_distortion
