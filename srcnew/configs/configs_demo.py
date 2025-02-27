@@ -64,7 +64,6 @@ class GeneralConfig(BaseModel):
     inference_size: float = 0.1
     val_size: float = 0.1
 
-    shuffled: bool = False
     sweep_count: int = 200
     accumulation_steps: int = 2
     learning_rate: float = 0.001

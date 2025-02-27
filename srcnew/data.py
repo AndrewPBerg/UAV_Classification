@@ -9,6 +9,7 @@ from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import KFold
 from time import time as timer
 from icecream import ic
+import json
 
 # Import from existing code
 from helper.util import AudioDataset
@@ -100,6 +101,16 @@ class AudioDataModule(pl.LightningDataModule):
         self.inference_dataset = None
         self.fold_datasets = None
         
+        # Initialize new attributes based on GeneralConfig
+        self.val_size = general_config.val_size
+        self.test_size = general_config.test_size
+        self.inference_size = general_config.inference_size
+        
+        # Calculate train_size
+        self.train_size = 1.0 - (self.val_size + self.test_size + self.inference_size)
+        assert np.isclose(self.train_size + self.val_size + self.test_size + self.inference_size, 1.0), \
+            "The sum of val_size, test_size, and inference_size should be less than 1.0"
+        
     def prepare_data(self):
         """
         Prepare data for training.
@@ -155,6 +166,11 @@ class AudioDataModule(pl.LightningDataModule):
                 self.save_dataloaders()
         # Save dataloaders if configured - MOVED AFTER dataset initialization
             
+        # Set sizes based on the dataset split
+        self.train_size = 1.0 - (self.val_size + self.test_size + self.inference_size)
+        assert np.isclose(self.train_size + self.val_size + self.test_size + self.inference_size, 1.0), \
+            "The sum of val_size, test_size, and inference_size should be less than 1.0"
+        
     def _setup_train_val_test(self, all_paths: List[Path]):
         """
         Setup datasets for standard train/val/test split.
@@ -497,23 +513,53 @@ class AudioDataModule(pl.LightningDataModule):
             torch.save(val_loader, f"{save_path}/val_dataloader.pth")
             torch.save(test_loader, f"{save_path}/test_dataloader.pth")
             torch.save(inference_loader, f"{save_path}/inference_dataloader.pth")
+            
+            # Create a serializable version of the augmentation config
+            serializable_aug_config = {
+                "augmentations_per_sample": self.augmentation_config.augmentations_per_sample,
+                "augmentations": self.augmentation_config.augmentations,
+                "aug_configs": {}
+            }
+
+            metadata = {}
+            
+            # Convert each Pydantic model in aug_configs to a dictionary
+            if self.augmentation_config.aug_configs and self.augmentation_config.augmentations_per_sample != 0:
+                for aug_name, aug_config in self.augmentation_config.aug_configs.items():
+                    if hasattr(aug_config, "model_dump"):
+                        # For newer Pydantic v2
+                        serializable_aug_config["aug_configs"][aug_name] = aug_config.model_dump()
+                    elif hasattr(aug_config, "dict"):
+                        # For older Pydantic v1
+                        serializable_aug_config["aug_configs"][aug_name] = aug_config.dict()
+                    else:
+                        # Fallback for non-Pydantic objects
+                        serializable_aug_config["aug_configs"][aug_name] = vars(aug_config)
+            
+                metadata["augmentation_config"] = serializable_aug_config
+            
+            # Save metadata
+            metadata = {
+                "data_path": self.data_path,
+                "batch_size": self.batch_size,
+                "num_workers": self.num_workers,
+                "num_classes": self.num_classes,
+                "train_size": self.train_size,
+                "val_size": self.val_size,
+                "test_size": self.test_size,
+                "inference_size": self.inference_size,
+                "seed": self.seed,
+                "pin_memory": self.pin_memory
+            }
+
+            with open(f"{save_path}/metadata.json", 'w') as f:
+                json.dump(metadata, f, indent=4)  # Use indent for better formatting
         else:
-            # Save k-fold dataloaders
-            for fold_idx in range(self.k_folds):
-                fold_dir = f"{save_path}/fold_{fold_idx}"
-                os.makedirs(fold_dir, exist_ok=True)
-                
-                train_loader, val_loader = self.get_fold_dataloaders(fold_idx)
-                torch.save(train_loader, f"{fold_dir}/train_dataloader.pth")
-                torch.save(val_loader, f"{fold_dir}/val_dataloader.pth")
-                
-            # Save inference dataloader
-            inference_loader = self.predict_dataloader()
-            torch.save(inference_loader, f"{save_path}/inference_dataloader.pth")
+            raise NotImplementedError("K-fold saving is not supported. Loaders will not be saved.")
             
         ic(f"Saved the dataloaders to: {save_path}")
         sys.exit() # TODO decide if this is needed
-        return save_path
+        # return save_path
         
     def load_dataloaders(self, path: str):
         """
@@ -533,10 +579,16 @@ class AudioDataModule(pl.LightningDataModule):
             val_path = f"{path}/val_dataloader.pth"
             test_path = f"{path}/test_dataloader.pth"
             inference_path = f"{path}/inference_dataloader.pth"
+            metadata_path = f"{path}/metadata.json"  # Path to the metadata file
             
-            if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path]):
+            if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path, metadata_path]):
                 raise FileNotFoundError(f"One or more dataloader files not found in {path}")
 
+            # Load metadata
+            with open(metadata_path, 'r') as f:
+                metadata = json.load(f)
+            
+            # You can now access metadata['data_path'], metadata['batch_size'], etc.
             
             # Load dataloaders
             train_loader = torch.load(train_path, weights_only=False)
@@ -549,21 +601,18 @@ class AudioDataModule(pl.LightningDataModule):
             self.test_dataset = test_loader.dataset
             self.inference_dataset = inference_loader.dataset
 
-            
-            ic(f"Loaded dataloaders from {path}")
-            # Fixed: Check if dataset has __len__ before calling len()
+            # Access instance variables
             train_samples = getattr(train_loader.dataset, "__len__", lambda: "unknown")()
             val_samples = getattr(val_loader.dataset, "__len__", lambda: "unknown")()
             test_samples = getattr(test_loader.dataset, "__len__", lambda: "unknown")()
             inference_samples = getattr(inference_loader.dataset, "__len__", lambda: "unknown")()
-            
+            augmentations_per_sample = train_loader.dataset.augmentations_per_sample  # Accessing instance variable
+
             ic(f"Train loader samples: {train_samples}")
             ic(f"Val loader samples: {val_samples}")
             ic(f"Test loader samples: {test_samples}")
             ic(f"Inference loader samples: {inference_samples}")
-
-            # Fixed: Don't try to call len() on an integer
-            ic(f"number of augmentations: {train_loader.dataset.augmentations_per_sample}")
+            ic(f"Number of augmentations: {augmentations_per_sample}")
 
             return train_loader, val_loader, test_loader, inference_loader
 
@@ -627,6 +676,7 @@ def example_usage():
         classes, class_to_idx, idx_to_class = data_module.get_class_info()
         print(f"Classes: {classes}")
         print(f"Number of classes: {len(classes)}")
+        
     except Exception as e:
         ic(f"Error: {str(e)}")
         import traceback
