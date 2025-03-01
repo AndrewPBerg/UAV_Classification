@@ -183,6 +183,19 @@ class PTLTrainer:
         best_model = None
         best_val_loss = float('inf')
         
+        # Initialize WandB for all folds if enabled
+        # We'll use a single WandB run for all folds
+        if self.general_config.use_wandb and self.wandb_logger is None:
+            wandb_login()
+            self.wandb_logger = WandbLogger(
+                project=self.wandb_config.project,
+                name=self.wandb_config.name,
+                tags=self.wandb_config.tags if self.wandb_config.tags else [],
+                notes=self.wandb_config.notes,
+                log_model=True,
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config)
+            )
+        
         # Train on each fold
         for fold in range(self.general_config.k_folds):
             ic(f"Training fold {fold+1}/{self.general_config.k_folds}")
@@ -200,17 +213,6 @@ class PTLTrainer:
                 peft_config=self.peft_config,
                 num_classes=self.data_module.num_classes
             )
-            
-            # Create fold-specific WandB logger if enabled
-            fold_logger = None
-            if self.general_config.use_wandb:
-                fold_logger = WandbLogger(
-                    project=self.wandb_config.project,
-                    name=f"{self.wandb_config.name}_fold_{fold+1}",
-                    tags=(self.wandb_config.tags + [f"fold_{fold+1}"]) if self.wandb_config.tags else [f"fold_{fold+1}"],
-                    notes=self.wandb_config.notes,
-                    log_model=False
-                )
             
             # Create checkpoint directory for this fold
             checkpoint_dir = Path("checkpoints") / f"fold_{fold+1}" / datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -241,7 +243,7 @@ class PTLTrainer:
                 accelerator="auto",
                 devices=1,  # Always use 1 device (either 1 GPU or 1 CPU)
                 callbacks=fold_callbacks,
-                logger=fold_logger,
+                logger=self.wandb_logger,  # Use the same logger for all folds
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,
@@ -257,41 +259,55 @@ class PTLTrainer:
             
             # Get validation loss
             val_loss = trainer.callback_metrics.get("val_loss", float('inf'))
+            val_acc = trainer.callback_metrics.get("val_acc", 0.0)
+            val_f1 = trainer.callback_metrics.get("val_f1", 0.0)
+            val_precision = trainer.callback_metrics.get("val_precision", 0.0)
+            val_recall = trainer.callback_metrics.get("val_recall", 0.0)
+            
+            # Convert tensor values to Python scalars
+            if isinstance(val_loss, torch.Tensor):
+                val_loss = val_loss.item()
+            if isinstance(val_acc, torch.Tensor):
+                val_acc = val_acc.item()
+            if isinstance(val_f1, torch.Tensor):
+                val_f1 = val_f1.item()
+            if isinstance(val_precision, torch.Tensor):
+                val_precision = val_precision.item()
+            if isinstance(val_recall, torch.Tensor):
+                val_recall = val_recall.item()
             
             # Store results
             fold_results = {
                 "fold": fold + 1,
-                "val_loss": val_loss.item() if isinstance(val_loss, torch.Tensor) else val_loss,
-                "val_acc": trainer.callback_metrics.get("val_acc", 0.0),
-                "val_f1": trainer.callback_metrics.get("val_f1", 0.0),
-                "val_precision": trainer.callback_metrics.get("val_precision", 0.0),
-                "val_recall": trainer.callback_metrics.get("val_recall", 0.0)
+                "val_loss": val_loss,
+                "val_acc": val_acc,
+                "val_f1": val_f1,
+                "val_precision": val_precision,
+                "val_recall": val_recall
             }
             
             all_fold_results.append(fold_results)
             
             # Keep track of best model
-            if fold_results["val_loss"] < best_val_loss:
-                best_val_loss = fold_results["val_loss"]
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
                 best_model = lightning_module
             
-            # Close WandB run for this fold
-            if fold_logger and fold_logger.experiment:
-                wandb.finish()
+            # Log final metrics for this fold to WandB
+            if self.general_config.use_wandb:
+                wandb.log({
+                    f"fold_{fold+1}_final_val_acc": val_acc,
+                    f"fold_{fold+1}_final_val_loss": val_loss,
+                    f"fold_{fold+1}_final_val_f1": val_f1,
+                    f"fold_{fold+1}_final_val_precision": val_precision,
+                    f"fold_{fold+1}_final_val_recall": val_recall
+                })
         
         # Calculate average metrics
         avg_metrics = self._calculate_average_metrics(all_fold_results)
         
         # Log average metrics to WandB
         if self.general_config.use_wandb:
-            wandb_login()
-            wandb.init(
-                project=self.wandb_config.project,
-                name=f"{self.wandb_config.name}_kfold_summary",
-                tags=(self.wandb_config.tags + ["kfold_summary"]) if self.wandb_config.tags else ["kfold_summary"],
-                notes=self.wandb_config.notes
-            )
-            
             # Log average metrics
             wandb.log(avg_metrics)
             
@@ -308,7 +324,6 @@ class PTLTrainer:
                 )
             
             wandb.log({"fold_results": fold_table})
-            wandb.finish()
         
         # Save best model if enabled
         if self.general_config.save_model and best_model is not None:
