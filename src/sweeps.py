@@ -23,7 +23,7 @@ from helper.util import wandb_login
 # Set up device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def load_config(config_path: str = 'config.yaml') -> Dict[str, Any]:
+def load_config(config_path: str = 'configs/config.yaml') -> Dict[str, Any]:
     """
     Load configuration from a YAML file.
     
@@ -74,7 +74,7 @@ def model_pipeline(sweep_config=None):
         config = wandb.config
         
         # Load general config
-        yaml_config = load_config()
+        yaml_config = load_config(config_path="configs/config.yaml")
         general_config_dict = yaml_config['general']
         
         # Combine sweep config with general config
@@ -178,7 +178,7 @@ def main():
     Main function to initialize and run the sweep.
     """
     # Load configuration
-    config = load_config()
+    config = load_config(config_path="configs/config.yaml")
     
     # Set random seeds for reproducibility
     SEED = config['general']['seed']

@@ -30,7 +30,7 @@ from peft.tuners.oft import OFTConfig
 from helper.MoA import AST_MoA, AST_SoftMoA
 
 # Load configuration from YAML file
-with open('config.yaml', 'r') as file:
+with open('configs/config.yaml', 'r') as file:
     config = yaml.safe_load(file)
 
 # Access yaml general configuration 
