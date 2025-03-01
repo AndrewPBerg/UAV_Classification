@@ -191,7 +191,7 @@ class PTLTrainer:
             fold_train_loader, fold_val_loader = self.data_module.get_fold_dataloaders(fold)
             
             # Create new model instance for this fold
-            model = self.model_factory(self.device)
+            model, feature_extractor = self.model_factory(self.device)
             
             # Create Lightning module
             lightning_module = AudioClassifier(
