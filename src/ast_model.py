@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 logging.getLogger('transformers').setLevel(logging.ERROR)
 
 # Constants
-CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
+CACHE_DIR = os.path.join("/app/src/model_cache")
 DEFAULT_AST_MODEL = "MIT/ast-finetuned-audioset-10-10-0.4593"
 
 

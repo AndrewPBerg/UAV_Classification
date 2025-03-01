@@ -7,7 +7,7 @@ general:
   # data_path: /app/src/datasets/static/9-augs-0-time_stretch-sin_distortion
   num_classes: 9
   save_dataloader: false
-  model_type: resnet152
+  model_type: vit_b_16
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
