@@ -8,7 +8,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
 
-from configs.configs_demo import GeneralConfig, CnnConfig
+from configs.configs_demo import GeneralConfig
 import re
 
 
@@ -21,7 +21,6 @@ class AudioClassifier(pl.LightningModule):
         self,
         model: nn.Module,
         general_config: GeneralConfig,
-        cnn_config: Optional[CnnConfig] = None,
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
     ):
@@ -31,14 +30,12 @@ class AudioClassifier(pl.LightningModule):
         Args:
             model: The PyTorch model to train
             general_config: General configuration
-            cnn_config: CNN configuration (optional)
             peft_config: PEFT configuration (optional)
             num_classes: Number of classes (if not provided, will use general_config.num_classes)
         """
         super().__init__()
         self.model = model
         self.general_config = general_config
-        self.cnn_config = cnn_config
         self.peft_config = peft_config
         
         # Set number of classes

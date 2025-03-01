@@ -12,7 +12,7 @@ from datetime import datetime
 
 from lightning_module import AudioClassifier
 from datamodule import AudioDataModule
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, CnnConfig, WandbConfig, SweepConfig
+from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from helper.util import wandb_login
 
 
@@ -25,7 +25,6 @@ class PTLTrainer:
         self,
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
-        cnn_config: CnnConfig,
         peft_config: Any,
         wandb_config: WandbConfig,
         sweep_config: SweepConfig,
@@ -38,7 +37,6 @@ class PTLTrainer:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
-            cnn_config: CNN configuration
             peft_config: PEFT configuration
             wandb_config: WandB configuration
             sweep_config: Sweep configuration
@@ -47,7 +45,6 @@ class PTLTrainer:
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
-        self.cnn_config = cnn_config
         self.peft_config = peft_config
         self.wandb_config = wandb_config
         self.sweep_config = sweep_config
@@ -66,12 +63,14 @@ class PTLTrainer:
         self.wandb_logger = None
         if general_config.use_wandb:
             wandb_login()
+            ic("successfully logged in to wandb")
             self.wandb_logger = WandbLogger(
                 project=wandb_config.project,
                 name=wandb_config.name,
                 tags=wandb_config.tags if wandb_config.tags else [],
                 notes=wandb_config.notes,
-                log_model=True
+                log_model=True,
+                config=wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config)
             )
     
     def _get_callbacks(self) -> List[pl.Callback]:
@@ -125,7 +124,6 @@ class PTLTrainer:
         lightning_module = AudioClassifier(
             model=model,
             general_config=self.general_config,
-            cnn_config=self.cnn_config,
             peft_config=self.peft_config,
             num_classes=self.data_module.num_classes
         )
@@ -199,7 +197,6 @@ class PTLTrainer:
             lightning_module = AudioClassifier(
                 model=model,
                 general_config=self.general_config,
-                cnn_config=self.cnn_config,
                 peft_config=self.peft_config,
                 num_classes=self.data_module.num_classes
             )

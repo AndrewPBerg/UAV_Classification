@@ -3,10 +3,14 @@ from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
 import sys
-from .peft_config import * # noqa: F403
-from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
-from .augmentation_config import create_augmentation_configs, AugmentationConfig
-
+try:
+    from .peft_config import * # noqa: F403
+    from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
+    from .augmentation_config import create_augmentation_configs, AugmentationConfig
+except ImportError as e:
+    from peft_config import * # noqa: F403
+    from wandb_config import get_wandb_config, WandbConfig, SweepConfig
+    from augmentation_config import create_augmentation_configs, AugmentationConfig
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Custom exception handler that terminates the script on any exception"""
@@ -69,6 +73,7 @@ class GeneralConfig(BaseModel):
     learning_rate: float = 0.001
     patience: int = 10
     use_wandb: bool = False
+    use_sweep: bool = False
     torch_viz: bool = False
 
     use_kfold: bool = False
@@ -83,8 +88,6 @@ class _FeatureExtractionType(BaseModel):
 class FeatureExtractionConfig(BaseModel):
     """
     nested pydantic model for general run configs
-
-    runs in CnnConfig
 
     Required Keys (will not be defaulted):
         N/A
@@ -109,20 +112,8 @@ class FeatureExtractionConfig(BaseModel):
     hop_length: int = 512
     power: float = 2.0
 
-class CnnConfig(BaseModel):
-    """
-    pydantic model for general run configs
 
-    Depends on: FeatureExtractionConfig
-
-    Required Keys (will not be defaulted):
-        N/A
-    """
-    hidden_units: int = 256
-    feature_extraction_config: FeatureExtractionConfig = FeatureExtractionConfig()
-
-
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, CnnConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
 
     
 
@@ -131,12 +122,8 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         general_config = GeneralConfig(**config["general"])
         ic("GeneralConfig instance created successfully:")
 
-        feature_extraction_config = FeatureExtractionConfig(**config["cnn_config"]["feature_extraction"])
+        feature_extraction_config = FeatureExtractionConfig(**config["feature_extraction"])
         ic("FeatureExtractionConfig instance created successfully:")
-
-
-        cnn_config = CnnConfig(**config["cnn_config"], feature_extraction_config=feature_extraction_config)
-        ic("CnnConfig instance created successfully:")
 
         peft_config = get_peft_config(config) # noqa: F405
         ic("PeftConfig instance created successfully:")
@@ -148,7 +135,7 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         augmentation_config = create_augmentation_configs(config)
         ic("AugmentationConfig instance created successfully:")
 
-        return general_config, feature_extraction_config, cnn_config, peft_config, wandb_config, sweep_config, augmentation_config
+        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
     except ValidationError as e:
         ic("Validation error occurred: ")
         ic(e)
@@ -157,24 +144,30 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         ic("ValueError occurred: ")
         ic(e)
     
-
-
+def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config):
+    
+    res = {}
+    res['wandb_config'] = dict(wandb_config)
+    res['general_config'] = dict(general_config)
+    res['peft_config'] = dict(peft_config)
+    res['feature_extraction_config'] = dict(feature_extraction_config)
+    
+    return res
 
 def main():
-    with open('config.yaml', 'r') as file:
+    with open('./config.yaml', 'r') as file:
         config = yaml.safe_load(file)
 
     (
         general_config,
         feature_extraction_config,
-        cnn_config,
         peft_config,
         wandb_config,
         sweep_config,
         augmentation_config
     ) = load_configs(config)
 
-
+    ic(wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config))
 
 if __name__ == '__main__':
     main()

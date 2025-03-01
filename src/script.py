@@ -22,8 +22,7 @@ def main():
         config = yaml.safe_load(file)
     
     (general_config, 
-     feature_extraction_config, 
-     cnn_config, 
+     feature_extraction_config,  
      peft_config, 
      wandb_config,
      sweep_config, 
@@ -104,7 +103,6 @@ def main():
     model_factory = ModelFactory.get_model_factory(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
-        cnn_config=cnn_config,
         peft_config=peft_config
     )
 
@@ -128,7 +126,6 @@ def main():
     trainer = PTLTrainer(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
-        cnn_config=cnn_config,
         peft_config=peft_config,
         wandb_config=wandb_config,
         sweep_config=sweep_config,

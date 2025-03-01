@@ -14,10 +14,14 @@ class _AdapterChoice(BaseModel):
 class NoneClassifierConfig(BaseModel):
     """None classifier configuration"""
     task_type: str = "AUDIO_CLASSIFICATION"
+    class Config:
+        strict = True
 
 class NoneFullConfig(BaseModel):
     """Full configuration"""
     task_type: str = "AUDIO_CLASSIFICATION"
+    class Config:
+        strict = True
 
 class LoraConfig(BaseModel):
     """LoRA configuration"""
@@ -56,6 +60,7 @@ class OFTConfig(BaseModel):
     target_modules: List[str] = ["query", "key", "value", "dense"]
     module_dropout: float = 0.0
     init_weights: bool = True
+    task_type: str = "AUDIO_CLASSIFICATION"
     class Config:
         strict = True
 
@@ -79,7 +84,7 @@ class LayernormConfig(BaseModel):
 def get_peft_config(config: dict) -> Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]]:
 
 
-    match config["general"]["adaptor_type"]:
+    match config["general"]["adapter_type"]:
         case "lora":
             # Handle LoRA configuration
             return LoraConfig(**config["lora"])
@@ -111,7 +116,7 @@ def get_peft_config(config: dict) -> Optional[Union[LoraConfig, IA3Config, AdaLo
             return NoneFullConfig()
 
         case _:
-            raise ValueError(f"Unsupported adapter type: {config['general']['adaptor_type']}")
+            raise ValueError(f"Unsupported adapter type: {config['general']['adapter_type']}")
 
 
 def main():

@@ -32,7 +32,7 @@ from peft.utils.peft_types import TaskType
 from icecream import ic
 from transformers import PreTrainedModel
 
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, CnnConfig
+from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from ast_model import ASTModel
 
@@ -45,7 +45,6 @@ class ModelFactory:
     def create_model(
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
-        cnn_config: Optional[CnnConfig] = None,
         peft_config: Optional[Any] = None,
         device: Optional[torch.device] = None
     ) -> Tuple[nn.Module, Any]:
@@ -55,7 +54,6 @@ class ModelFactory:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
-            cnn_config: CNN configuration (optional)
             peft_config: PEFT configuration (optional)
             device: Device to put model on (optional)
             
@@ -321,7 +319,6 @@ class ModelFactory:
     def get_model_factory(
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
-        cnn_config: Optional[CnnConfig] = None,
         peft_config: Optional[Any] = None
     ) -> Callable[[torch.device], Tuple[nn.Module, Any]]:
         """
@@ -330,7 +327,6 @@ class ModelFactory:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
-            cnn_config: CNN configuration (optional)
             peft_config: PEFT configuration (optional)
             
         Returns:
@@ -340,7 +336,6 @@ class ModelFactory:
             return ModelFactory.create_model(
                 general_config=general_config,
                 feature_extraction_config=feature_extraction_config,
-                cnn_config=cnn_config,
                 peft_config=peft_config,
                 device=device
             )

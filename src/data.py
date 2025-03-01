@@ -18,7 +18,7 @@ from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, Whisp
 
 # Import Pydantic configs
 from configs.augmentation_config import AugmentationConfig
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, CnnConfig, WandbConfig, SweepConfig
+from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
 
 
 class AudioDataModule(pl.LightningDataModule):
@@ -627,7 +627,7 @@ def example_usage():
     with open('configs/config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     
-    general_config, feature_extraction_config, cnn_config, peft_config, wandb_config, sweep_config, augmentation_config = load_configs(config)
+    general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config = load_configs(config)
 
     
     # Create data module directly from configs

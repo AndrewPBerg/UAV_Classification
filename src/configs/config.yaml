@@ -1,9 +1,9 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_9
+  # data_path: /app/src/datasets/UAV_Dataset_9
   # data_path: /app/src/datasets/UAV_Dataset_31
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/static-31-augs-1-time_stretch-sin_distortion
-  # data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+  data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
   num_classes: 9
   save_dataloader: false
   model_type: resnet18
@@ -21,10 +21,11 @@ general:
   learning_rate: 0.001
   patience: 10
   use_wandb: true
+  use_sweep: false
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adaptor_type: none-classifier
+  adapter_type: lora
 
 augmentations:
   augmentations_per_sample: 1
@@ -37,16 +38,14 @@ augmentations:
   sin_distortion_max_rate: 0.7
   sin_distortion_p: 1
 
-cnn_config:
-  hidden_units: 256
-  feature_extraction:
-    type: melspectrogram
-    sampling_rate: 16000
-    n_mfcc: 40
-    n_mels: 128
-    n_fft: 1024
-    hop_length: 512
-    power: 2
+feature_extraction:
+  type: melspectrogram
+  sampling_rate: 16000
+  n_mfcc: 40
+  n_mels: 128
+  n_fft: 1024
+  hop_length: 512
+  power: 2
 
 
 lora:
@@ -110,7 +109,7 @@ layernorm:
 
 wandb:
   project: demo-plt
-  name: test-1
+  name: demo-3
   reinit: false
   notes: null
   tags: null

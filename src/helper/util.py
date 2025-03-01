@@ -25,7 +25,6 @@ from time import time as timer
 from dotenv import load_dotenv
 from configs.augmentation_config import AugmentationConfig
 
-
 def generate_model_image(model: torch.nn.Module, device:str):
     # try:
     x = torch.randn(128, 157, requires_grad=True).to(device)
