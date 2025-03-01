@@ -145,7 +145,12 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         ic(e)
     
 def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config):
+    """
+    What dis do:
+    - takes in all the configs and returns a correctly formatted
+    dictionary of all the configs for the Weights & Biases Platform.
     
+    """
     res = {}
     res['wandb_config'] = dict(wandb_config)
     res['general_config'] = dict(general_config)

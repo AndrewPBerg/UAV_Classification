@@ -1,5 +1,6 @@
 import os
 import yaml
+from configs.augmentation_config import AugmentationConfig
 import torch
 import wandb
 import numpy as np
@@ -18,7 +19,9 @@ from configs.configs_demo import (
     SweepConfig,
     wandb_config_dict
 )
+from configs.peft_config import get_peft_config
 from helper.util import wandb_login
+import sys
 
 # Set up device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -38,29 +41,6 @@ def load_config(config_path: str = 'configs/config.yaml') -> Dict[str, Any]:
     
     return config
 
-def get_mixed_params(sweep_config: Dict[str, Any], general_config: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Combine sweep configuration with general configuration.
-    
-    Args:
-        sweep_config: Sweep configuration from wandb
-        general_config: General configuration from YAML file
-        
-    Returns:
-        Combined configuration dictionary
-    """
-    mixed_params = {}
-    
-    # Add all general config parameters first
-    for key, value in general_config.items():
-        mixed_params[key] = value
-    
-    # Override with sweep config parameters
-    for key, value in sweep_config.items():
-        mixed_params[key] = value
-    
-    return mixed_params
-
 def model_pipeline(sweep_config=None):
     """
     Pipeline function for wandb sweep agent.
@@ -78,71 +58,74 @@ def model_pipeline(sweep_config=None):
         general_config_dict = yaml_config['general']
         
         # Combine sweep config with general config
-        mixed_params = get_mixed_params(dict(config), general_config_dict)
+        mixed_params = get_mixed_params(sweep_config=yaml_config['sweep'], general_config=yaml_config['general'], 
+                                        wandb_config=yaml_config['wandb'], feature_extraction_config=yaml_config['feature_extraction'],
+                                        augmentation_config=yaml_config['augmentation'])
+        
+        ic(mixed_params)
+        
+        sys.exit(0)
         
         # Create configuration objects
         general_config = GeneralConfig(
-            model_type=mixed_params.get('model_type', 'AST'),
-            num_classes=mixed_params.get('num_classes', 4),
-            epochs=mixed_params.get('epochs', 30),
-            batch_size=mixed_params.get('batch_size', 32),
-            learning_rate=mixed_params.get('learning_rate', 1e-4),
-            seed=mixed_params.get('seed', 42),
-            patience=mixed_params.get('patience', 5),
-            accumulation_steps=mixed_params.get('accumulation_steps', 1),
-            use_wandb=True,
-            save_model=True,
-            use_kfold=mixed_params.get('use_kfold', False),
-            k_folds=mixed_params.get('k_folds', 5),
-            adapter_type=mixed_params.get('adapter_type', 'lora')
+            model_type=mixed_params['model_type'],
+            num_classes=mixed_params['num_classes'],
+            epochs=mixed_params['epochs'],
+            batch_size=mixed_params['batch_size'],
+            learning_rate=mixed_params['learning_rate'],
+            seed=mixed_params['seed'],
+            patience=mixed_params['patience'],
+            accumulation_steps=mixed_params['accumulation_steps'],
+            use_wandb=mixed_params['use_wandb'],
+            save_model=mixed_params['save_model'],
+            use_kfold=mixed_params['use_kfold'],
+            k_folds=mixed_params['k_folds'],
+            adapter_type=mixed_params['adapter_type']
         )
         
         # Feature extraction config
         feature_extraction_config = FeatureExtractionConfig(
-            type=mixed_params.get('feature_type', 'melspectrogram'),
-            sampling_rate=mixed_params.get('sampling_rate', 16000),
-            n_mels=mixed_params.get('n_mels', 128),
-            n_fft=mixed_params.get('n_fft', 1024),
-            hop_length=mixed_params.get('hop_length', 512),
-            power=mixed_params.get('power', 2.0),
-            n_mfcc=mixed_params.get('n_mfcc', 40)
+            type=mixed_params['feature_type'],
+            sampling_rate=mixed_params['sampling_rate'],
+            n_mels=mixed_params['n_mels'],
+            n_fft=mixed_params['n_fft'],
+            hop_length=mixed_params['hop_length'],
+            power=mixed_params['power'],
+            n_mfcc=mixed_params['n_mfcc']
         )
+        
+        #PEFT config
+        peft_config = get_peft_config(mixed_params)
         
         # WandB config
         wandb_config = WandbConfig(
-            project=yaml_config['wandb']['project'],
+            project=mixed_params['wandb_project'],
             name=f"sweep_{wandb.run.id}",
             tags=["sweep"],
-            notes="Automated hyperparameter sweep"
+            notes="Automated hyperparameter sweep",
         )
         
-        # PEFT config (if needed)
-        peft_config = None
-        if general_config.model_type.lower() == 'ast' and general_config.adapter_type != 'none':
-            from peft import LoraConfig, TaskType
-            
-            # Example LoRA config - adjust parameters based on sweep
-            peft_config = LoraConfig(
-                task_type=TaskType.SEQ_CLS,
-                r=mixed_params.get('lora_r', 8),
-                lora_alpha=mixed_params.get('lora_alpha', 16),
-                lora_dropout=mixed_params.get('lora_dropout', 0.1),
-                target_modules=["query", "key", "value"],
-                bias="none"
-            )
+        # Sweep config
+        sweep_config = SweepConfig(
+            project=mixed_params['sweep_project'],
+            name=mixed_params['sweep_name'],
+            method=mixed_params['sweep_method'],
+            metric=mixed_params['sweep_metric'],
+            parameters=mixed_params['sweep_parameters']
+        )
+        
+        augmentation_config = AugmentationConfig(
+            augmentations=mixed_params['augmentations'],
+            augmentations_per_sample=mixed_params['augmentations_per_sample']
+        )
         
         # Create data module
         data_module = AudioDataModule(
-            data_path=mixed_params.get('data_path', 'data'),
-            batch_size=general_config.batch_size,
-            test_size=mixed_params.get('test_size', 0.2),
-            val_size=mixed_params.get('val_size', 0.2),
-            inference_size=mixed_params.get('inference_size', 0.1),
-            num_workers=mixed_params.get('num_cuda_workers', 4),
-            seed=general_config.seed,
+            general_config=general_config,
             feature_extraction_config=feature_extraction_config,
-            augmentations=mixed_params.get('augmentations', ['None']),
-            augmentations_per_sample=mixed_params.get('augmentations_per_sample', 1)
+            augmentation_config=augmentation_config,
+            wandb_config=wandb_config,
+            sweep_config=sweep_config
         )
         
         # Get model factory function
@@ -173,6 +156,75 @@ def model_pipeline(sweep_config=None):
             # Log final test metrics
             wandb.log(results)
 
+# def get_mixed_params(sweep_config: Dict[str, Any], general_config: GeneralConfig,
+#                      wandb_config: WandbConfig, feature_extraction_config: FeatureExtractionConfig,
+#                      peft_config: Optional[Any], augmentation_config: Optional[AugmentationConfig]) -> Dict[str, Any]:
+def get_mixed_params(config: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Combine sweep configuration with general configuration.
+    
+    """
+    
+    # 1. get mixed params from config file, sweeps overrides all values
+    mixed_params = {}
+    
+    # general
+    
+    # augmentations
+    
+    # feature extraction
+    
+    # wandb
+    
+    # peft (tricky cases for specific peft configs)
+    
+    """
+    pseudo code for this case
+    
+    if yaml_config['sweep'][general_config['adapter_type']: 
+    # essentially checking if this adapter is part of the sweep
+    
+    then compare the parameters from the sweep config with that adapters    
+    """
+    
+    # # Add all general config parameters first
+    # for key, value in general_config.items():
+    #     mixed_params[key] = value
+    
+    # # Override with sweep config parameters
+    # for key, value in sweep_config.items():
+    #     mixed_params[key] = value
+
+    # # Override with wandb config parameters
+    # for key, value in wandb_config.items():
+    #     mixed_params[key] = value
+
+    # # Override with feature extraction config parameters
+    # for key, value in feature_extraction_config.items():
+    #     mixed_params[key] = value
+
+    # # Override with PEFT config parameters
+    # # if peft_config:
+    # #     for key, value in peft_config.items():
+    # #         mixed_params[key] = value
+
+    # # Override with augmentation config parameters
+    # for key, value in augmentation_config.dict().items():
+    #     mixed_params[key] = value
+    
+    # return mixed_params
+
+def demo_3_1():
+    # Load general config
+    yaml_config = load_config(config_path="configs/config.yaml")
+    general_config_dict = yaml_config['general']
+    
+    # Combine sweep config with general config
+    mixed_params = get_mixed_params(yaml_config)
+    
+    ic(mixed_params)
+    
+    sys.exit(0)
 def main():
     """
     Main function to initialize and run the sweep.
@@ -206,4 +258,5 @@ def main():
     )
 
 if __name__ == "__main__":
-    main()
+    # main()
+    demo_3_1()
