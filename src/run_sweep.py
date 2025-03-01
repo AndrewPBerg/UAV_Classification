@@ -108,8 +108,14 @@ def main():
     # Check if sweeps are enabled
     if not general_config.use_sweep:
         raise ValueError("Sweeps are not enabled in the configuration. Set use_sweep=True to enable sweeps.")
+    
     # Enable wandb logging
     general_config.use_wandb = True
+    
+    # Override wandb project with sweep project if running a sweep
+    if sweep_config.project:
+        ic(f"Overriding wandb project '{wandb_config.project}' with sweep project '{sweep_config.project}'")
+        wandb_config.project = sweep_config.project
     
     # Ensure wandb is logged in
     wandb_login()
