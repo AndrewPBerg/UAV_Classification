@@ -22,6 +22,7 @@ class SweepConfig(BaseModel):
     class Config:
         strict = True
     
+    project: str # ex: "9class-Kfold-sweep"
     name: str # ex: Augmentations/sample Tuning
     method: str  # ex: random
     metric: Dict[str, str] = {"name": "test_acc", "goal": "maximize"}
