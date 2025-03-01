@@ -23,6 +23,7 @@ from sklearn.model_selection import KFold
 from icecream import ic
 from time import time as timer
 from dotenv import load_dotenv
+from configs.augmentation_config import AugmentationConfig
 
 
 def generate_model_image(model: torch.nn.Module, device:str):
@@ -104,7 +105,7 @@ class AudioDataset(Dataset):
                  augmentations_per_sample: int = 0,
                  augmentations: list[str] = [],
                  num_channels: int = 1,
-                 config: dict = None) -> Dataset:
+                 config: Optional[dict] = None) -> None:
         self.paths = data_paths
         self.feature_extractor = feature_extractor
         self.classes, self.class_to_idx = find_classes(data_path)
@@ -125,14 +126,16 @@ class AudioDataset(Dataset):
         self.target_duration = target_duration
         self.target_length = target_duration * self.target_sr
         self.augmentations_per_sample = augmentations_per_sample
-        self.config = config
+        self.config = config or {}
 
         total_samples = (augmentations_per_sample + 1) * len(self.paths)
         self.audio_tensors = torch.empty(total_samples, num_channels, self.target_sr * target_duration)
         self.class_indices = []
 
-        if self.augmentations_per_sample > 0:
+        if self.augmentations_per_sample > 0 and augmentations:
             self.composed_transform = create_augmentation_pipeline(augmentations, self.config)
+        else:
+            self.composed_transform = None
 
         # Load original audio samples
         for index, path in enumerate(self.paths):
@@ -385,8 +388,8 @@ def train_test_split_custom(
     inference_size: float = 0.1,
     seed: int = 42, 
     augmentations_per_sample: int = 3,
-    augmentations: list[str] = None,
-    config: dict = None
+    augmentations: Optional[list[str]] = None,
+    config: Optional[AugmentationConfig] = None
 ):
     def split_dataset(data, val_size, test_size, inference_size, random_state=None):
         train_size = 1.0 - (val_size + test_size + inference_size)
@@ -422,24 +425,26 @@ def train_test_split_custom(
     test_paths = [all_paths[i] for i in test_indices]
     inference_paths = [all_paths[i] for i in inference_indices]
 
-
-    # Create AudioDataset instances
+    # Create AudioDataset instances with proper config handling
+    augmentations = augmentations or []
+    config_dict = config.aug_configs if isinstance(config, AugmentationConfig) else {}
+    
     train_dataset = AudioDataset(data_path,
-                                 train_paths,
-                                 feature_extractor,
-                                 augmentations_per_sample=augmentations_per_sample,
-                                 augmentations=augmentations,
-                                 config=config)
+                                train_paths,
+                                feature_extractor,
+                                augmentations_per_sample=augmentations_per_sample,
+                                augmentations=augmentations,
+                                config=config_dict)
     
     val_dataset = AudioDataset(data_path, 
                                val_paths, 
                                feature_extractor,
                                augmentations_per_sample=augmentations_per_sample,
                                augmentations=augmentations,
-                               config=config)
+                               config=config_dict)
     
-    test_dataset = AudioDataset(data_path, test_paths, feature_extractor, config=config)
-    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
+    test_dataset = AudioDataset(data_path, test_paths, feature_extractor, config=config_dict)
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config_dict)
     
     print(f"Lengths: Train: {len(train_dataset)}, Validation: {len(val_dataset)}, "
           f"Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
@@ -487,8 +492,8 @@ def k_fold_split_custom(
     inference_size: float = 0.1,
     seed: int = 42,
     augmentations_per_sample: int = 3,
-    augmentations: list[str] = None,
-    config: dict = None
+    augmentations: Optional[list[str]] = None,
+    config: Optional[AugmentationConfig] = None
 ) -> list[tuple]:
     """
     Creates k-fold splits of the dataset for cross validation.
@@ -530,14 +535,14 @@ def k_fold_split_custom(
             feature_extractor,
             augmentations_per_sample=augmentations_per_sample,
             augmentations=augmentations,
-            config=config
+            config=config.aug_configs if isinstance(config, AugmentationConfig) else {}
         )
         
         val_dataset = AudioDataset(
             data_path,
             fold_val_paths,
             feature_extractor,
-            config=config
+            config=config.aug_configs if isinstance(config, AugmentationConfig) else {}
         )
         
         fold_datasets.append((train_dataset, val_dataset))
@@ -545,11 +550,15 @@ def k_fold_split_custom(
     
     # Create inference dataset
     inference_paths = [all_paths[i] for i in inference_indices]
-    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config)
+    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config.aug_configs if isinstance(config, AugmentationConfig) else {})
     
     end_time = timer()  # End timer for dataset initialization
     dataset_init_time = end_time - start_time
     print(f"Dataset initialization took {dataset_init_time:.2f} seconds")
+    
+    # Handle config properly
+    augmentations = augmentations or []
+    config_dict = config.aug_configs if isinstance(config, AugmentationConfig) else {}
     
     return fold_datasets, inference_dataset
 

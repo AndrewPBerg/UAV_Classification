@@ -1,8 +1,9 @@
 general:
+  data_path: /app/src/datasets/UAV_Dataset_9
   # data_path: /app/src/datasets/UAV_Dataset_31
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/static-31-augs-1-time_stretch-sin_distortion
-  data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+  # data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
   num_classes: 9
   save_dataloader: false
   model_type: resnet18
@@ -108,14 +109,14 @@ layernorm:
 
 
 wandb:
-  project: 9class-Kfold-Results
-  name: CNN-0augs-LR=0.001
+  project: demo-plt
+  name: test-1
   reinit: false
   notes: null
   tags: null
   dir: wandb
 sweep:
-  name: Augmentations/sample Tuning
+  name: demo-plt/Sweep
   method: random
   metric:
     name: test_acc
