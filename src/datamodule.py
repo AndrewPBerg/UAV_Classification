@@ -488,15 +488,16 @@ class AudioDataModule(pl.LightningDataModule):
         
         # Use default path if none provided
         if base_path is None:
-            # base_path = '/app/src/datasets/static/' # TODO change for server dev
-            base_path = '/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/'
+            base_path = '/app/src/datasets'
+            # base_path = self.data_path
             
         
-        # Create a distinct name based on configuration
-        distinct_name = f"static-{self.num_classes}-augs-{self.augmentation_config.augmentations_per_sample}"
+        # Create a distinct name based on configuration 
+        distinct_name = f"/static/{self.num_classes}-augs-{self.augmentation_config.augmentations_per_sample}"
         
         # Add augmentations to the path string
-        save_path = f"{base_path}{distinct_name}"
+        save_path = os.path.join(base_path, distinct_name.lstrip('/'))
+
         for aug in self.augmentation_config.augmentations:
             save_path += f"-{aug.replace(' ', '-')}"  # Remove white space from the string
             
