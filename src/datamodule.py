@@ -116,6 +116,11 @@ class AudioDataModule(pl.LightningDataModule):
         Prepare data for training.
         This method is called only once and on 1 GPU.
         """
+        # Skip file checking for static datasets
+        if "static" in self.data_path:
+            return
+        
+        
         # Check if data path exists
         if not os.path.exists(self.data_path):
             raise FileNotFoundError(f"Data path {self.data_path} does not exist")
@@ -612,7 +617,31 @@ class AudioDataModule(pl.LightningDataModule):
             test_samples = getattr(test_loader.dataset, "__len__", lambda: "unknown")()
             inference_samples = getattr(inference_loader.dataset, "__len__", lambda: "unknown")()
             augmentations_per_sample = train_loader.dataset.augmentations_per_sample  # Accessing instance variable
+            
+            # Sanity Data check
+            
+            # Comprehensive sanity checks for train data
+            # Check if datasets exist and have proper length
+            if train_samples <= 0:
+                raise ValueError("Train dataset is empty")
+            if train_samples < val_samples:
+                raise ValueError("Train dataset is smaller than validation dataset")
+            if not isinstance(train_samples, int):
+                raise ValueError("Train samples count is not an integer")
+                
+            # Check if we can actually get a batch of data
+            try:
+                batch = next(iter(train_loader))
+                if not isinstance(batch, (tuple, list)) or len(batch) != 2:
+                    raise ValueError("Training batch should contain (data, labels)")
+                if not torch.is_tensor(batch[0]) or not torch.is_tensor(batch[1]):
+                    raise ValueError("Both data and labels should be torch tensors")
+                if batch[0].dim() < 2:  # At least [batch_size, features]
+                    raise ValueError("Input tensor has incorrect dimensions")
+            except Exception as e:
+                raise ValueError(f"Failed to load a batch from train_loader: {str(e)}")
 
+            ic("Sanity check Passed \n\n")
             ic(f"Train loader samples: {train_samples}")
             ic(f"Val loader samples: {val_samples}")
             ic(f"Test loader samples: {test_samples}")
