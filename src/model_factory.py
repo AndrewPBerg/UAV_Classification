@@ -60,6 +60,9 @@ class ModelFactory:
         Returns:
             Tuple of (model, feature_extractor)
         """
+        
+        torch.hub.set_dir('/app/src/model_cache')  # Set custom cache directory
+        
         model_type = general_config.model_type.lower()
         num_classes = general_config.num_classes
         
