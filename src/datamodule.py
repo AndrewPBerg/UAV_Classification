@@ -562,7 +562,7 @@ class AudioDataModule(pl.LightningDataModule):
             raise NotImplementedError("K-fold saving is not supported. Loaders will not be saved.")
             
         ic(f"Saved the dataloaders to: {save_path}")
-        sys.exit() # TODO decide if this is needed
+        sys.exit(0)
         # return save_path
         
     def load_dataloaders(self, path: str):
