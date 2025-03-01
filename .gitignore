@@ -3,7 +3,9 @@ wandb/
 saved_models/
 .vscode
 .datasets/
+.dataset/
 datasets/
+dataset/
 *output/
 */output/
 server_login.txt
@@ -12,8 +14,7 @@ model_cache/
 instructions.md
 .cursor
 .cursorrules
-lightning_logs/
-checkpoints/
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
