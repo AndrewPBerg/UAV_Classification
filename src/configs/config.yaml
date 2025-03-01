@@ -21,7 +21,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 10
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
@@ -109,8 +109,8 @@ layernorm:
 
 
 wandb:
-  project: demo-plt
-  name: demo-3
+  project: demo-kfold
+  name: demo-1
   reinit: false
   notes: null
   tags: null
