@@ -485,7 +485,7 @@ class AudioDataModule(pl.LightningDataModule):
         # Use default path if none provided
         if base_path is None:
             # base_path = '/app/src/datasets/static/' # TODO change for server dev
-            base_path = '/Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/'
+            base_path = self.data_path
             
         
         # Create a distinct name based on configuration
@@ -558,7 +558,7 @@ class AudioDataModule(pl.LightningDataModule):
             raise NotImplementedError("K-fold saving is not supported. Loaders will not be saved.")
             
         ic(f"Saved the dataloaders to: {save_path}")
-        sys.exit() # TODO decide if this is needed
+        sys.exit(0) # TODO decide if this is needed
         # return save_path
         
     def load_dataloaders(self, path: str):

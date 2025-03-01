@@ -1,7 +1,8 @@
 from configs.configs_demo import load_configs
 import yaml
-from srcnew.datamodule import AudioDataModule
+from datamodule import AudioDataModule
 from icecream import ic
+import torch
 
 
 
