@@ -1,9 +1,34 @@
+import os
+import torch
+import sys
+from icecream import ic
+
+# Print GPU information
+num_gpus = torch.cuda.device_count()
+print("-" * 50)
+print(f"PyTorch version: {torch.__version__}")
+print(f"CUDA available: {torch.cuda.is_available()}")
+print(f"Number of GPUs: {num_gpus}")
+if num_gpus > 0:
+    for i in range(num_gpus):
+        print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
+print(f"Using DDP strategy: {num_gpus > 1}")
+print("-" * 50)
+
+# Import the rest of the modules
+from ptl_trainer import PTLTrainer
+from datamodule import AudioDataModule
+from model_factory import ModelFactory
+from configs.configs_demo import (
+    load_configs,
+)
+
+from helper.util import wandb_login
+
 from script import main as script_main
 from sweeps import main as sweep_main
 import yaml
 from typing import Any
-from icecream import ic
-import sys
 from helper.teleBot import send_message
 
 def change_config_value(file_path: str, key: str, value: Any) -> None:

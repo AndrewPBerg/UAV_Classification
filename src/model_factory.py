@@ -54,8 +54,8 @@ class ModelFactory:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
-            peft_config: PEFT configuration (optional)
-            device: Device to put model on (optional)
+            peft_config: PEFT configuration
+            device: Device to move model to (no longer used with PyTorch Lightning)
             
         Returns:
             Tuple of (model, feature_extractor)
@@ -78,13 +78,14 @@ class ModelFactory:
         # Create model based on type
         if model_type == "ast":
             # Use the new ASTModel class
-            model, processor, _ = ASTModel.create_model(
+            model, _, _ = ASTModel.create_model(
                 num_classes=num_classes,
                 adapter_type=general_config.adapter_type,
                 peft_config=peft_config,
-                device=device
+                model_name=general_config.ast_model_name,
+                device=None  # Let PyTorch Lightning handle device placement
             )
-            return model, processor
+            return model, feature_extractor
         elif model_type.startswith("vit"):
             model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
         elif model_type.startswith("resnet"):
@@ -96,16 +97,16 @@ class ModelFactory:
         else:
             raise ValueError(f"Unsupported model type: {model_type}")
         
-        # Apply PEFT if provided - only for AST models which are PreTrainedModels
+        # Set up PEFT if requested and supported by model
         # Other models don't support PEFT directly
         if peft_config is not None and not isinstance(peft_config, str) and model_type == "ast":
             model = get_peft_model(model, peft_config)
             if hasattr(model, "print_trainable_parameters"):
                 model.print_trainable_parameters()
         
-        # Move model to device if provided
-        if device is not None and model is not None:
-            model = model.to(device)
+        # Don't move model to device - PyTorch Lightning will handle this
+        # Remove: if device is not None and model is not None:
+        #     model = model.to(device)
         
         return model, feature_extractor
     
