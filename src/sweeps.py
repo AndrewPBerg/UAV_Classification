@@ -70,6 +70,9 @@ def model_pipeline(sweep_config=None):
         sweep_config,
         augmentation_config
          ) = load_configs(mixed_params)
+        ic(wandb_config)
+        ic(sweep_config)
+        # sys.exit(0)
         # Create configuration objects
         # general_config = GeneralConfig(
         #     **mixed_params
@@ -147,10 +150,15 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     mixed_params.update(general_config['wandb'])
     # sweep
     mixed_params.update(general_config['sweep'])
-    
+    # ic(mixed_params.get('project'))
+    # ic(mixed_params.get('name'))
     # sweep project and name
     mixed_params['project'] = general_config['sweep']['project']
     mixed_params['name'] = general_config['sweep']['name']
+    # ic(mixed_params.get('project'))
+    # ic(mixed_params.get('name'))
+    
+    # sys.exit(0)
     
     # peft (tricky cases for specific peft general_configs)
     # ic("params before sweep", mixed_params)
@@ -167,7 +175,7 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     mixed_params.update(general_config[peft_name])
     mixed_params.update(sweep_config)
     
-    ic("after sweep mixing", mixed_params)
+    # ic("after sweep mixing", mixed_params)
 
     # sys.exit(0)
     
@@ -195,7 +203,7 @@ def main():
     # Initialize sweep
     sweep_id = wandb.sweep(
         sweep_config,
-        project=config['wandb']['project']
+        project=config['sweep']['project']
     )
     
     # Run sweep agent
