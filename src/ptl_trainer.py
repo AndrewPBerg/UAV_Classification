@@ -40,8 +40,8 @@ class PTLTrainer:
             peft_config: PEFT configuration
             wandb_config: WandB configuration
             sweep_config: Sweep configuration
-            data_module: AudioDataModule instance
-            model_factory: Function that creates a model instance
+            data_module: Audio data module
+            model_factory: Model factory function
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -51,27 +51,31 @@ class PTLTrainer:
         self.data_module = data_module
         self.model_factory = model_factory
         
-        # Set up device
+        # Determine device strategy based on available resources
+        self.num_gpus = torch.cuda.device_count()
+        self.strategy = 'ddp' if self.num_gpus > 1 else None
+        print(f"Available GPUs: {self.num_gpus}, using strategy: {self.strategy or 'default'}")
+        
+        # Set up wandb logger
+        self.wandb_logger = None
+        if self.general_config.use_wandb:
+            wandb_login()
+            self.wandb_logger = WandbLogger(
+                project=self.wandb_config.project,
+                name=self.wandb_config.name,
+                tags=self.wandb_config.tags if self.wandb_config.tags else [],
+                notes=self.wandb_config.notes,
+                log_model=True,
+                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
+            )
+        
+        # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
         # Set random seeds for reproducibility
         torch.manual_seed(general_config.seed)
         torch.cuda.manual_seed(general_config.seed)
         np.random.seed(general_config.seed)
-        
-        # Initialize WandB if enabled
-        self.wandb_logger = None
-        if general_config.use_wandb:
-            wandb_login()
-            ic("successfully logged in to wandb")
-            self.wandb_logger = WandbLogger(
-                project=wandb_config.project,
-                name=wandb_config.name,
-                tags=wandb_config.tags if wandb_config.tags else [],
-                notes=wandb_config.notes,
-                log_model=True,
-                config=wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config)
-            )
     
     def _get_callbacks(self) -> List[pl.Callback]:
         """
@@ -142,8 +146,9 @@ class PTLTrainer:
         # Create trainer
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
-            accelerator="auto",
-            devices=1,  # Always use 1 device (either 1 GPU or 1 CPU)
+            accelerator="gpu" if torch.cuda.is_available() else "cpu",
+            devices=self.num_gpus if self.num_gpus > 0 else 1,
+            strategy=self.strategy,
             callbacks=self._get_callbacks(),
             logger=self.wandb_logger,
             gradient_clip_val=1.0,
@@ -275,10 +280,11 @@ class PTLTrainer:
             # Create trainer for this fold
             trainer = pl.Trainer(
                 max_epochs=self.general_config.epochs,
-                accelerator="auto",
-                devices=1,  # Always use 1 device (either 1 GPU or 1 CPU)
+                accelerator="gpu" if torch.cuda.is_available() else "cpu",
+                devices=self.num_gpus if self.num_gpus > 0 else 1,
+                strategy=self.strategy,
                 callbacks=fold_callbacks,
-                logger=self.wandb_logger,  # Use the same logger for all folds
+                logger=self.wandb_logger,
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,

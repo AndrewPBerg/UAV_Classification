@@ -14,6 +14,7 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
+      - CUDA_VISIBLE_DEVICES=all  # Ensure all GPUs are visible
 
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
@@ -37,6 +38,7 @@ services:
     user: root
     networks:
       - app_network
+    shm_size: 8gb  # Add shared memory size for DDP communication
 
 volumes:
   datasets:

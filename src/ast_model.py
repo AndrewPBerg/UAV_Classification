@@ -39,71 +39,55 @@ class ASTModel:
         device: Optional[torch.device] = None
     ) -> Tuple[nn.Module, Any, Dict[str, Any]]:
         """
-        Create an AST model with the specified configuration.
+        Create an AST model with or without adapter.
         
         Args:
-            num_classes: Number of output classes
-            adapter_type: Type of adapter to use ('none', 'none-classifier', 'none-full', 'lora', etc.)
-            peft_config: Configuration for PEFT methods
-            model_name: Name of the pretrained model to use
-            device: Device to put the model on
+            num_classes: Number of classes
+            adapter_type: Type of adapter to use
+            peft_config: PEFT configuration
+            model_name: Name of the AST model to use
+            device: Device to put model on (no longer used with PyTorch Lightning)
             
         Returns:
             Tuple of (model, processor, adapter_config)
         """
-        # Create base model and processor
+        print(f"Creating AST model with {num_classes} classes, adapter_type: {adapter_type}")
+        
+        # Load base model and processor
         model = ASTModel._load_base_model(model_name)
         processor = ASTModel._load_processor(model_name)
         
         if model is None or processor is None:
-            raise ValueError("Failed to load AST model or processor")
+            raise ValueError(f"Failed to load AST model or processor for {model_name}")
         
         # Set number of classes
-        model.config.num_labels = num_classes
+        if hasattr(model.config, "num_labels"):
+            model.config.num_labels = num_classes
+        elif hasattr(model, "classifier") and hasattr(model.classifier, "out_features"):
+            in_features = model.classifier.in_features
+            model.classifier = nn.Linear(in_features=in_features, out_features=num_classes)
         
-        # Configure model based on adapter type
-        adapter_config = {}
+        # Default empty adapter config
+        adapter_config = {"type": "none"}
         
-        if adapter_type == "none-classifier":
-            # Freeze all parameters except classifier
-            for param in model.parameters():
-                param.requires_grad = False
-            for param in model.classifier.parameters():
-                param.requires_grad = True
-                
-            # Replace classifier
-            in_features = model.classifier.dense.in_features
-            model.classifier.dense = nn.Linear(in_features, num_classes)
+        # Handle PEFT if requested
+        if adapter_type != "none" and peft_config is not None:
+            adapter_config = peft_config
+            print(f"Using adapter_type: {adapter_type}")
             
-        elif adapter_type == "none-full":
-            # Train all parameters
-            for param in model.parameters():
-                param.requires_grad = True
-                
-            # Replace classifier
-            in_features = model.classifier.dense.in_features
-            model.classifier.dense = nn.Linear(in_features, num_classes)
-            
-        elif adapter_type != "none":
-            # Apply PEFT adapter
-            if peft_config is None:
-                raise ValueError(f"PEFT config is required for adapter type: {adapter_type}")
-                
-            # Replace classifier first
-            in_features = model.classifier.dense.in_features
-            model.classifier.dense = nn.Linear(in_features, num_classes)
-            
-            # Create and apply PEFT adapter
-            adapter_config = ASTModel._create_peft_config(adapter_type, peft_config)
-            model = get_peft_model(model, adapter_config)
+            # Create PEFT config
+            peft_config_obj = ASTModel._create_peft_config(adapter_type, peft_config)
+            if peft_config_obj is not None:
+                model = get_peft_model(model, peft_config_obj)
+                adapter_config["type"] = adapter_type
             
             # Print trainable parameters
             if hasattr(model, "print_trainable_parameters"):
                 model.print_trainable_parameters()
         
-        # Move model to device if specified
-        if device is not None and model is not None:
-            model = model.to(device)
+        # Don't move model to device - PyTorch Lightning will handle this
+        # Remove: if device is not None and model is not None:
+        #     model = model.to(device)
             
         return model, processor, adapter_config
     

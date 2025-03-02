@@ -25,9 +25,11 @@ from time import time as timer
 from dotenv import load_dotenv
 from configs.augmentation_config import AugmentationConfig
 
-def generate_model_image(model: torch.nn.Module, device:str):
-    # try:
-    x = torch.randn(128, 157, requires_grad=True).to(device)
+def generate_model_image(model: torch.nn.Module, device=None):
+    # Create a random input tensor
+    # Note: We removed the explicit .to(device) to let PyTorch Lightning handle device placement
+    # The model will be on the correct device when called
+    x = torch.randn(128, 157, requires_grad=True)
     x = x.float()
     x = x.unsqueeze(0)
     
@@ -40,11 +42,7 @@ def generate_model_image(model: torch.nn.Module, device:str):
 
     dot = make_dot(y_pred.mean(), params=dict(model.named_parameters()), show_attrs=True, show_saved=True)
     dot.render("images/model_graph", format="svg")  # Save the visualization as PNG
-    # except:
-    #     ic(f"exception e")
-    #     pass
         
-    
 
 def count_parameters(model):
     total_params = sum(p.numel() for p in model.parameters())
