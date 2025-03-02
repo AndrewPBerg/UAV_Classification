@@ -1,8 +1,5 @@
-import os
 import yaml
-from configs.augmentation_config import AugmentationConfig
 import torch
-import json
 import wandb
 import numpy as np
 from pathlib import Path
@@ -14,15 +11,10 @@ from ptl_trainer import PTLTrainer
 from datamodule import AudioDataModule
 from model_factory import ModelFactory
 from configs.configs_demo import (
-    GeneralConfig, 
-    FeatureExtractionConfig,
     load_configs,
-    wandb_config_dict
 )
-from configs.peft_config import get_peft_config
-from configs.wandb_config import get_wandb_config
+
 from helper.util import wandb_login
-import sys
 
 # Set up device
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
