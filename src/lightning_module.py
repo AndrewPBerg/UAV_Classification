@@ -91,6 +91,11 @@ class AudioClassifier(pl.LightningModule):
         """Training step."""
         x, y = batch
         
+        # Validate target labels to ensure they are within range
+        if torch.any(y < 0) or torch.any(y >= self.num_classes):
+            invalid_labels = y[(y < 0) | (y >= self.num_classes)]
+            raise ValueError(f"Invalid target labels found: {invalid_labels.tolist()}. Labels must be in range [0, {self.num_classes-1}]")
+        
         # Forward pass
         y_pred = self(x)
         
@@ -119,6 +124,11 @@ class AudioClassifier(pl.LightningModule):
         """Validation step."""
         x, y = batch
         
+        # Validate target labels to ensure they are within range
+        if torch.any(y < 0) or torch.any(y >= self.num_classes):
+            invalid_labels = y[(y < 0) | (y >= self.num_classes)]
+            raise ValueError(f"Invalid target labels found: {invalid_labels.tolist()}. Labels must be in range [0, {self.num_classes-1}]")
+        
         # Forward pass
         y_pred = self(x)
         
@@ -146,6 +156,11 @@ class AudioClassifier(pl.LightningModule):
     def test_step(self, batch, batch_idx):
         """Test step."""
         x, y = batch
+        
+        # Validate target labels to ensure they are within range
+        if torch.any(y < 0) or torch.any(y >= self.num_classes):
+            invalid_labels = y[(y < 0) | (y >= self.num_classes)]
+            raise ValueError(f"Invalid target labels found: {invalid_labels.tolist()}. Labels must be in range [0, {self.num_classes-1}]")
         
         # Forward pass
         y_pred = self(x)

@@ -120,6 +120,17 @@ class PTLTrainer:
         # Create model
         model, feature_extractor = self.model_factory(self.device)
         
+        # Ensure data module is set up
+        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes is None:
+            self.data_module.setup()
+            
+        # Validate number of classes
+        if self.data_module.num_classes <= 0:
+            raise ValueError(f"Invalid number of classes: {self.data_module.num_classes}. Must be positive.")
+            
+        # Log number of classes for debugging
+        print(f"Number of classes in data module: {self.data_module.num_classes}")
+        
         # Create Lightning module
         lightning_module = AudioClassifier(
             model=model,
@@ -142,16 +153,36 @@ class PTLTrainer:
         )
         
         # Train model
-        trainer.fit(
-            model=lightning_module,
-            datamodule=self.data_module
-        )
+        try:
+            trainer.fit(
+                model=lightning_module,
+                datamodule=self.data_module
+            )
+        except Exception as e:
+            print(f"Error during training: {str(e)}")
+            # Check if this is a CUDA assertion error related to class labels
+            if "nll_loss_forward" in str(e) and "Assertion `t >= 0 && t < n_classes`" in str(e):
+                print("\nERROR: Invalid class labels detected in your dataset.")
+                print(f"The model expects labels in range [0, {self.data_module.num_classes-1}], but found labels outside this range.")
+                print("Please check your dataset preprocessing and ensure all labels are correctly mapped.")
+                return {"error": "Invalid class labels in dataset"}
+            raise  # Re-raise the exception if it's not the specific error we're handling
         
         # Test model
-        test_results = trainer.test(
-            model=lightning_module,
-            datamodule=self.data_module
-        )
+        try:
+            test_results = trainer.test(
+                model=lightning_module,
+                datamodule=self.data_module
+            )
+        except Exception as e:
+            print(f"Error during testing: {str(e)}")
+            # Check if this is a CUDA assertion error related to class labels
+            if "nll_loss_forward" in str(e) and "Assertion `t >= 0 && t < n_classes`" in str(e):
+                print("\nERROR: Invalid class labels detected in your test dataset.")
+                print(f"The model expects labels in range [0, {self.data_module.num_classes-1}], but found labels outside this range.")
+                print("Please check your dataset preprocessing and ensure all labels are correctly mapped.")
+                return {"error": "Invalid class labels in test dataset"}
+            raise  # Re-raise the exception if it's not the specific error we're handling
         
         # Save model if enabled
         if self.general_config.save_model:

@@ -160,7 +160,7 @@ def main():
             
         else:
             ic("Starting regular training")
-            model, test_results = trainer.train()
+            test_results = trainer.train()
             
             # Print test results
             print("\nTest Results:")
@@ -178,7 +178,6 @@ def main():
         sys.exit(1)
     
     print("\nTraining completed successfully!")
-    sys.exit(0)
 
 
 if __name__ == "__main__":
