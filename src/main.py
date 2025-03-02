@@ -135,22 +135,28 @@ def main():
 
     run_count = 0
     # Process valid runs
-    for run in oc.get('runs'):
-        
-        id, changes, type = run.get('id'), run.get('changes'), run.get('type')
-        
-        ic(f'{id}: applying changes to config.yaml...')
-        alter(changes, 'configs/config.yaml')
+    try:
+        for run in oc.get('runs'):
+            
+            id, changes, type = run.get('id'), run.get('changes'), run.get('type')
+            
+            ic(f'{id}: applying changes to config.yaml...')
+            alter(changes, 'configs/config.yaml')
 
-        if type == 'script':
-            ic(f'{id}: running script...')
-            script_main()
+            if type == 'script':
+                ic(f'{id}: running script...')
+                script_main()
 
-        else:
-            ic(f'{id}: running sweep...')
-            sweep_main()
-    
-        run_count += 1
+            else:
+                ic(f'{id}: running sweep...')
+                sweep_main()
+        
+            run_count += 1
+    except Exception as e:
+        ic('Error occurred during orchestration:', e)
+        if oc.get('SEND_MESSAGE'):
+                send_message(f'Your Symphony has failed @ run number: {run_count}.\n\n Traceback: {e}')
+            
     if oc.get('SEND_MESSAGE'):
         send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
         
