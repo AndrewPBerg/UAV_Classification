@@ -1,6 +1,6 @@
 general:
   data_path: /app/src/datasets/UAV_Dataset_31
-  num_classes: 9
+  num_classes: 31
   save_dataloader: false
   model_type: resnet34
   batch_size: 32

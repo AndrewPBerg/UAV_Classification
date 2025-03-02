@@ -24,6 +24,7 @@ runs:
         use_wandb: false
         model_type: resnet34
         data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
 
  
 
