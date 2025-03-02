@@ -2,6 +2,7 @@ import os
 import yaml
 from configs.augmentation_config import AugmentationConfig
 import torch
+import json
 import wandb
 import numpy as np
 from pathlib import Path
@@ -58,6 +59,14 @@ def model_pipeline(sweep_config=None):
 
         # Combine sweep config with general config
         mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
+        
+        # mixed_params_table = wandb.Table(data=[mixed_params])
+        # broken code for adding the mixed params to a wandb table
+        # columns = [f"col_{i}" for i in range(54)]
+        # mixed_params_table = wandb.Table(data=[mixed_params], columns=columns)
+        
+        # # Update wandb config with the mixed parameters
+        # wandb.log({"mixed_params_table": mixed_params_table})
 
         # load into pydantic models w/ load_configs()
         (
@@ -68,7 +77,7 @@ def model_pipeline(sweep_config=None):
         sweep_config,
         augmentation_config
          ) = load_configs(mixed_params)
-
+        
         # Create data module
         data_module = AudioDataModule(
             general_config=general_config,
@@ -102,7 +111,7 @@ def model_pipeline(sweep_config=None):
             # Log results summary
             wandb.log(results["avg_metrics"])
         else:
-            model, results = trainer.train()
+            results = trainer.train()
             # Log final test metrics
             wandb.log(results)
 
