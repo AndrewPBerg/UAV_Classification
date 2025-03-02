@@ -58,10 +58,8 @@ def model_pipeline(sweep_config=None):
 
         # Combine sweep config with general config
         mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
-        
-        # ic(mixed_params)
-        
-        # sys.exit(0)
+
+        # load into pydantic models w/ load_configs()
         (
         general_config,
         feature_extraction_config,
@@ -70,30 +68,7 @@ def model_pipeline(sweep_config=None):
         sweep_config,
         augmentation_config
          ) = load_configs(mixed_params)
-        ic(wandb_config)
-        ic(sweep_config)
-        # sys.exit(0)
-        # Create configuration objects
-        # general_config = GeneralConfig(
-        #     **mixed_params
-        # )
-        
-        # # Feature extraction config
-        # feature_extraction_config = FeatureExtractionConfig(
-        #     **mixed_params
-        # )
-        
-        # #PEFT config
-        # peft_config = get_peft_config(mixed_params)
-        
-        
-        # wandb_config, sweep_config = get_wandb_config(mixed_params)
-        
-        
-        # augmentation_config = AugmentationConfig(
-        #     **mixed_params
-        # )
-        
+
         # Create data module
         data_module = AudioDataModule(
             general_config=general_config,
@@ -136,8 +111,7 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     Combine sweep configuration with general configuration.
     
     """
-    ic(sweep_config)
-    # 1. get mixed params from config file, sweeps overrides all values
+
     mixed_params = {}
     
     # general
@@ -150,34 +124,20 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     mixed_params.update(general_config['wandb'])
     # sweep
     mixed_params.update(general_config['sweep'])
-    # ic(mixed_params.get('project'))
-    # ic(mixed_params.get('name'))
-    # sweep project and name
+
+    # sweep project and name (this isn't needed, but for my peace of mind)
     mixed_params['project'] = general_config['sweep']['project']
     mixed_params['name'] = general_config['sweep']['name']
-    # ic(mixed_params.get('project'))
-    # ic(mixed_params.get('name'))
-    
-    # sys.exit(0)
-    
-    # peft (tricky cases for specific peft general_configs)
-    # ic("params before sweep", mixed_params)
     
     try: 
         peft_name = str(sweep_config['adapter_type'])
     except KeyError as e:
         ic("the adapter type is not included in the sweep config, defaulting to general config's: ", e)
-        peft_name = str(general_config['general']['adapter_type'])
-    
-    # ic(peft_name)
-    
+        peft_name = str(general_config['general']['adapter_type']) 
    
+    # finally update the mixed_params with the correct peft config(sweep agnostic)
     mixed_params.update(general_config[peft_name])
     mixed_params.update(sweep_config)
-    
-    # ic("after sweep mixing", mixed_params)
-
-    # sys.exit(0)
     
     return mixed_params
 
@@ -215,4 +175,4 @@ def main():
 
 if __name__ == "__main__":
     main()
-    #demo_3_1()
+    

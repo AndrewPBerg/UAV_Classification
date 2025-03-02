@@ -124,27 +124,30 @@ wandb:
 
   
 sweep:
-  project: demo-sweep132123
-  name: demo-plt/Sweep123123
+  project: edge-case-demo
+  name: test1
   method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    # seed:
-    #   values:
-    #   - 42
-    #   - 43
-    #   - 44
-    #   - 45
-    #   - 46
-    # learning_rate:
-    #   values:
-    #   - 0.001
-    #   - 0.002
-    #   - 0.003
-    #   - 0.004
-
+    seed:
+      values:
+      - 42
+      - 43
+      - 44
+      - 45
+      - 46
+    learning_rate:
+      values:
+      - 0.001
+      - 0.002
+      - 0.003
+      - 0.004
+    augmentations:
+      values:
+      - [sin_distortion]
+      - [time_stretch]
     r:
       values:
       - 1000
@@ -156,4 +159,3 @@ sweep:
       values:
       - lora
 
-      # how can I handle nested lists?
