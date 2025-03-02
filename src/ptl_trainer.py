@@ -110,12 +110,12 @@ class PTLTrainer:
         
         return callbacks
     
-    def train(self) -> Tuple[AudioClassifier, Dict[str, Any]]:
+    def train(self) -> Dict[str, Any]:
         """
         Train the model using PyTorch Lightning.
         
         Returns:
-            Tuple of (trained model, training results)
+            Dictionary of training results
         """
         # Create model
         model, feature_extractor = self.model_factory(self.device)
@@ -163,7 +163,11 @@ class PTLTrainer:
         # Ensure the return type is Dict[str, Any]
         results_dict: Dict[str, Any] = {} if not test_results else dict(test_results[0])
         
-        return lightning_module, results_dict
+        # Add any additional metrics you want to track
+        if hasattr(lightning_module, 'best_val_accuracy'):
+            results_dict['best_val_accuracy'] = lightning_module.best_val_accuracy
+        
+        return results_dict
     
     def k_fold_cross_validation(self) -> Dict[str, Any]:
         """

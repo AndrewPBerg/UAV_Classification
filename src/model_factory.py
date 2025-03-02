@@ -60,9 +60,15 @@ class ModelFactory:
         Returns:
             Tuple of (model, feature_extractor)
         """
+        # # Set a custom directory for PyTorch to cache downloaded models based on the operating system
+        # if os.name == 'linux':  # Specifically for Linux
+        #     torch.hub.set_dir('/app/src/model_cache/linux')  # Set custom cache directory for Linux
+        # elif os.name == 'posix':  # This includes macOS
+        #     torch.hub.set_dir('/app/src/model_cache/mac')  # Set custom cache directory for macOS
+        # else:
+        #     torch.hub.set_dir('C:/app/src/model_cache')  # Set custom cache directory for Windows
         
-        torch.hub.set_dir('/app/src/model_cache')  # Set custom cache directory
-        
+        torch.hub.set_dir('./model_cache')
         model_type = general_config.model_type.lower()
         num_classes = general_config.num_classes
         

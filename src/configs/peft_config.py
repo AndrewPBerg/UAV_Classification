@@ -83,41 +83,75 @@ class LayernormConfig(BaseModel):
 
 def get_peft_config(config: dict) -> Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]]:
 
+    try:
+        match config["general"]["adapter_type"]:
+            case "lora":
+                # Handle LoRA configuration
+                return LoraConfig(**config["lora"])
+    
+            case "ia3":
+                # Handle IA3 configuration
+                return IA3Config(**config["ia3"])
 
-    match config["general"]["adapter_type"]:
-        case "lora":
-            # Handle LoRA configuration
-            return LoraConfig(**config["lora"])
- 
-        case "ia3":
-            # Handle IA3 configuration
-            return IA3Config(**config["ia3"])
+            case "adalora":
+                # Handle AdaLoRA configuration
+                return AdaLoraConfig(**config["adalora"])
 
-        case "adalora":
-            # Handle AdaLoRA configuration
-            return AdaLoraConfig(**config["adalora"])
+            case "oft":
+                # Handle OFT configuration
+                return OFTConfig(**config["oft"])
 
-        case "oft":
-            # Handle OFT configuration
-            return OFTConfig(**config["oft"])
+            case "fourier":
+                # Handle Fourier configuration
+                return FourierConfig(**config["fourier"])
 
-        case "fourier":
-            # Handle Fourier configuration
-            return FourierConfig(**config["fourier"])
+            case "layernorm":
+                # Handle Layernorm configuration
+                return LayernormConfig(**config["layernorm"])
 
-        case "layernorm":
-            # Handle Layernorm configuration
-            return LayernormConfig(**config["layernorm"])
+            case "none-classifier":
+                return NoneClassifierConfig()
+            
+            case "none-full":
+                return NoneFullConfig()
 
-        case "none-classifier":
-            return NoneClassifierConfig()
-        
-        case "none-full":
-            return NoneFullConfig()
+            case _:
+                raise ValueError(f"Unsupported adapter type: {config['general']['adapter_type']}")
+    except KeyError as e:
+        ic("the adapter type is not included in the config, defaulting to sweeps case: ", e)
+        match config["adapter_type"]: # this is for the sweeps case
+            case "lora":
+                # Handle LoRA configuration
+                return LoraConfig(**config)
+    
+            case "ia3":
+                # Handle IA3 configuration
+                return IA3Config(**config)
 
-        case _:
-            raise ValueError(f"Unsupported adapter type: {config['general']['adapter_type']}")
+            case "adalora":
+                # Handle AdaLoRA configuration
+                return AdaLoraConfig(**config)
 
+            case "oft":
+                # Handle OFT configuration
+                return OFTConfig(**config)
+
+            case "fourier":
+                # Handle Fourier configuration
+                return FourierConfig(**config)
+
+            case "layernorm":
+                # Handle Layernorm configuration
+                return LayernormConfig(**config)
+
+            case "none-classifier":
+                return NoneClassifierConfig()
+            
+            case "none-full":
+                return NoneFullConfig()
+
+            case _:
+                raise ValueError(f"Unsupported adapter type: {config['general']['adapter_type']}")
 
 def main():
     with open('config.yaml', 'r') as file:

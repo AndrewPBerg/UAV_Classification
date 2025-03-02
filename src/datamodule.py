@@ -4,15 +4,17 @@ import torch
 import numpy as np
 import pytorch_lightning as pl
 from pathlib import Path
-from typing import Optional, Union, Dict, List, Tuple, Any
+from typing import Optional, Union, Dict, List, Tuple, Any, Callable
 from torch.utils.data import Dataset, DataLoader
 from sklearn.model_selection import KFold
 from time import time as timer
 from icecream import ic
 import json
+import wandb
+import yaml
 
 # Import from existing code
-from helper.util import AudioDataset
+from helper.util import AudioDataset, wandb_login
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 
@@ -31,7 +33,9 @@ class AudioDataModule(pl.LightningDataModule):
         feature_extraction_config: FeatureExtractionConfig,
         augmentation_config: Optional[AugmentationConfig] = None,
         feature_extractor: Optional[Any] = None,
-        num_channels: int = 1
+        num_channels: int = 1,
+        wandb_config: Optional[WandbConfig] = None,
+        sweep_config: Optional[SweepConfig] = None
     ):
         """
         Initialize the AudioDataModule using Pydantic config models.
@@ -42,6 +46,8 @@ class AudioDataModule(pl.LightningDataModule):
             augmentation_config: Augmentation configuration
             feature_extractor: Optional pre-created feature extractor (if None, will be created based on config)
             num_channels: Number of audio channels
+            wandb_config: Optional WandB configuration for logging
+            sweep_config: Optional sweep configuration for hyperparameter tuning
         """
         super().__init__()
         
@@ -58,6 +64,8 @@ class AudioDataModule(pl.LightningDataModule):
         self.pin_memory = general_config.pinned_memory
         self.save_dataloader = general_config.save_dataloader
         self.num_classes = general_config.num_classes
+        self.use_sweep = general_config.use_sweep
+        self.sweep_count = general_config.sweep_count
         
         # Unpack feature extraction config
         self.target_sr = feature_extraction_config.sampling_rate
@@ -70,6 +78,10 @@ class AudioDataModule(pl.LightningDataModule):
             augmentations=[],
             aug_configs={}
         )
+        
+        # Store wandb and sweep configs
+        self.wandb_config = wandb_config
+        self.sweep_config = sweep_config
         
         # Create feature extractor if not provided
         if feature_extractor is None:
@@ -649,6 +661,119 @@ class AudioDataModule(pl.LightningDataModule):
             ic(f"Number of augmentations: {augmentations_per_sample}")
 
             return train_loader, val_loader, test_loader, inference_loader
+
+    def run_sweep(self, model_pipeline_fn: Callable, config_path: str = 'configs/config.yaml'):
+        """
+        Run a wandb sweep using the provided model pipeline function.
+        
+        Args:
+            model_pipeline_fn: Function that takes a sweep configuration and trains a model
+            config_path: Path to the configuration file
+        """
+        if not self.use_sweep:
+            ic("Sweeps are not enabled in the configuration. Set use_sweep=True to enable sweeps.")
+            return
+        
+        if self.wandb_config is None or self.sweep_config is None:
+            ic("WandB or sweep configuration is missing. Make sure both are provided.")
+            return
+        
+        # Login to wandb
+        wandb_login()
+        
+        # Load the full configuration
+        with open(config_path, 'r') as file:
+            config = yaml.safe_load(file)
+        
+        # Get sweep configuration
+        sweep_config = config.get('sweep', {})
+        if not sweep_config:
+            ic("Sweep configuration is empty. Check your config file.")
+            return
+        
+        # Initialize sweep
+        sweep_id = wandb.sweep(
+            sweep_config,
+            project=self.wandb_config.project
+        )
+        
+        # Run sweep agent
+        wandb.agent(
+            sweep_id,
+            function=model_pipeline_fn,
+            count=self.sweep_count
+        )
+    
+    def get_mixed_params(self, sweep_config: Dict[str, Any], general_config: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Combine sweep configuration with general configuration.
+        
+        Args:
+            sweep_config: Sweep configuration from wandb
+            general_config: General configuration from YAML file
+            
+        Returns:
+            Combined configuration dictionary
+        """
+        mixed_params = {}
+        
+        # Add all general config parameters first
+        for key, value in general_config.items():
+            mixed_params[key] = value
+        
+        # Override with sweep config parameters
+        for key, value in sweep_config.items():
+            mixed_params[key] = value
+        
+        return mixed_params
+    
+    def create_sweep_pipeline(self, trainer_factory: Callable, config_path: str = 'configs/config.yaml'):
+        """
+        Create a model pipeline function for wandb sweep.
+        
+        Args:
+            trainer_factory: Function that creates a trainer instance
+            config_path: Path to the configuration file
+            
+        Returns:
+            Function that can be used as a sweep agent
+        """
+        def model_pipeline(sweep_config=None):
+            """
+            Pipeline function for wandb sweep agent.
+            
+            Args:
+                sweep_config: Configuration provided by wandb sweep
+            """
+            # Initialize wandb run
+            with wandb.init(config=sweep_config):
+                # Get the sweep configuration
+                config = wandb.config
+                
+                # Load general config
+                with open(config_path, 'r') as file:
+                    yaml_config = yaml.safe_load(file)
+                general_config_dict = yaml_config['general']
+                
+                # Combine sweep config with general config
+                mixed_params = self.get_mixed_params(dict(config), general_config_dict)
+                
+                # Create trainer with the mixed parameters
+                trainer = trainer_factory(mixed_params)
+                
+                # Train model and get results
+                results = trainer.train()
+                
+                # Log results to wandb
+                # The train method now returns a dictionary directly
+                if isinstance(results, dict):
+                    wandb.log(results)
+                else:
+                    print(f"Warning: Unexpected results format: {type(results)}. Cannot log to wandb.")
+                
+                return results
+        
+        return model_pipeline
 
 
 # Example usage
