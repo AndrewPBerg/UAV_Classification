@@ -14,7 +14,9 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
-      - CUDA_VISIBLE_DEVICES=all  # Ensure all GPUs are visible
+      - NVIDIA_VISIBLE_DEVICES=all  # Changed from CUDA_VISIBLE_DEVICES
+      - NVIDIA_DRIVER_CAPABILITIES=compute,utility  # Add driver capabilities
+      - PL_TRAINER_STRATEGY=auto  # Add environment variable for PyTorch Lightning strategy
 
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
@@ -26,7 +28,7 @@ services:
           devices:
             - driver: nvidia
               count: all
-              capabilities: [gpu]
+              capabilities: [gpu, compute, utility]  # Added more capabilities
     # command: python3 script.py
     command: python3 main.py
     # command: python3 sweeps.py
@@ -39,6 +41,7 @@ services:
     networks:
       - app_network
     shm_size: 8gb  # Add shared memory size for DDP communication
+    # runtime: nvidia  # Add explicit nvidia runtime
 
 volumes:
   datasets:
@@ -49,3 +52,6 @@ volumes:
 networks:
   app_network:
     driver: bridge
+
+# Add a .env file with the following content to set default compose options
+# COMPOSE_COMMAND_OPTIONS=--remove-orphans
