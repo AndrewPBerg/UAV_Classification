@@ -143,7 +143,26 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
     except ValueError as e:
         ic("ValueError occurred: ")
         ic(e)
-    
+    except KeyError as e:
+        ic("Key error occurred, defaulting to sweeps case: ", e)
+        general_config = GeneralConfig(**config)
+        ic("GeneralConfig instance created successfully:")
+
+        feature_extraction_config = FeatureExtractionConfig(**config)
+        ic("FeatureExtractionConfig instance created successfully:")
+
+        peft_config = get_peft_config(config) # noqa: F405
+        ic("PeftConfig instance created successfully:")
+
+        wandb_config, sweep_config = get_wandb_config(config)
+        ic("WandbConfig instance created successfully:")
+        ic("SweepConfig instance created successfully:")
+
+        augmentation_config = create_augmentation_configs(config)
+        ic("AugmentationConfig instance created successfully:")
+
+        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
+
 def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config):
     """
     What dis do:

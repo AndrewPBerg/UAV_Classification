@@ -34,17 +34,17 @@ def get_wandb_config(config: dict) -> Tuple[WandbConfig, SweepConfig]:
 
     try:
         wandb_config = WandbConfig(**config["wandb"])
-        
-    except ValidationError as e:
-        ic("Validation error occurred:")
-        ic(e)
-
-    try:
         sweep_config = SweepConfig(**config["sweep"])
         
     except ValidationError as e:
         ic("Validation error occurred:")
         ic(e)
+    
+    except KeyError as e:
+        ic("Key error, defaulting to sweeps case: ", e)
+        wandb_config = WandbConfig(**config)
+        sweep_config = SweepConfig(**config)
+    
     
     return wandb_config, sweep_config
 

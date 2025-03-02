@@ -15,11 +15,11 @@ from model_factory import ModelFactory
 from configs.configs_demo import (
     GeneralConfig, 
     FeatureExtractionConfig,
-    WandbConfig,
-    SweepConfig,
+    load_configs,
     wandb_config_dict
 )
 from configs.peft_config import get_peft_config
+from configs.wandb_config import get_wandb_config
 from helper.util import wandb_login
 import sys
 
@@ -55,69 +55,41 @@ def model_pipeline(sweep_config=None):
         
         # Load general config
         yaml_config = load_config(config_path="configs/config.yaml")
-        general_config_dict = yaml_config['general']
-        
+
         # Combine sweep config with general config
-        mixed_params = get_mixed_params(sweep_config=yaml_config['sweep'], general_config=yaml_config['general'], 
-                                        wandb_config=yaml_config['wandb'], feature_extraction_config=yaml_config['feature_extraction'],
-                                        augmentation_config=yaml_config['augmentation'])
+        mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
         
-        ic(mixed_params)
+        # ic(mixed_params)
         
-        sys.exit(0)
-        
+        # sys.exit(0)
+        (
+        general_config,
+        feature_extraction_config,
+        peft_config,
+        wandb_config,
+        sweep_config,
+        augmentation_config
+         ) = load_configs(mixed_params)
         # Create configuration objects
-        general_config = GeneralConfig(
-            model_type=mixed_params['model_type'],
-            num_classes=mixed_params['num_classes'],
-            epochs=mixed_params['epochs'],
-            batch_size=mixed_params['batch_size'],
-            learning_rate=mixed_params['learning_rate'],
-            seed=mixed_params['seed'],
-            patience=mixed_params['patience'],
-            accumulation_steps=mixed_params['accumulation_steps'],
-            use_wandb=mixed_params['use_wandb'],
-            save_model=mixed_params['save_model'],
-            use_kfold=mixed_params['use_kfold'],
-            k_folds=mixed_params['k_folds'],
-            adapter_type=mixed_params['adapter_type']
-        )
+        # general_config = GeneralConfig(
+        #     **mixed_params
+        # )
         
-        # Feature extraction config
-        feature_extraction_config = FeatureExtractionConfig(
-            type=mixed_params['feature_type'],
-            sampling_rate=mixed_params['sampling_rate'],
-            n_mels=mixed_params['n_mels'],
-            n_fft=mixed_params['n_fft'],
-            hop_length=mixed_params['hop_length'],
-            power=mixed_params['power'],
-            n_mfcc=mixed_params['n_mfcc']
-        )
+        # # Feature extraction config
+        # feature_extraction_config = FeatureExtractionConfig(
+        #     **mixed_params
+        # )
         
-        #PEFT config
-        peft_config = get_peft_config(mixed_params)
+        # #PEFT config
+        # peft_config = get_peft_config(mixed_params)
         
-        # WandB config
-        wandb_config = WandbConfig(
-            project=mixed_params['wandb_project'],
-            name=f"sweep_{wandb.run.id}",
-            tags=["sweep"],
-            notes="Automated hyperparameter sweep",
-        )
         
-        # Sweep config
-        sweep_config = SweepConfig(
-            project=mixed_params['sweep_project'],
-            name=mixed_params['sweep_name'],
-            method=mixed_params['sweep_method'],
-            metric=mixed_params['sweep_metric'],
-            parameters=mixed_params['sweep_parameters']
-        )
+        # wandb_config, sweep_config = get_wandb_config(mixed_params)
         
-        augmentation_config = AugmentationConfig(
-            augmentations=mixed_params['augmentations'],
-            augmentations_per_sample=mixed_params['augmentations_per_sample']
-        )
+        
+        # augmentation_config = AugmentationConfig(
+        #     **mixed_params
+        # )
         
         # Create data module
         data_module = AudioDataModule(
@@ -156,75 +128,51 @@ def model_pipeline(sweep_config=None):
             # Log final test metrics
             wandb.log(results)
 
-# def get_mixed_params(sweep_config: Dict[str, Any], general_config: GeneralConfig,
-#                      wandb_config: WandbConfig, feature_extraction_config: FeatureExtractionConfig,
-#                      peft_config: Optional[Any], augmentation_config: Optional[AugmentationConfig]) -> Dict[str, Any]:
-def get_mixed_params(config: Dict[str, Any]) -> Dict[str, Any]:
+def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Combine sweep configuration with general configuration.
     
     """
-    
+    ic(sweep_config)
     # 1. get mixed params from config file, sweeps overrides all values
     mixed_params = {}
     
     # general
-    
+    mixed_params.update(general_config['general'])
     # augmentations
-    
+    mixed_params.update(general_config['augmentations'])
     # feature extraction
-    
+    mixed_params.update(general_config['feature_extraction'])
     # wandb
+    mixed_params.update(general_config['wandb'])
+    # sweep
+    mixed_params.update(general_config['sweep'])
     
-    # peft (tricky cases for specific peft configs)
+    # sweep project and name
+    mixed_params['project'] = general_config['sweep']['project']
+    mixed_params['name'] = general_config['sweep']['name']
     
-    """
-    pseudo code for this case
+    # peft (tricky cases for specific peft general_configs)
+    # ic("params before sweep", mixed_params)
     
-    if yaml_config['sweep'][general_config['adapter_type']: 
-    # essentially checking if this adapter is part of the sweep
+    try: 
+        peft_name = str(sweep_config['adapter_type'])
+    except KeyError as e:
+        ic("the adapter type is not included in the sweep config, defaulting to general config's: ", e)
+        peft_name = str(general_config['general']['adapter_type'])
     
-    then compare the parameters from the sweep config with that adapters    
-    """
+    # ic(peft_name)
     
-    # # Add all general config parameters first
-    # for key, value in general_config.items():
-    #     mixed_params[key] = value
+   
+    mixed_params.update(general_config[peft_name])
+    mixed_params.update(sweep_config)
     
-    # # Override with sweep config parameters
-    # for key, value in sweep_config.items():
-    #     mixed_params[key] = value
+    ic("after sweep mixing", mixed_params)
 
-    # # Override with wandb config parameters
-    # for key, value in wandb_config.items():
-    #     mixed_params[key] = value
-
-    # # Override with feature extraction config parameters
-    # for key, value in feature_extraction_config.items():
-    #     mixed_params[key] = value
-
-    # # Override with PEFT config parameters
-    # # if peft_config:
-    # #     for key, value in peft_config.items():
-    # #         mixed_params[key] = value
-
-    # # Override with augmentation config parameters
-    # for key, value in augmentation_config.dict().items():
-    #     mixed_params[key] = value
+    # sys.exit(0)
     
-    # return mixed_params
+    return mixed_params
 
-def demo_3_1():
-    # Load general config
-    yaml_config = load_config(config_path="configs/config.yaml")
-    general_config_dict = yaml_config['general']
-    
-    # Combine sweep config with general config
-    mixed_params = get_mixed_params(yaml_config)
-    
-    ic(mixed_params)
-    
-    sys.exit(0)
 def main():
     """
     Main function to initialize and run the sweep.
@@ -243,7 +191,7 @@ def main():
     
     # Get sweep configuration
     sweep_config = config['sweep']
-    
+
     # Initialize sweep
     sweep_id = wandb.sweep(
         sweep_config,
@@ -258,5 +206,5 @@ def main():
     )
 
 if __name__ == "__main__":
-    # main()
-    demo_3_1()
+    main()
+    #demo_3_1()

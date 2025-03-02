@@ -1,9 +1,9 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_9
+  # data_path: /app/src/datasets/UAV_Dataset_9
   # data_path: /app/src/datasets/UAV_Dataset_31
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/UAV_Dataset_9
   # data_path: /Users/Sidewinders/Desktop/CODE/UAV_Classification_repo/.datasets/static-31-augs-1-time_stretch-sin_distortion
-  # data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+  data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
   # data_path: /app/src/datasets/static/9-augs-0-time_stretch-sin_distortion
   num_classes: 9
   save_dataloader: false
@@ -48,7 +48,11 @@ feature_extraction:
   hop_length: 512
   power: 2
 
+none-classifier:
+  task_type: AUDIO_CLASSIFICATION
 
+none-full:
+  task_type: AUDIO_CLASSIFICATION
 lora:
   r: 1000
   lora_alpha: 16
@@ -93,6 +97,7 @@ oft:
   - dense
   module_dropout: 0.0
   init_weights: true
+
 fourier:
   scaling: 100
   n_frequency: 1000
@@ -102,6 +107,7 @@ fourier:
   - value
   - dense
   task_type: AUDIO_CLASSIFICATION
+
 layernorm:
   target_modules:
   - layernorm
@@ -118,30 +124,36 @@ wandb:
 
   
 sweep:
-  project: demo-sweep
-  name: demo-plt/Sweep
+  project: demo-sweep132123
+  name: demo-plt/Sweep123123
   method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    seed:
+    # seed:
+    #   values:
+    #   - 42
+    #   - 43
+    #   - 44
+    #   - 45
+    #   - 46
+    # learning_rate:
+    #   values:
+    #   - 0.001
+    #   - 0.002
+    #   - 0.003
+    #   - 0.004
+
+    r:
       values:
-      - 42
-      - 43
-      - 44
-      - 45
-      - 46
-    learning_rate:
+      - 1000
+      - 2000
+      - 3000
+      - 4000
+
+    adapter_type:
       values:
-      - 0.001
-      - 0.002
-      - 0.003
-      - 0.004
-    lora:
-      r:
-        values:
-        - 1000
-        - 2000
-        - 3000
-        - 4000
+      - lora
+
+      # how can I handle nested lists?
