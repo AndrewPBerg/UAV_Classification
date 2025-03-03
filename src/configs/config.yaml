@@ -16,7 +16,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.002
   patience: 10
-  use_wandb: false
+  use_wandb: true
   use_sweep: true
   torch_viz: false
   use_kfold: false
@@ -102,8 +102,8 @@ layernorm:
   - layernorm
   task_type: AUDIO_CLASSIFICATION
 wandb:
-  project: model-testings
-  name: vit_h_14
+  project: model-full-test
+  name: ast
   reinit: false
   notes: null
   tags: null
