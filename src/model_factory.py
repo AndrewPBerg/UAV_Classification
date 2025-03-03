@@ -36,6 +36,10 @@ from transformers import (
     ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor
 )
 import math
+import logging
+import sys
+import torch.nn.functional as F
+    
 
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
@@ -91,7 +95,7 @@ class ModelFactory:
                 # Use the new ASTModel class
                 model, feature_extractor = ModelFactory._create_ast_model(num_classes, CACHE_DIR)
             elif model_type == "mert":
-                model, feature_extractor = ModelFactory._create_mert_model(CACHE_DIR)
+                model, feature_extractor = ModelFactory._create_mert_model(num_classes, CACHE_DIR)
                 
             
         
@@ -153,34 +157,91 @@ class ModelFactory:
         return input_shape, feature_extractor
     
     @staticmethod
-    def _create_mert_model(CACHE_DIR: str) -> nn.Module:
+    def _create_mert_model(num_classes, CACHE_DIR: str) -> nn.Module:
         """
-        Create a MERT model.
+        Create a MERT model with proper input shape and device handling.
         """
+        # Set up logging
+        logger = logging.getLogger("MERT_MODEL")
         
-        pretrained_MERT_model="m-a-p/MERT-v1-330M"
+        pretrained_MERT_model = "m-a-p/MERT-v1-330M"
         
         try:
-            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
+            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
         except OSError:
-            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+            model = AutoModel.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
         
         try:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+        
+        # Save original forward method
+        original_forward = model.forward
+        
+        # Define new forward method to handle shape issues and device consistency
+        def new_forward(self, x):
+            logger.debug(f"Input shape: {x.shape}, device: {x.device}")
             
+            # Ensure model is on same device as input
+            if next(self.parameters()).device != x.device:
+                self = self.to(x.device)
+                logger.debug(f"Moved model to device: {x.device}")
+            
+            # Handle 4D input [batch, channels, height, width]
+            if len(x.shape) == 4:
+                batch_size, channels, height, width = x.shape
+                if channels == 1:
+                    # For single channel input, reshape to [batch, sequence_length]
+                    x = x.squeeze(1)  # Remove channel dimension
+                    if height == 1:
+                        x = x.squeeze(1)  # Remove height dimension if it's 1
+                    else:
+                        x = x.view(batch_size, -1)  # Flatten remaining dimensions
+                    logger.debug(f"Reshaped 4D input to: {x.shape}")
+            
+            # Handle 3D input [batch, channels, sequence_length]
+            elif len(x.shape) == 3:
+                if x.size(1) == 1:  # If single channel
+                    x = x.squeeze(1)  # Remove channel dimension
+                    logger.debug(f"Squeezed 3D input to: {x.shape}")
+            
+            # Add classifier head if needed
+            if not hasattr(self, 'classifier'):
+                hidden_size = self.config.hidden_size
+                self.classifier = nn.Linear(hidden_size, num_classes).to(x.device)
+                logger.debug(f"Added classifier head with {hidden_size} -> {num_classes} on device {x.device}")
+            else:
+                # Ensure classifier is on same device as input
+                self.classifier = self.classifier.to(x.device)
+            
+            # Forward pass through MERT
+            outputs = original_forward(x)
+            hidden_states = outputs[0]  # Get the last hidden state
+            
+            # Pool the output (mean pooling over sequence dimension)
+            pooled_output = torch.mean(hidden_states, dim=1)
+            
+            # Ensure pooled output and classifier are on same device
+            pooled_output = pooled_output.to(self.classifier.weight.device)
+            
+            # Pass through classifier
+            logits = self.classifier(pooled_output)
+            
+            return logits
+        
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
+        
         return model, feature_extractor
+    
+
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str) -> nn.Module:
         """
         Create an AST model.
         """
-        import logging
-        import sys
-        import torch.nn.functional as F
-        import torch
         
         # Set up detailed logging
         logging.basicConfig(
