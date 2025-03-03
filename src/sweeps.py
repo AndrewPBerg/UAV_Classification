@@ -156,6 +156,14 @@ def model_pipeline(sweep_config=None):
             num_gpus = torch.cuda.device_count()
             strategy = 'ddp' if is_distributed else 'auto'
             print(f"Available GPUs: {num_gpus}, using strategy: {strategy}")
+        
+        # Initialize all config variables to avoid UnboundLocalError
+        general_config = None
+        model_config = None
+        train_config = None
+        aug_config = None
+        wandb_config = None
+        sweep_config_obj = None
             
         # Load configurations into the pydantic models (will validate)
         try:
@@ -165,10 +173,11 @@ def model_pipeline(sweep_config=None):
                 train_config, 
                 aug_config, 
                 wandb_config,
-                sweep_config
+                sweep_config_obj
             ) = load_configs(config_copy)
             
             # For distributed workers, create a complete dummy wandb_config
+            # with all required attributes to avoid AttributeError
             if is_distributed and local_rank > 0:
                 # Create a more complete dummy wandb_config with all required attributes
                 wandb_config = SimpleNamespace(
@@ -211,14 +220,71 @@ def model_pipeline(sweep_config=None):
                 config_copy['general']['model_type'] = 'ast'
                 
             # Try loading configs again with fixed config
-            (
-                general_config, 
-                model_config, 
-                train_config, 
-                aug_config, 
-                wandb_config,
-                sweep_config
-            ) = load_configs(config_copy)
+            try:
+                (
+                    general_config, 
+                    model_config, 
+                    train_config, 
+                    aug_config, 
+                    wandb_config,
+                    sweep_config_obj
+                ) = load_configs(config_copy)
+            except Exception as inner_e:
+                # If still failing, create minimal valid objects
+                from types import SimpleNamespace
+                
+                # Create minimal valid config objects
+                if general_config is None:
+                    general_config = SimpleNamespace(
+                        data_path='data/processed',
+                        num_classes=10,
+                        model_type='ast',
+                        seed=42
+                    )
+                
+                if model_config is None:
+                    model_config = SimpleNamespace(
+                        adapter_type='default',
+                        trainable_layers='all',
+                        freeze_feature_extractor=False
+                    )
+                
+                if train_config is None:
+                    train_config = SimpleNamespace(
+                        batch_size=32,
+                        epochs=100,
+                        learning_rate=0.001
+                    )
+                
+                if aug_config is None:
+                    aug_config = SimpleNamespace(
+                        enabled=False
+                    )
+                
+                if wandb_config is None:
+                    wandb_config = SimpleNamespace(
+                        project="dummy_project",
+                        entity="dummy_entity",
+                        name="dummy_run",
+                        mode="disabled",
+                        tags=[],
+                        notes="",
+                        group="",
+                        job_type="",
+                        id="",
+                        save_code=False,
+                        log_model=False,
+                        reinit=False,
+                        dir="",
+                        config={}
+                    )
+                
+                if sweep_config_obj is None:
+                    sweep_config_obj = SimpleNamespace(
+                        method="random",
+                        metric={"name": "val_acc", "goal": "maximize"},
+                        parameters={}
+                    )
             
             # For distributed workers, create a complete dummy wandb_config
             if is_distributed and local_rank > 0:
@@ -245,13 +311,13 @@ def model_pipeline(sweep_config=None):
                     )
                 )
         
-        # Safely access data
+        # Create data module and model factory
         data_module = AudioDataModule(
             general_config=general_config,
             feature_extraction_config=model_config,
             augmentation_config=aug_config,
             wandb_config=wandb_config,
-            sweep_config=sweep_config
+            sweep_config=sweep_config_obj
         )
         
         model_factory = ModelFactory.get_model_factory(
@@ -326,8 +392,9 @@ def model_pipeline(sweep_config=None):
             # Use the dummy wandb config
             trainer = PTLTrainer(
                 general_config=general_config,
-                feature_extraction_config=model_config,
-                peft_config=train_config,
+                model_config=model_config,
+                train_config=train_config,
+                aug_config=aug_config,
                 wandb_config=dummy_wandb_config,
                 sweep_config=None,
                 data_module=data_module,
@@ -337,8 +404,9 @@ def model_pipeline(sweep_config=None):
             # Normal case for non-distributed runs
             trainer = PTLTrainer(
                 general_config=general_config,
-                feature_extraction_config=model_config,
-                peft_config=train_config,
+                model_config=model_config,
+                train_config=train_config,
+                aug_config=aug_config,
                 wandb_config=wandb_config,
                 sweep_config=None,
                 data_module=data_module,

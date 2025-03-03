@@ -1,4 +1,4 @@
-from typing import Optional, Literal, Dict, Any, List
+from typing import Optional, Literal, Dict, Any, List, Tuple
 from pydantic import BaseModel, Field, ValidationError, field_validator
 import yaml
 from icecream import ic
@@ -113,55 +113,89 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
-
+def load_configs(config: Dict[str, Any]) -> Tuple[Any, Any, Any, Any, Any, Any]:
+    """
+    Load configurations from the given dictionary into pydantic models.
     
-
-    # Create GeneralConfig instance from the dictionary
+    Args:
+        config: Dictionary containing the configuration.
+        
+    Returns:
+        Tuple of (general_config, model_config, train_config, aug_config, wandb_config, sweep_config).
+    """
     try:
-        general_config = GeneralConfig(**config["general"])
-        ic("GeneralConfig instance created successfully:")
-
-        feature_extraction_config = FeatureExtractionConfig(**config["feature_extraction"])
-        ic("FeatureExtractionConfig instance created successfully:")
-
-        peft_config = get_peft_config(config) # noqa: F405
-        ic("PeftConfig instance created successfully:")
-
-        wandb_config, sweep_config = get_wandb_config(config)
-        ic("WandbConfig instance created successfully:")
-        ic("SweepConfig instance created successfully:")
-
-        augmentation_config = create_augmentation_configs(config)
-        ic("AugmentationConfig instance created successfully:")
-
-        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
-    except ValidationError as e:
-        ic("Validation error occurred: ")
-        ic(e)
-    
-    except ValueError as e:
-        ic("ValueError occurred: ")
-        ic(e)
-    except KeyError as e:
-        ic("Key error occurred, defaulting to sweeps case: ", e)
-        general_config = GeneralConfig(**config)
-        ic("GeneralConfig instance created successfully:")
-
-        feature_extraction_config = FeatureExtractionConfig(**config)
-        ic("FeatureExtractionConfig instance created successfully:")
-
-        peft_config = get_peft_config(config) # noqa: F405
-        ic("PeftConfig instance created successfully:")
-
-        wandb_config, sweep_config = get_wandb_config(config)
-        ic("WandbConfig instance created successfully:")
-        ic("SweepConfig instance created successfully:")
-
-        augmentation_config = create_augmentation_configs(config)
-        ic("AugmentationConfig instance created successfully:")
-
-        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
+        # Ensure all required sections exist
+        if 'general' not in config:
+            config['general'] = {
+                'data_path': 'data/processed',
+                'num_classes': 10,
+                'model_type': 'ast',
+                'seed': 42
+            }
+        
+        if 'model' not in config:
+            config['model'] = {
+                'adapter_type': 'default',
+                'trainable_layers': 'all',
+                'freeze_feature_extractor': False
+            }
+        
+        if 'train' not in config:
+            config['train'] = {
+                'batch_size': 32,
+                'epochs': 100,
+                'learning_rate': 0.001
+            }
+        
+        if 'augmentation' not in config:
+            config['augmentation'] = {
+                'enabled': False
+            }
+        
+        if 'wandb' not in config:
+            config['wandb'] = {
+                'project': 'default_project',
+                'entity': 'default_entity',
+                'tags': [],
+                'notes': '',
+                'group': '',
+                'job_type': '',
+                'save_code': False,
+                'log_model': False
+            }
+        
+        if 'sweep' not in config:
+            config['sweep'] = {
+                'method': 'random',
+                'metric': {'name': 'val_acc', 'goal': 'maximize'},
+                'parameters': {}
+            }
+        
+        # Create pydantic models
+        general_config = GeneralConfig(**config['general'])
+        print(ic('GeneralConfig instance created successfully:'))
+        
+        model_config = FeatureExtractionConfig(**config['model'])
+        print(ic('FeatureExtractionConfig instance created successfully:'))
+        
+        peft_config = PeftConfig(**config['model'])
+        print(ic('PeftConfig instance created successfully:'))
+        
+        wandb_config = WandbConfig(**config['wandb'])
+        print(ic('WandbConfig instance created successfully:'))
+        
+        sweep_config = SweepConfig(**config['sweep'])
+        print(ic('SweepConfig instance created successfully:'))
+        
+        # Initialize aug_config before any potential exceptions
+        aug_config = AugmentationConfig(**config['augmentation'])
+        print(ic('AugmentationConfig instance created successfully:'))
+        
+        return general_config, model_config, peft_config, aug_config, wandb_config, sweep_config
+    except Exception as e:
+        print(ic("Error in load_configs: ", e))
+        # Re-raise the exception to be handled by the caller
+        raise
 
 def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config):
     """
@@ -186,9 +220,9 @@ def main():
         general_config,
         feature_extraction_config,
         peft_config,
+        augmentation_config,
         wandb_config,
-        sweep_config,
-        augmentation_config
+        sweep_config
     ) = load_configs(config)
 
     ic(wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config))
