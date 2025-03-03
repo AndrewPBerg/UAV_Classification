@@ -6,6 +6,9 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from icecream import ic
 import copy
+import os
+import os
+from pytorch_lightning.loggers import WandbLogger
 
 # Import the PyTorch Lightning implementation
 from ptl_trainer import PTLTrainer
@@ -53,18 +56,6 @@ def model_pipeline(sweep_config=None):
         else:
             config_copy = copy.deepcopy(config)
         
-        # Initialize wandb if needed for this process
-        if "wandb" in config_copy and not wandb.run:
-            try:
-                wandb.init(
-                    config=config_copy,
-                    **config_copy.get("wandb", {})
-                )
-            except Exception as e:
-                ic("Error initializing wandb:", e)
-                # Continue without wandb if it fails
-                pass
-                
         # Get the number of GPUs and set up DDP strategy
         num_gpus = torch.cuda.device_count()
         print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if num_gpus > 1 else 'auto'}")
@@ -74,7 +65,41 @@ def model_pipeline(sweep_config=None):
         if num_gpus > 1:
             trainer_kwargs["strategy"] = "ddp"
             # Add find_unused_parameters to avoid DDP issues with unused model parameters
+            trainer_kwargs["plugins"] = [{"class_path": "pytorch_lightning.plugins.environments.LightningEnvironment"}]
             trainer_kwargs["strategy_kwargs"] = {"find_unused_parameters": False}
+        
+        # Set up wandb configuration properly for DDP
+        # Only initialize wandb on the main process for DDP
+        local_rank = int(os.environ.get("LOCAL_RANK", 0))
+        is_main_process = local_rank == 0
+        
+        # Configure a proper WandbLogger for PyTorch Lightning
+        if "wandb" in config_copy:
+            try:
+                # Make sure we don't have conflicting runs
+                if wandb.run is not None and is_main_process:
+                    wandb.finish()
+                
+                # Extract wandb config
+                wandb_config = config_copy.get("wandb", {}).copy()
+                # Remove problematic nested configurations
+                if "config" in wandb_config:
+                    del wandb_config["config"]
+                
+                # Only log from rank 0 in DDP
+                wandb_logger = WandbLogger(
+                    log_model=True,
+                    save_dir="./wandb",
+                    **wandb_config,
+                    settings=wandb.Settings(start_method="thread")
+                )
+                
+                # Add logger to trainer args
+                if "logger" not in trainer_kwargs:
+                    trainer_kwargs["logger"] = wandb_logger
+            except Exception as e:
+                ic("Error setting up wandb logger:", e)
+                # Continue without wandb if it fails
         
         # load into pydantic models w/ load_configs()
         (
@@ -113,15 +138,22 @@ def model_pipeline(sweep_config=None):
             model_factory=model_factory
         )
         
-        # Train model
-        if general_config.use_kfold:
-            results = trainer.k_fold_cross_validation()
-            # Log results summary
-            wandb.log(results["avg_metrics"])
-        else:
+        # Create the model
+        from Model import AudioClassifier
+        model = AudioClassifier(config_copy)
+        
+        # Run the training
+        try:
             results = trainer.train()
-            # Log final test metrics
-            wandb.log(results)
+        except Exception as e:
+            ic(f"Error during training: {str(e)}")
+            raise
+        
+        # Only log from main process
+        if is_main_process and wandb.run:
+            wandb.finish()
+            
+        return results
     except Exception as e:
         ic(f"Error in model_pipeline: {str(e)}")
         import traceback
