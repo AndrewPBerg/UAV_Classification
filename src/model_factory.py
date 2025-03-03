@@ -1,5 +1,6 @@
 import torch
 import torch.nn as nn
+import types
 from typing import Dict, Tuple, Any, Optional, Union, Callable
 from torchvision.models import (
     # ResNet variants
@@ -31,6 +32,7 @@ from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
 from transformers import PreTrainedModel
+import math
 
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
@@ -74,7 +76,7 @@ class ModelFactory:
         
         # Get feature extractor and input shape
         input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
-        
+        ic(model_type)
         # Create model based on type
         if model_type == "ast":
             # Use the new ASTModel class
@@ -152,14 +154,6 @@ class ModelFactory:
     def _create_vit_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int]) -> nn.Module:
         """
         Create a ViT model.
-        
-        Args:
-            model_type: Model type (e.g., 'vit_b_16')
-            num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
-            
-        Returns:
-            ViT model
         """
         # Parse model size from model type
         if "b_16" in model_type:
@@ -174,15 +168,11 @@ class ModelFactory:
             model = vit_h_14(weights=ViT_H_14_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported ViT model type: {model_type}")
-        
-        # Modify the model for audio input
+
+        # Add resize layer to match ViT's expected input size
         model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         
-        # Store original forward method
-        original_forward = model.forward
-        
-        # Define new forward method
         def new_forward(self, x):
             # Handle input
             x = x.float()
@@ -192,16 +182,57 @@ class ModelFactory:
             # Resize input to match ViT's expected size
             x = resize_layer(x)
             
-            # Call original forward method
-            return original_forward(x)
-        
-        # Replace forward method
-        model.forward = new_forward.__get__(model, type(model))
-        
-        # Replace classification head
-        in_features = model.heads.head.in_features
-        model.heads.head = nn.Linear(in_features, num_classes)
-        
+            # Process through convolutional projection
+            x = self.conv_proj(x)
+            
+            # Reshape to sequence
+            batch_size = x.shape[0]
+            x = x.flatten(2).transpose(1, 2)
+            
+            # Add class token
+            class_token = self.class_token.expand(batch_size, -1, -1)
+            x = torch.cat([class_token, x], dim=1)
+            
+            # Get position embeddings and adjust if necessary
+            pos_embedding = self.encoder.pos_embedding
+            if x.size(1) != pos_embedding.size(1):
+                # Remove class token from position embeddings
+                pos_tokens = pos_embedding[:, 1:]
+                # Reshape position embeddings to square grid
+                grid_size = int(math.sqrt(pos_tokens.size(1)))
+                pos_tokens = pos_tokens.reshape(-1, grid_size, grid_size, pos_embedding.size(-1))
+                
+                # Interpolate position embeddings to match sequence length
+                new_grid_size = int(math.sqrt(x.size(1) - 1))  # -1 for class token
+                pos_tokens = torch.nn.functional.interpolate(
+                    pos_tokens.permute(0, 3, 1, 2),
+                    size=(new_grid_size, new_grid_size),
+                    mode='bilinear',
+                    align_corners=False
+                )
+                pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
+                
+                # Add class token position embedding back
+                new_pos_embedding = torch.cat([pos_embedding[:, :1], pos_tokens], dim=1)
+                x = x + new_pos_embedding
+            else:
+                x = x + pos_embedding
+            
+            # Forward through encoder and classification head
+            for block in self.encoder.layers:
+                x = block(x)
+            x = self.encoder.ln(x)
+            x = x[:, 0]
+            x = self.heads(x)
+            
+            return x
+
+        # Update model components
+        model.forward = types.MethodType(new_forward, model)
+        model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
+        hidden_dim = model.conv_proj.out_channels
+        model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
+
         return model
     
     @staticmethod
@@ -350,4 +381,4 @@ class ModelFactory:
                 device=device
             )
         
-        return factory_fn 
+        return factory_fn
