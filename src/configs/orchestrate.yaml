@@ -4,13 +4,13 @@
 SEND_MESSAGE: false
 
 runs:
-  - id: 0
-    type: script
-    changes:
+  # - id: 0
+  #   type: script
+  #   changes:
 
-      general:
-        use_wandb: true
-        num_classes: 31
+  #     general:
+  #       use_wandb: true
+  #       num_classes: 31
   - id: 1
     type: sweep
     changes:
