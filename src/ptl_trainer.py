@@ -18,7 +18,7 @@ from helper.util import wandb_login
 
 class PTLTrainer:
     """
-    PyTorch Lightning trainer that handles both regular training and k-fold cross-validation.
+    PyTorch Lightning trainer that handles training using a single GPU.
     This replaces the functionality in engine.py and fold_engine.py.
     """
     def __init__(
@@ -51,10 +51,9 @@ class PTLTrainer:
         self.data_module = data_module
         self.model_factory = model_factory
         
-        # Determine device strategy based on available resources
-        self.num_gpus = torch.cuda.device_count()
-        self.strategy = 'ddp' if self.num_gpus > 1 else None
-        print(f"Available GPUs: {self.num_gpus}, using strategy: {self.strategy or 'default'}")
+        # Single GPU configuration
+        self.gpu_available = torch.cuda.is_available()
+        print(f"GPU available: {self.gpu_available}")
         
         # Set up wandb logger
         self.wandb_logger = None
@@ -72,7 +71,8 @@ class PTLTrainer:
             )
         
         # Set device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if self.gpu_available else "cpu")
+    
         
         # Set random seeds for reproducibility
         torch.manual_seed(general_config.seed)
@@ -148,15 +148,14 @@ class PTLTrainer:
         # Create trainer
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
-            accelerator="gpu" if torch.cuda.is_available() else "cpu",
-            devices=self.num_gpus if self.num_gpus > 0 else 1,
-            strategy=self.strategy,
+            accelerator="gpu" if self.gpu_available else "cpu",
+            devices=1,  # Always use a single device
             callbacks=self._get_callbacks(),
             logger=self.wandb_logger,
             gradient_clip_val=1.0,
             accumulate_grad_batches=self.general_config.accumulation_steps,
             deterministic=True,
-            precision="16-mixed" if torch.cuda.is_available() else "32"
+            precision="16-mixed" if self.gpu_available else "32"
         )
         
         # Train model
@@ -464,15 +463,14 @@ class PTLTrainer:
             # Create trainer for this fold
             trainer = pl.Trainer(
                 max_epochs=self.general_config.epochs,
-                accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                devices=self.num_gpus if self.num_gpus > 0 else 1,
-                strategy=self.strategy,
+                accelerator="gpu" if self.gpu_available else "cpu",
+                devices=1,  # Always use a single device
                 callbacks=fold_callbacks,
                 logger=self.wandb_logger,
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,
-                precision="16-mixed" if torch.cuda.is_available() else "32"
+                precision="16-mixed" if self.gpu_available else "32"
             )
             
             # Train on this fold
