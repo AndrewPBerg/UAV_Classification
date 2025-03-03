@@ -90,6 +90,14 @@ class AudioClassifier(pl.LightningModule):
         # Ensure input is float32
         x = x.float()
         
+        # Check for problematic 5D input shape for AST model specifically
+        if isinstance(self.model, type(self.model)) and hasattr(self.model, 'audio_spectrogram_transformer'):
+            if len(x.shape) == 5:
+                # If we have a 5D tensor [batch, channels, height, extra_dim, width]
+                batch_size, channels, height, extra_dim, width = x.shape
+                # Reshape to 4D tensor [batch, channels, height*extra_dim, width]
+                x = x.reshape(batch_size, channels, height * extra_dim, width)
+        
         # Forward pass
         outputs = self.model(x)
         

@@ -188,11 +188,16 @@ class ModelFactory:
         
         # Define a new forward method to handle input shape issues
         def new_forward(self, x):
+            # Print original shape for debugging
+            original_shape = x.shape
+            
             # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
             if len(x.shape) == 5:
-                # Remove the extra dimension by reshaping
-                # From [batch, channels, height, extra_dim, width] to [batch, channels, height, width]
-                x = x.squeeze(3)  # Remove the 4th dimension (index 3)
+                # Reshape the 5D tensor to a 4D tensor that conv2d can accept
+                batch_size, channels, height, extra_dim, width = x.shape
+                # Reshape to combine the height and extra_dim dimensions
+                x = x.reshape(batch_size, channels, height * extra_dim, width)
+            
             return original_forward(x)
         
         # Replace the forward method

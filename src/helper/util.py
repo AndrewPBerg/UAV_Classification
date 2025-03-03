@@ -217,7 +217,15 @@ class AudioDataset(Dataset):
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
-                return features.input_values.squeeze(0)
+                # Get the features and ensure it has the right shape
+                feature_values = features.input_values.squeeze(0)
+                
+                # Check for problematic 5D shape and fix before returning
+                if len(feature_values.shape) == 4 and feature_values.shape[2] == 1:
+                    # If we have [channels, height, 1, width], reshape to [channels, height, width]
+                    feature_values = feature_values.squeeze(2)
+                
+                return feature_values
             elif isinstance(self.feature_extractor, SeamlessM4TFeatureExtractor):
                 features = self.feature_extractor(
                     audio_np,
