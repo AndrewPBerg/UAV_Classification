@@ -39,7 +39,7 @@ import math
 
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
-from ast_model import ASTModel
+
 
 
 class ModelFactory:
@@ -74,8 +74,9 @@ class ModelFactory:
         #     torch.hub.set_dir('C:/app/src/model_cache')  # Set custom cache directory for Windows
         
         # set model cache directory (for both transformer and torch-hub models)
-        torch.hub.set_dir('./model_cache')
-        CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
+
+        CACHE_DIR = './model_cache'
+        torch.hub.set_dir(CACHE_DIR)
         
         model_type = general_config.model_type.lower()
         num_classes = general_config.num_classes
@@ -88,9 +89,9 @@ class ModelFactory:
             # Create model and feature extractor based on type
             if model_type == "ast":
                 # Use the new ASTModel class
-                model, feature_extractor = ModelFactory._create_ast_model(model_type, num_classes, input_shape, CACHE_DIR)
+                model, feature_extractor = ModelFactory._create_ast_model(CACHE_DIR)
             elif model_type == "mert":
-                model, feature_extractor = ModelFactory._create_mert_model(model_type, num_classes, input_shape, CACHE_DIR)
+                model, feature_extractor = ModelFactory._create_mert_model(CACHE_DIR)
         
         # handle models downloaded from torch-hub
         else:
@@ -108,16 +109,6 @@ class ModelFactory:
             else:
                 raise ValueError(f"Unsupported model type: {model_type}")
         
-        # Set up PEFT if requested and supported by model
-        # Other models don't support PEFT directly
-        if peft_config is not None and not isinstance(peft_config, str) and model_type == "ast":
-            model = get_peft_model(model, peft_config)
-            if hasattr(model, "print_trainable_parameters"):
-                model.print_trainable_parameters()
-        
-        # Don't move model to device - PyTorch Lightning will handle this
-        # Remove: if device is not None and model is not None:
-        #     model = model.to(device)
         
         return model, feature_extractor
     
@@ -160,7 +151,7 @@ class ModelFactory:
         return input_shape, feature_extractor
     
     @staticmethod
-    def _create_mert_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], CACHE_DIR: str) -> nn.Module:
+    def _create_mert_model(CACHE_DIR: str) -> nn.Module:
         """
         Create a MERT model.
         """
@@ -180,7 +171,7 @@ class ModelFactory:
         return model, feature_extractor
     
     @staticmethod
-    def _create_ast_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], CACHE_DIR: str) -> nn.Module:
+    def _create_ast_model(CACHE_DIR: str) -> nn.Module:
         """
         Create an AST model.
         """
@@ -188,9 +179,9 @@ class ModelFactory:
         pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
 
         try:
-            model = ASTModel.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
-            model = ASTModel.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
         try:
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)

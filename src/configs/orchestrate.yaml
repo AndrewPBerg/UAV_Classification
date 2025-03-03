@@ -1,121 +1,121 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
 
-SEND_MESSAGE: true
+SEND_MESSAGE: false
 
 runs:
-  # - id: 0
-  #   type: script
-  #   changes:
+  - id: 0
+    type: script
+    changes:
         
-  #     general:
-  #       model_type: resnet18
-  #       use_wandb: false
-  #       data_path: /app/src/datasets/UAV_Dataset_9
-  #       num_classes: 9
+      general:
+        model_type: ast
+        use_wandb: false
+        data_path: /app/src/datasets/UAV_Dataset_9
+        num_classes: 9
   # - id: 1
   #   type: script
   #   changes:
 
         
+  # #     general:
+  # #       model_type: resnet34
+  # # - id: 2
+  # #   type: script
+  # #   changes:
+
+        
+  # #     general:
+  # #       model_type: resnet50
+  # # - id: 3
+  # #   type: script
+  # #   changes:
+
+        
+  # #     general:
+  # #       model_type: resnet101
+  # # - id: 4
+  # #   type: script
+  # #   changes:
+        
+  # #     general:
+  # #       model_type: resnet152
+
+  # - id: 70
+  #   type: script
+  #   changes:
+        
   #     general:
-  #       model_type: resnet34
-  # - id: 2
+  #       model_type: efficientnet_b0
+  #       use_wandb: false
+  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       num_classes: 9
+  # - id: 61
   #   type: script
   #   changes:
 
         
   #     general:
-  #       model_type: resnet50
-  # - id: 3
+  #       model_type: efficientnet_b1
+  # - id: 62
   #   type: script
   #   changes:
 
         
   #     general:
-  #       model_type: resnet101
-  # - id: 4
+  #       model_type: efficientnet_b2
+  # - id: 63
+  #   type: script
+  #   changes:
+
+        
+  #     general:
+  #       model_type: efficientnet_b3
+  # - id: 64
+  #   type: script
+  #   changes:
+
+        
+  #     general:
+  #       model_type: efficientnet_b4
+  # - id: 65
+  #   type: script
+  #   changes:
+
+        
+  #     general:
+  #       model_type: efficientnet_b5
+
+        
+  # - id: 66
+  #   type: script
+  #   changes:
+
+        
+  #     general:
+  #       model_type: efficientnet_b6
+  # - id: 37
+  #   type: script
+  #   changes:
+
+        
+  #     general:
+  #       model_type: efficientnet_b7
+  # - id: 30
   #   type: script
   #   changes:
         
   #     general:
-  #       model_type: resnet152
-
-  - id: 70
-    type: script
-    changes:
+  #       model_type: mobilenet_v3_small
+  #       use_wandb: false
+  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       num_classes: 9
+  # - id: 31
+  #   type: script
+  #   changes:
         
-      general:
-        model_type: efficientnet_b0
-        use_wandb: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-  - id: 61
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b1
-  - id: 62
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b2
-  - id: 63
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b3
-  - id: 64
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b4
-  - id: 65
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b5
-
-        
-  - id: 66
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b6
-  - id: 37
-    type: script
-    changes:
-
-        
-      general:
-        model_type: efficientnet_b7
-  - id: 30
-    type: script
-    changes:
-        
-      general:
-        model_type: mobilenet_v3_small
-        use_wandb: false
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-  - id: 31
-    type: script
-    changes:
-        
-      general:
-        model_type: mobilenet_v3_large
+  #     general:
+  #       model_type: mobilenet_v3_large
 
  
 
