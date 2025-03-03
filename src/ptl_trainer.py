@@ -136,7 +136,17 @@ class PTLTrainer:
         model, feature_extractor = self.model_factory(self.device)
         
         # Create trainer
-        trainer = self._create_trainer()
+        trainer = pl.Trainer(
+            max_epochs=self.general_config.epochs,
+            accelerator="gpu" if self.gpu_available else "cpu",
+            devices=1,  # Always use a single device
+            callbacks=self._get_callbacks(),
+            logger=self.wandb_logger,
+            gradient_clip_val=1.0,
+            accumulate_grad_batches=self.general_config.accumulation_steps,
+            deterministic=False,  # Set to False to avoid issues with operations that don't have deterministic implementations
+            precision="16-mixed" if self.gpu_available else "32"
+        )
         ic("trainer created")
         
         # Ensure data module is set up
