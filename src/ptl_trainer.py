@@ -257,36 +257,37 @@ class PTLTrainer:
         Returns:
             Dictionary of inference results
         """
-        # Run prediction
-        predictions = trainer.predict(
-            model=model,
-            datamodule=self.data_module
-        )
-        
-        if not predictions:
-            return {}
-        
-        # Get metrics from the model's logged metrics
-        # The metrics are automatically logged in the on_predict_epoch_end method
-        metrics = {}
-        
-        # Try to get metrics from the trainer's callback_metrics
-        if hasattr(trainer, 'callback_metrics'):
-            metrics = {
-                "inference_acc": trainer.callback_metrics.get("predict_acc", None),
-                "inference_precision": trainer.callback_metrics.get("predict_precision", None),
-                "inference_recall": trainer.callback_metrics.get("predict_recall", None),
-                "inference_f1": trainer.callback_metrics.get("predict_f1", None)
-            }
+        try:
+            # Run prediction
+            print("Starting inference with predict...")
+            predictions = trainer.predict(
+                model=model,
+                datamodule=self.data_module
+            )
             
-            # Convert tensor values to Python scalars
-            for key, value in metrics.items():
-                if isinstance(value, torch.Tensor):
-                    metrics[key] = value.item()
-        
-        # If metrics are not available from callback_metrics, calculate them manually
-        if not all(metrics.values()):
-            print("Metrics not found in callback_metrics, calculating manually...")
+            if not predictions:
+                return {}
+            
+            # Get metrics from the model's stored metrics attribute
+            metrics = {}
+            
+            # Check if model has predict_metrics attribute (added in our fix)
+            if hasattr(model, 'predict_metrics'):
+                metrics = {
+                    "inference_acc": model.predict_metrics.get("predict_acc", None),
+                    "inference_precision": model.predict_metrics.get("predict_precision", None),
+                    "inference_recall": model.predict_metrics.get("predict_recall", None),
+                    "inference_f1": model.predict_metrics.get("predict_f1", None)
+                }
+                
+                # Convert tensor values to Python scalars
+                for key, value in metrics.items():
+                    if isinstance(value, torch.Tensor):
+                        metrics[key] = value.item()
+            
+            # If metrics are not available from model attributes, calculate them manually
+            if not all(metrics.values()):
+                print("Metrics not found in model attributes, calculating manually...")
             
             # Collect all predictions and ground truth
             all_preds = []
@@ -335,6 +336,10 @@ class PTLTrainer:
                 "inference_recall": recall,
                 "inference_f1": f1
             }
+        
+        except Exception as e:
+            print(f"Error during inference: {str(e)}")
+            return {}
         
         # Create confusion matrix
         # We still need to collect predictions to create the confusion matrix

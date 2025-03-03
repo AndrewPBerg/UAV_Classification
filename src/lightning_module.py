@@ -60,6 +60,9 @@ class AudioClassifier(pl.LightningModule):
         self.total_train_time = 0
         self.total_test_time = 0
         
+        # Initialize prediction metrics dictionary to store results
+        self.predict_metrics = {}
+        
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
         # Training metrics
@@ -167,10 +170,11 @@ class AudioClassifier(pl.LightningModule):
         self.predict_recall(y_pred_class, y)
         self.predict_f1(y_pred_class, y)
         
-        # Log batch metrics if logger is available
-        if self.logger:
-            self.log("predict_batch_acc", self.predict_accuracy, on_step=True, on_epoch=False, prog_bar=True)
-            self.log("predict_batch_f1", self.predict_f1, on_step=True, on_epoch=False, prog_bar=True)
+        # Display batch metrics in progress bar (without logging)
+        batch_acc = self.predict_accuracy.compute()
+        batch_f1 = self.predict_f1.compute()
+        if batch_idx % 10 == 0:  # Display every 10 batches to avoid clutter
+            print(f"Batch {batch_idx} - Acc: {batch_acc:.4f}, F1: {batch_f1:.4f}")
         
         return y_pred_class, y
     
@@ -187,12 +191,13 @@ class AudioClassifier(pl.LightningModule):
             final_recall = self.predict_recall.compute()
             final_f1 = self.predict_f1.compute()
             
-            # Log final metrics
-            if self.logger:
-                self.log("predict_acc", final_accuracy, on_step=False, on_epoch=True)
-                self.log("predict_precision", final_precision, on_step=False, on_epoch=True)
-                self.log("predict_recall", final_recall, on_step=False, on_epoch=True)
-                self.log("predict_f1", final_f1, on_step=False, on_epoch=True)
+            # Store metrics as attributes so they can be accessed later
+            self.predict_metrics = {
+                "predict_acc": final_accuracy,
+                "predict_precision": final_precision,
+                "predict_recall": final_recall,
+                "predict_f1": final_f1
+            }
             
             # Print final metrics
             print("\nPrediction Metrics:")
