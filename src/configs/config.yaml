@@ -10,7 +10,7 @@ general:
   epochs: 10
   save_model: false
   test_size: 0.2
-  inference_size: 0
+  inference_size: 0.1
   val_size: 0.1
   sweep_count: 200
   accumulation_steps: 2
@@ -103,7 +103,7 @@ layernorm:
   task_type: AUDIO_CLASSIFICATION
 wandb:
   project: demo-ddp
-  name: demo-without-inf
+  name: demo-with-inf-2
   reinit: false
   notes: null
   tags: null
