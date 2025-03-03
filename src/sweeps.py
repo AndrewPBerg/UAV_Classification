@@ -11,6 +11,7 @@ import os
 from pytorch_lightning.loggers import WandbLogger
 import torch.distributed as dist
 import pytorch_lightning as pl
+from pytorch_lightning.strategies import DDPStrategy
 
 # Import the PyTorch Lightning implementation
 from ptl_trainer import PTLTrainer
@@ -48,20 +49,14 @@ def model_pipeline(sweep_config=None):
         import torch
         import torch.distributed as dist
         import pytorch_lightning as pl
+        from pytorch_lightning.strategies import DDPStrategy
         from pytorch_lightning.loggers import WandbLogger
         
         # Determine rank for DDP coordination
-        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-        global_rank = int(os.environ.get("RANK", "0"))
-        world_size = int(os.environ.get("WORLD_SIZE", "1"))
-        is_distributed = world_size > 1
-        is_main_process = global_rank == 0
+        local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
+        is_distributed = local_rank >= 0
         
-        # Basic configuration tracking
-        if is_main_process:
-            print(f"DDP Configuration: world_size={world_size}, rank={global_rank}, local_rank={local_rank}")
-        
-        # Load the general configuration - should be identical on all ranks
+        # Load the general configuration
         config = load_config()
         
         # If this is a sweep run, merge the configurations
@@ -78,25 +73,30 @@ def model_pipeline(sweep_config=None):
         
         # Get the number of GPUs and set up DDP strategy
         num_gpus = torch.cuda.device_count()
-        if is_main_process:
-            print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if num_gpus > 1 else 'auto'}")
+        print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if is_distributed else 'auto'}")
         
-        # Create DDP strategy configuration consistently across all ranks
+        # Create trainer kwargs based on distributed status
         trainer_kwargs = config_copy.get("trainer", {}).copy()
         if is_distributed:
-            # Use explicit strategy for DDP to avoid discrepancies
+            # For distributed training, use explicit DDP configuration
             trainer_kwargs["accelerator"] = "gpu"
             trainer_kwargs["devices"] = [local_rank]  # Each process uses its specific GPU
-            trainer_kwargs["strategy"] = "ddp"
-            trainer_kwargs["num_nodes"] = 1
-            trainer_kwargs["use_distributed_sampler"] = True
             
-            # Set strategy_kwargs only if not already set to avoid overwriting
-            if "strategy_kwargs" not in trainer_kwargs:
-                trainer_kwargs["strategy_kwargs"] = {"find_unused_parameters": False}
+            # Use explicit DDPStrategy for better control
+            ddp_strategy = DDPStrategy(
+                find_unused_parameters=False,
+                static_graph=True  # Use static graph for better performance
+            )
+            trainer_kwargs["strategy"] = ddp_strategy
+        else:
+            # For non-distributed training, use auto strategy
+            trainer_kwargs["accelerator"] = "gpu" if num_gpus > 0 else "cpu"
+            trainer_kwargs["devices"] = "auto"
+            trainer_kwargs["strategy"] = "auto"
         
-        # Configure wandb properly - ONLY on the main process
-        if is_main_process and "wandb" in config_copy:
+        # Configure wandb - important: only create logger on non-distributed runs
+        # or if explicitly running as the main process in a distributed setting
+        if not is_distributed and "wandb" in config_copy:
             try:
                 # Finish any existing wandb runs to avoid conflicts
                 if wandb.run is not None:
@@ -107,30 +107,30 @@ def model_pipeline(sweep_config=None):
                 if "config" in wandb_config:
                     del wandb_config["config"]
                 
-                # Create WandbLogger for Lightning - simpler and more compatible with DDP
+                # Create WandbLogger for Lightning
                 wandb_logger = WandbLogger(
                     save_dir="./wandb",
-                    log_model=True,
-                    **wandb_config,
-                    settings=wandb.Settings(start_method="thread")
+                    log_model="all",
+                    **wandb_config
                 )
                 
                 # Set logger in trainer args
                 trainer_kwargs["logger"] = wandb_logger
             except Exception as e:
                 print(f"Error setting up wandb: {e}")
-        else:
-            # For non-main processes, use a dummy logger
+                # Continue without wandb logger
+                pass
+        elif is_distributed:
+            # For distributed workers, disable logging completely
             trainer_kwargs["logger"] = False
+            # Ensure wandb is disabled
+            os.environ["WANDB_MODE"] = "disabled"
         
-        # Synchronize all processes before model creation to ensure consistency
-        if is_distributed and dist.is_initialized():
-            dist.barrier()
+        # Add deterministic flag for reproducibility
+        trainer_kwargs["deterministic"] = True
         
-        # load into pydantic models w/ load_configs() - critical part where errors occur
+        # load into pydantic models w/ load_configs()
         try:
-            # Note: This is where the models are created from config
-            # Make sure this code path is identical on all ranks
             (
                 general_config,
                 feature_extraction_config,
@@ -155,19 +155,17 @@ def model_pipeline(sweep_config=None):
                 peft_config=peft_config
             )
             
-            # Create PTL trainer with all necessary configurations
-            # IMPORTANT: For non-main processes, we still need to send a minimal wandb_config
-            # to avoid 'NoneType' has no attribute 'project' errors
-            if not is_main_process and wandb_config is None:
-                # Create a dummy wandb config with just enough attributes to avoid errors
-                # but disable actual logging for non-main processes
+            # Create PTL trainer - don't pass wandb_config in distributed settings
+            if is_distributed or wandb_config is None:
+                # Create a minimal dummy wandb config to avoid errors
                 from types import SimpleNamespace
                 dummy_wandb_config = SimpleNamespace()
-                dummy_wandb_config.project = general_config.project if hasattr(general_config, 'project') else "dummy-project"
-                dummy_wandb_config.entity = general_config.entity if hasattr(general_config, 'entity') else None
-                dummy_wandb_config.mode = "disabled"  # Disable actual logging
+                dummy_wandb_config.project = "dummy-project"
+                dummy_wandb_config.entity = None
+                dummy_wandb_config.name = "dummy-run"
+                dummy_wandb_config.mode = "disabled"
                 
-                # Use the dummy config for non-main processes
+                # Use the dummy wandb config
                 trainer = PTLTrainer(
                     general_config=general_config,
                     feature_extraction_config=feature_extraction_config,
@@ -178,7 +176,7 @@ def model_pipeline(sweep_config=None):
                     model_factory=model_factory
                 )
             else:
-                # Main process uses the real wandb_config
+                # Normal case for non-distributed runs
                 trainer = PTLTrainer(
                     general_config=general_config,
                     feature_extraction_config=feature_extraction_config,
@@ -194,33 +192,17 @@ def model_pipeline(sweep_config=None):
             traceback.print_exc()
             raise
         
-        # Synchronize again before training
-        if is_distributed and dist.is_initialized():
-            dist.barrier()
-        
         # Run the training with proper error handling
         try:
-            # Disable wandb syncing for non-main processes
-            if not is_main_process and wandb.run is not None:
-                os.environ["WANDB_MODE"] = "offline"
-            
             results = trainer.train()
-            
         except Exception as e:
             print(f"Error during training: {str(e)}")
-            # Clean up distributed environment on error
-            if is_distributed and dist.is_initialized():
-                dist.destroy_process_group()
+            # Clean up distributed environment on error if needed
             raise
         
-        # Final cleanup
-        if is_main_process and wandb.run is not None:
+        # Final cleanup for wandb
+        if not is_distributed and wandb.run is not None:
             wandb.finish()
-            
-        # Wait for all processes to finish
-        if is_distributed and dist.is_initialized():
-            dist.barrier()
-            dist.destroy_process_group()
             
         return results
     except Exception as e:
@@ -284,16 +266,45 @@ def main():
     import torch.distributed as dist
     from pytorch_lightning.utilities.rank_zero import rank_zero_only
     
-    # Determine rank for DDP coordination
-    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
-    global_rank = int(os.environ.get("RANK", "0"))
-    world_size = int(os.environ.get("WORLD_SIZE", "1"))
-    is_distributed = world_size > 1
-    is_main_process = global_rank == 0
+    # Detect if this is a distributed run
+    local_rank = int(os.environ.get("LOCAL_RANK", "-1"))
+    is_distributed = local_rank >= 0
     
-    # Only print from main process to avoid duplicate outputs
-    if is_main_process:
-        print(f"Starting with rank={global_rank}, local_rank={local_rank}, world_size={world_size}")
+    # If this is a distributed worker (not the main process), don't use wandb sweeps at all
+    if is_distributed:
+        print(f"Running as distributed worker with local_rank={local_rank}")
+        # Set environment variable to disable wandb for worker processes
+        os.environ["WANDB_MODE"] = "disabled"
+        
+        # Load configuration - use fixed config rather than wandb sweep
+        config = load_config(config_path="configs/config.yaml")
+        
+        # Set random seeds for reproducibility
+        SEED = config['general']['seed']
+        torch.manual_seed(SEED)
+        torch.cuda.manual_seed(SEED)
+        np.random.seed(SEED)
+        
+        # Create a simple fixed config for the worker process
+        # The actual hyperparam values will be broadcast from the main process
+        dummy_config = {
+            "learning_rate": config['general'].get('learning_rate', 0.001),
+            "seed": SEED
+        }
+        
+        # Call the model pipeline directly
+        try:
+            model_pipeline(dummy_config)
+        except Exception as e:
+            print(f"Worker process error: {e}")
+            import traceback
+            traceback.print_exc()
+        
+        print(f"Worker rank {local_rank} finished")
+        return
+    
+    # Continue with normal execution for the main process (non-distributed or rank 0)
+    print("Running as main process - will manage wandb sweeps")
     
     # Load configuration
     config = load_config(config_path="configs/config.yaml")
@@ -304,42 +315,26 @@ def main():
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
     
-    # In distributed mode, only login to wandb on the main process
-    if is_main_process:
-        # Login to wandb
-        wandb_login()
-        
-        # Get sweep configuration
-        sweep_config = config['sweep']
-
-        # Initialize sweep
-        sweep_id = wandb.sweep(
-            sweep_config,
-            project=config['sweep']['project']
-        )
-        
-        # Run sweep agent
-        wandb.agent(
-            sweep_id,
-            function=model_pipeline,
-            count=config['general'].get('sweep_count', 10)
-        )
-        
-        print("All runs completed.")
-    else:
-        # Non-main processes should just call model_pipeline once
-        # They will synchronize with the main process during distributed training
-        print(f"Rank {global_rank}: waiting for main process to coordinate training")
-        # Use a dummy sweep config with the same keys that would be in the real one
-        dummy_sweep = {
-            "learning_rate": config['general'].get('learning_rate', 0.001),
-            "seed": config['general'].get('seed', 42)
-        }
-        model_pipeline(dummy_sweep)
+    # Login to wandb
+    wandb_login()
     
-    # Clean up distributed environment
-    if is_distributed and dist.is_initialized():
-        dist.destroy_process_group()
+    # Get sweep configuration
+    sweep_config = config['sweep']
+
+    # Initialize sweep
+    sweep_id = wandb.sweep(
+        sweep_config,
+        project=config['sweep']['project']
+    )
+    
+    # Run sweep agent
+    wandb.agent(
+        sweep_id,
+        function=model_pipeline,
+        count=config['general'].get('sweep_count', 10)
+    )
+    
+    print("All runs completed.")
 
 if __name__ == "__main__":
     # Display PyTorch and GPU information

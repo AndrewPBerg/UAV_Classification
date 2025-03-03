@@ -14,17 +14,17 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
-      # DDP configuration with explicit settings
+      # DDP configuration
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PL_TRAINER_STRATEGY=ddp
-      - TORCH_DISTRIBUTED_DEBUG=INFO  # Lower level to reduce noise
+      - TORCH_DISTRIBUTED_DEBUG=INFO
       - NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
       - NCCL_P2P_DISABLE=0
       - NCCL_IB_DISABLE=1
       - NCCL_BLOCKING_WAIT=1
-      - TORCH_NCCL_ASYNC_ERROR_HANDLING=1
+      - TORCH_NCCL_ASYNC_ERROR_HANDLING=0  # Disable async error handling to fix pipe issues
       - WANDB_START_METHOD=thread
       - WANDB_AGENT_DISABLE_FLAPPING=true
       - MASTER_ADDR=localhost
@@ -32,6 +32,9 @@ services:
       - TORCH_CPP_LOG_LEVEL=INFO
       - TORCH_SHOW_CPP_STACKTRACES=1
       - PYTHONPATH=/app
+      # Separate processes settings
+      - WORLD_SIZE=2  # Total number of processes
+      - NODE_RANK=0   # Current node rank
 
     volumes:
       - ./src:/app/src
@@ -44,10 +47,12 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu, compute, utility]
-    # Use a simpler command that's more compatible with wandb
-    # command: python3 -m torch.distributed.run --nproc_per_node=2 sweeps.py
-    command: python3 sweeps.py  # Use the standard command and let PTL handle DDP
-    # command: /bin/bash # interactive shell new
+    # Use the torchrun launcher with explicit processes
+    command: python -m torch.distributed.launch --nproc_per_node=2 --master_port=12355 sweeps.py
+    
+    # Alternative command for non-DDP execution
+    # command: python sweeps.py
+    
     stdin_open: true
     tty: true
     working_dir: /app/src
