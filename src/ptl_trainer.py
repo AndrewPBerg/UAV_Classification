@@ -65,7 +65,9 @@ class PTLTrainer:
                 name=self.wandb_config.name,
                 tags=self.wandb_config.tags if self.wandb_config.tags else [],
                 notes=self.wandb_config.notes,
-                log_model=True,
+                log_model=False,
+                save_dir="wandb",
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
             )
         
@@ -232,8 +234,10 @@ class PTLTrainer:
                 name=self.wandb_config.name,
                 tags=self.wandb_config.tags if self.wandb_config.tags else [],
                 notes=self.wandb_config.notes,
-                log_model=True,
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config)
+                log_model=False,
+                save_dir="wandb",
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
+                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
             )
         
         # Train on each fold

@@ -9,16 +9,17 @@ runs:
     changes:
 
       general:
+        model_type: resnet18
         use_wandb: true
         num_classes: 31
-  - id: 1
-    type: sweep
-    changes:
+  # - id: 1
+  #   type: sweep
+  #   changes:
 
-      sweep:
-        project: demo-ddp
-      general:
-        num_classes: 31
+  #     sweep:
+  #       project: demo-ddp
+  #     general:
+  #       num_classes: 31
 
  
 
