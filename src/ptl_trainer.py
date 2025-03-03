@@ -14,6 +14,7 @@ from lightning_module import AudioClassifier
 from datamodule import AudioDataModule
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from helper.util import wandb_login
+import time
 
 
 class PTLTrainer:
@@ -158,6 +159,9 @@ class PTLTrainer:
             precision="16-mixed" if self.gpu_available else "32"
         )
         
+        # start timer (outside of trainer.fit, so it properly captures loading times)
+        start_time = time.time() 
+        
         # Train model
         try:
             trainer.fit(
@@ -173,6 +177,23 @@ class PTLTrainer:
                 print("Please check your dataset preprocessing and ensure all labels are correctly mapped.")
                 return {"error": "Invalid class labels in dataset"}
             raise  # Re-raise the exception if it's not the specific error we're handling
+        
+        
+        def _format_time(seconds):
+            """Convert seconds to mm:ss format"""
+            minutes = int(seconds // 60)
+            seconds = int(seconds % 60)
+            return f"{minutes:02d}:{seconds:02d}"
+        
+        
+        end_time = time.time() - start_time
+        formatted_end_time = _format_time(end_time)
+        # total train time
+        ic(formatted_end_time)
+        if self.wandb_logger :
+                            self.wandb_logger.experiment.log({
+                                "total_train_time": formatted_end_time
+                            })
         
         # Test model
         try:

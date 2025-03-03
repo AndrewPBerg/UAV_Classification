@@ -6,8 +6,6 @@ from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, M
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
-import time
-import wandb
 
 from configs.configs_demo import GeneralConfig
 import re
@@ -54,12 +52,6 @@ class AudioClassifier(pl.LightningModule):
         # Enable automatic optimization
         self.automatic_optimization = True
 
-        # Simplify timing variables
-        self.train_start_time = None
-        self.test_start_time = None
-        self.total_train_time = 0
-        self.total_test_time = 0
-        
         # Initialize prediction metrics dictionary to store results
         self.predict_metrics = {}
         
@@ -106,42 +98,6 @@ class AudioClassifier(pl.LightningModule):
             return outputs.logits
         else:
             return outputs
-    
-    def _format_time(self, seconds):
-        """Convert seconds to mm:ss format"""
-        minutes = int(seconds // 60)
-        seconds = int(seconds % 60)
-        return f"{minutes:02d}:{seconds:02d}"
-        
-    def on_train_epoch_start(self):
-        """Called at the beginning of training epoch"""
-        self.train_start_time = time.time()
-        
-    def on_train_epoch_end(self):
-        """Called at the end of training epoch"""
-        if self.train_start_time is not None:
-            self.total_train_time += time.time() - self.train_start_time
-            
-    def on_fit_end(self):
-        """Log final training time at the end of fitting (after training completes)"""
-        formatted_time = self._format_time(self.total_train_time)
-        if wandb.run is not None:
-            wandb.log({"total_train_time": formatted_time})
-
-    def on_test_epoch_start(self):
-        """Called at the beginning of test epoch"""
-        self.test_start_time = time.time()
-        
-    def on_test_epoch_end(self):
-        """Called at the end of test epoch"""
-        if self.test_start_time is not None:
-            self.total_test_time += time.time() - self.test_start_time
-            
-    def on_test_model_end(self):
-        """Log final test time at the end of testing"""
-        formatted_time = self._format_time(self.total_test_time)
-        if wandb.run is not None:
-            wandb.log({"total_test_time": formatted_time})
         
     def on_predict_start(self):
         """Called at the beginning of prediction."""

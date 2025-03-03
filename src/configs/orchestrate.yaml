@@ -1,7 +1,7 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
 
-SEND_MESSAGE: true
+SEND_MESSAGE: false
 
 runs:
   # - id: 0
@@ -48,10 +48,10 @@ runs:
     changes:
       wandb:
         project: model-testings
-        name: vit_h_14
+        name: vit_b_14
         
       general:
-        model_type: vit_h_14
+        model_type: resnet18
 
 
   # - id: 1
