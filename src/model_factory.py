@@ -177,6 +177,7 @@ class ModelFactory:
         """
         import logging
         import sys
+        import torch.nn.functional as F
         
         # Set up detailed logging
         logging.basicConfig(
@@ -192,6 +193,50 @@ class ModelFactory:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        # Get the expected sequence length from the position embeddings
+        expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]
+        logger.debug(f"Expected sequence length from position embeddings: {expected_seq_length}")
+        
+        # Save original embeddings forward method
+        original_embeddings_forward = model.audio_spectrogram_transformer.embeddings.forward
+        
+        # Define a new embeddings forward method to handle sequence length mismatch
+        def new_embeddings_forward(self, input_values):
+            logger.debug(f"Embeddings input shape: {input_values.shape}")
+            
+            # Get patch embeddings
+            embeddings = self.patch_embeddings(input_values)
+            logger.debug(f"Patch embeddings shape: {embeddings.shape}")
+            
+            # Check if sequence length matches expected length
+            current_seq_length = embeddings.shape[1]
+            
+            if current_seq_length != expected_seq_length:
+                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
+                
+                # Adapt sequence length using interpolation
+                # This will resize the sequence dimension to match what the model expects
+                embeddings = F.interpolate(
+                    embeddings.transpose(1, 2),  # [batch, dim, seq_len]
+                    size=expected_seq_length,
+                    mode='linear',
+                    align_corners=False
+                ).transpose(1, 2)  # [batch, seq_len, dim]
+                
+                logger.debug(f"Adapted embeddings shape: {embeddings.shape}")
+            
+            # Add position embeddings
+            embeddings = embeddings + self.position_embeddings
+            embeddings = self.dropout(embeddings)
+            
+            return embeddings
+        
+        # Replace the embeddings forward method
+        model.audio_spectrogram_transformer.embeddings.forward = types.MethodType(
+            new_embeddings_forward, 
+            model.audio_spectrogram_transformer.embeddings
+        )
         
         # Save original forward method
         original_forward = model.forward

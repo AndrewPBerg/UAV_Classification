@@ -230,10 +230,16 @@ class AudioDataset(Dataset):
             # For AST feature extractor
             elif isinstance(self.feature_extractor, ASTFeatureExtractor):
                 logger.debug("Using ASTFeatureExtractor")
+                
+                # AST expects specific input dimensions
+                # Make sure we're using the right parameters for feature extraction
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
-                    return_tensors="pt"
+                    return_tensors="pt",
+                    padding="max_length",  # Use max_length padding to ensure consistent dimensions
+                    max_length=1024,       # Set a fixed max length that works with the model
+                    truncation=True        # Truncate if needed
                 )
                 logger.debug(f"AST raw features shape: {features.input_values.shape}")
                 

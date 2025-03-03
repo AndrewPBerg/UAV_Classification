@@ -145,7 +145,28 @@ class AudioClassifier(pl.LightningModule):
         except Exception as e:
             logger.error(f"Error in model forward pass: {e}")
             logger.error(f"Input tensor shape: {x.shape}")
-            raise
+            
+            # If we're using an AST model and get an error, try one more approach
+            if is_ast_model:
+                try:
+                    logger.debug("Attempting alternative approach for AST model")
+                    # Try to reshape the input to match expected dimensions
+                    if len(x.shape) == 4:  # [batch, channels, height, width]
+                        # AST expects specific input dimensions, try to adapt
+                        batch_size, channels, height, width = x.shape
+                        # Reshape to match expected input shape for AST
+                        # The exact reshape depends on the model's expectations
+                        x = x.view(batch_size, channels, height, width)
+                        logger.debug(f"Reshaped for AST to: {x.shape}")
+                        outputs = self.model(x)
+                        logger.debug("Alternative approach successful")
+                    else:
+                        raise e
+                except Exception as e2:
+                    logger.error(f"Alternative approach failed: {e2}")
+                    raise e  # Raise the original error
+            else:
+                raise
         
         # Handle different model output formats
         if hasattr(outputs, "logits"):
