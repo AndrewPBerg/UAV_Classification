@@ -8,7 +8,6 @@ import sys
 from model_factory import ModelFactory
 from ptl_trainer import PTLTrainer
 from pathlib import Path
-from ast_model import ASTModel  # Import the new ASTModel class
 from torchinfo import summary
 
 
