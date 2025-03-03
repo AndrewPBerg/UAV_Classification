@@ -191,40 +191,74 @@ class AudioDataset(Dataset):
         
     def feature_extraction(self, audio_tensor):
         """Process audio tensor for model input."""
+        import logging
+        import sys
+        
+        # Set up detailed logging
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            stream=sys.stdout
+        )
+        logger = logging.getLogger("AUDIO_DATASET")
+        
         audio_np = audio_tensor.squeeze().numpy()
+        logger.debug(f"Audio tensor shape before feature extraction: {audio_tensor.shape}")
+        logger.debug(f"Audio numpy shape after squeeze: {audio_np.shape}")
 
         try:
             # For MelSpectrogram feature extractor
             if isinstance(self.feature_extractor, MelSpectrogramFeatureExtractor):
+                logger.debug("Using MelSpectrogramFeatureExtractor")
                 features = self.feature_extractor(
                     audio_tensor,  # Pass tensor directly
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
+                logger.debug(f"MelSpectrogram features shape: {features.input_values.shape}")
                 return features.input_values
             # For MFCC feature extractor
             elif isinstance(self.feature_extractor, MFCCFeatureExtractor):
+                logger.debug("Using MFCCFeatureExtractor")
                 features = self.feature_extractor(
                     audio_tensor,  # Pass tensor directly
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
+                logger.debug(f"MFCC features shape: {features.input_values.shape}")
                 return features.input_values
             # For AST feature extractor
             elif isinstance(self.feature_extractor, ASTFeatureExtractor):
+                logger.debug("Using ASTFeatureExtractor")
                 features = self.feature_extractor(
                     audio_np,
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
+                logger.debug(f"AST raw features shape: {features.input_values.shape}")
+                
                 # Get the features and ensure it has the right shape
                 feature_values = features.input_values.squeeze(0)
+                logger.debug(f"AST features after squeeze(0): {feature_values.shape}")
                 
-                # Check for problematic 5D shape and fix before returning
-                if len(feature_values.shape) == 4 and feature_values.shape[2] == 1:
+                # Check for problematic shapes and fix
+                if len(feature_values.shape) == 4:
+                    logger.debug(f"Detected 4D feature tensor: {feature_values.shape}")
+                    
                     # If we have [channels, height, 1, width], reshape to [channels, height, width]
-                    feature_values = feature_values.squeeze(2)
+                    if feature_values.shape[2] == 1:
+                        feature_values = feature_values.squeeze(2)
+                        logger.debug(f"Squeezed dimension 2, new shape: {feature_values.shape}")
+                    # If we have a different 4D shape, try to reshape it to 3D
+                    else:
+                        c, h, d, w = feature_values.shape
+                        try:
+                            feature_values = feature_values.reshape(c, h*d, w)
+                            logger.debug(f"Reshaped to 3D tensor: {feature_values.shape}")
+                        except Exception as e:
+                            logger.error(f"Error reshaping 4D tensor: {e}")
                 
+                logger.debug(f"Final AST feature shape: {feature_values.shape}")
                 return feature_values
             elif isinstance(self.feature_extractor, SeamlessM4TFeatureExtractor):
                 features = self.feature_extractor(

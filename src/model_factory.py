@@ -175,6 +175,16 @@ class ModelFactory:
         """
         Create an AST model.
         """
+        import logging
+        import sys
+        
+        # Set up detailed logging
+        logging.basicConfig(
+            level=logging.DEBUG,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            stream=sys.stdout
+        )
+        logger = logging.getLogger("AST_MODEL")
         
         pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
 
@@ -182,26 +192,107 @@ class ModelFactory:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
-            
+        
         # Save original forward method
         original_forward = model.forward
         
         # Define a new forward method to handle input shape issues
         def new_forward(self, x):
-            # Print original shape for debugging
-            original_shape = x.shape
+            # Debug logging
+            logger.debug(f"AST model input shape before processing: {x.shape}")
             
             # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
             if len(x.shape) == 5:
-                # Reshape the 5D tensor to a 4D tensor that conv2d can accept
+                logger.debug(f"Detected 5D input tensor with shape: {x.shape}")
+                
+                # Get the dimensions
                 batch_size, channels, height, extra_dim, width = x.shape
-                # Reshape to combine the height and extra_dim dimensions
-                x = x.reshape(batch_size, channels, height * extra_dim, width)
+                
+                # Reshape to 4D tensor that conv2d can accept
+                # We need to reshape from [batch, channels, height, extra_dim, width] to [batch, channels, height*extra_dim, width]
+                try:
+                    x = x.reshape(batch_size, channels, height * extra_dim, width)
+                    logger.debug(f"Reshaped tensor to: {x.shape}")
+                except Exception as e:
+                    logger.error(f"Error reshaping tensor: {e}")
+                    
+                    # Alternative approach: try to squeeze out the extra dimension if it's 1
+                    if extra_dim == 1:
+                        try:
+                            x = x.squeeze(3)  # Remove the 4th dimension (index 3)
+                            logger.debug(f"Squeezed tensor to: {x.shape}")
+                        except Exception as e2:
+                            logger.error(f"Error squeezing tensor: {e2}")
+                            
+                            # Last resort: try to view the tensor differently
+                            try:
+                                x = x.view(batch_size, channels, height, width)
+                                logger.debug(f"Viewed tensor as: {x.shape}")
+                            except Exception as e3:
+                                logger.error(f"Error viewing tensor: {e3}")
             
-            return original_forward(x)
+            # Final shape check before passing to original forward
+            logger.debug(f"Final tensor shape before original forward: {x.shape}")
+            
+            try:
+                return original_forward(x)
+            except Exception as e:
+                logger.error(f"Error in original_forward: {e}")
+                logger.error(f"Input tensor shape: {x.shape}")
+                raise
         
         # Replace the forward method
         model.forward = types.MethodType(new_forward, model)
+        
+        # Also patch the patch_embeddings projection method directly
+        original_patch_embeddings_forward = model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward
+        
+        def new_patch_embeddings_forward(self, input_values):
+            logger.debug(f"Patch embeddings input shape: {input_values.shape}")
+            
+            # Handle 5D input directly at the patch embeddings level
+            if len(input_values.shape) == 5:
+                logger.debug("Fixing 5D input at patch embeddings level")
+                batch_size, channels, height, extra_dim, width = input_values.shape
+                
+                # Try different approaches
+                if extra_dim == 1:
+                    # If extra dimension is 1, just squeeze it out
+                    input_values = input_values.squeeze(3)
+                    logger.debug(f"Squeezed to shape: {input_values.shape}")
+                else:
+                    # Otherwise reshape
+                    try:
+                        input_values = input_values.reshape(batch_size, channels, height * extra_dim, width)
+                        logger.debug(f"Reshaped to: {input_values.shape}")
+                    except Exception as e:
+                        logger.error(f"Error reshaping in patch embeddings: {e}")
+            
+            # Call original method with fixed input
+            try:
+                result = original_patch_embeddings_forward(input_values)
+                logger.debug(f"Patch embeddings output shape: {result.shape}")
+                return result
+            except Exception as e:
+                logger.error(f"Error in original patch embeddings forward: {e}")
+                logger.error(f"Input shape: {input_values.shape}")
+                # Try one more approach if it fails
+                if len(input_values.shape) == 4:
+                    logger.debug("Attempting alternative approach for 4D input")
+                    # Try to use the projection directly
+                    try:
+                        result = self.projection(input_values).flatten(2).transpose(1, 2)
+                        logger.debug(f"Direct projection successful, shape: {result.shape}")
+                        return result
+                    except Exception as e2:
+                        logger.error(f"Direct projection failed: {e2}")
+                raise
+        
+        # Replace the patch embeddings forward method
+        model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward = types.MethodType(
+            new_patch_embeddings_forward, 
+            model.audio_spectrogram_transformer.embeddings.patch_embeddings
+        )
         
         try:
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
