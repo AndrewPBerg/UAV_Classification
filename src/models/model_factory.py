@@ -41,7 +41,7 @@ import sys
 import torch.nn.functional as F
     
 
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
+from configs import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 
 

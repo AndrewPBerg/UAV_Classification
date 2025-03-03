@@ -104,7 +104,7 @@ layernorm:
 wandb:
   project: model-full-test
   name: ast
-  reinit: false
+  reinit: true
   notes: null
   tags: null
   dir: wandb

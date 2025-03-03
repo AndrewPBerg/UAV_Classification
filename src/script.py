@@ -1,12 +1,12 @@
-from configs.configs_demo import load_configs
+from configs import load_configs
 import yaml
-from datamodule import AudioDataModule
+from helper.datamodule import AudioDataModule
 from icecream import ic
 import torch
 import numpy as np
 import sys
-from model_factory import ModelFactory
-from ptl_trainer import PTLTrainer
+from models.model_factory import ModelFactory
+from helper.ptl_trainer import PTLTrainer
 from pathlib import Path
 from torchinfo import summary
 

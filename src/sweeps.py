@@ -7,10 +7,10 @@ from typing import Dict, Any, Optional
 from icecream import ic
 
 # Import the PyTorch Lightning implementation
-from ptl_trainer import PTLTrainer
-from datamodule import AudioDataModule
-from model_factory import ModelFactory
-from configs.configs_demo import (
+from helper.ptl_trainer import PTLTrainer
+from helper.datamodule import AudioDataModule
+from models.model_factory import ModelFactory
+from configs import (
     load_configs,
 )
 

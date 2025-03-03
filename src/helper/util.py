@@ -23,7 +23,7 @@ from sklearn.model_selection import KFold
 from icecream import ic
 from time import time as timer
 from dotenv import load_dotenv
-from configs.augmentation_config import AugmentationConfig
+from configs import AugConfig as AugmentationConfig
 
 def generate_model_image(model: torch.nn.Module, device=None):
     # Create a random input tensor

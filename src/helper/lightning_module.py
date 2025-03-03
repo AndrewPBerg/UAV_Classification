@@ -7,7 +7,7 @@ from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
 
-from configs.configs_demo import GeneralConfig
+from configs import GeneralConfig
 import re
 
 
