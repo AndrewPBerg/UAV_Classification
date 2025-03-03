@@ -7,19 +7,24 @@ runs:
   - id: 0
     type: script
     changes:
-
+      wandb:
+        name: demo-with-inf
+        
       general:
         model_type: resnet18
         use_wandb: true
         num_classes: 31
-  # - id: 1
-  #   type: sweep
-  #   changes:
+        inference_size: 0.1
 
-  #     sweep:
-  #       project: demo-ddp
-  #     general:
-  #       num_classes: 31
+  - id: 1
+    type: script
+    changes:
+
+      wandb:
+        name: demo-without-inf
+        
+      general:
+        inference_size: 0
 
  
 
