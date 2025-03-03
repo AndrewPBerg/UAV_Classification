@@ -158,6 +158,14 @@ def main():
             print(f"  Val Accuracy: {results['avg_metrics']['average_val_acc']:.4f} ± {results['avg_metrics']['std_val_acc']:.4f}")
             print(f"  Val F1: {results['avg_metrics']['average_val_f1']:.4f} ± {results['avg_metrics']['std_val_f1']:.4f}")
             
+            # Print average inference metrics if available
+            if any(key.startswith('average_inference_') for key in results['avg_metrics'].keys()):
+                print("\nAverage Inference Metrics:")
+                print(f"  Inference Accuracy: {results['avg_metrics'].get('average_inference_acc', 'N/A'):.4f} ± {results['avg_metrics'].get('std_inference_acc', 0.0):.4f}")
+                print(f"  Inference F1: {results['avg_metrics'].get('average_inference_f1', 'N/A'):.4f} ± {results['avg_metrics'].get('std_inference_f1', 0.0):.4f}")
+                print(f"  Inference Precision: {results['avg_metrics'].get('average_inference_precision', 'N/A'):.4f} ± {results['avg_metrics'].get('std_inference_precision', 0.0):.4f}")
+                print(f"  Inference Recall: {results['avg_metrics'].get('average_inference_recall', 'N/A'):.4f} ± {results['avg_metrics'].get('std_inference_recall', 0.0):.4f}")
+            
         else:
             ic("Starting regular training")
             test_results = trainer.train()
@@ -170,6 +178,15 @@ def main():
             print(f"Test F1: {test_results.get('test_f1', 'N/A')}")
             print(f"Test Precision: {test_results.get('test_precision', 'N/A')}")
             print(f"Test Recall: {test_results.get('test_recall', 'N/A')}")
+            
+            # Print inference results if available
+            if any(key.startswith('inference_') for key in test_results.keys()):
+                print("\nInference Results:")
+                print("-" * 40)
+                print(f"Inference Accuracy: {test_results.get('inference_acc', 'N/A')}")
+                print(f"Inference F1: {test_results.get('inference_f1', 'N/A')}")
+                print(f"Inference Precision: {test_results.get('inference_precision', 'N/A')}")
+                print(f"Inference Recall: {test_results.get('inference_recall', 'N/A')}")
             
     except Exception as e:
         ic(f"Error during training: {str(e)}")
