@@ -18,7 +18,7 @@ from helper.util import wandb_login
 
 class PTLTrainer:
     """
-    PyTorch Lightning trainer that handles both regular training and k-fold cross-validation.
+    PyTorch Lightning trainer that handles training using a single GPU.
     This replaces the functionality in engine.py and fold_engine.py.
     """
     def __init__(
@@ -51,10 +51,9 @@ class PTLTrainer:
         self.data_module = data_module
         self.model_factory = model_factory
         
-        # Determine device strategy based on available resources
-        self.num_gpus = torch.cuda.device_count()
-        self.strategy = 'ddp' if self.num_gpus > 1 else None
-        print(f"Available GPUs: {self.num_gpus}, using strategy: {self.strategy or 'default'}")
+        # Single GPU configuration
+        self.gpu_available = torch.cuda.is_available()
+        print(f"GPU available: {self.gpu_available}")
         
         # Set up wandb logger
         self.wandb_logger = None
@@ -65,12 +64,15 @@ class PTLTrainer:
                 name=self.wandb_config.name,
                 tags=self.wandb_config.tags if self.wandb_config.tags else [],
                 notes=self.wandb_config.notes,
-                log_model=True,
+                log_model=False,
+                save_dir="wandb",
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
             )
         
         # Set device
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.device = torch.device("cuda" if self.gpu_available else "cpu")
+    
         
         # Set random seeds for reproducibility
         torch.manual_seed(general_config.seed)
@@ -146,15 +148,14 @@ class PTLTrainer:
         # Create trainer
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
-            accelerator="gpu" if torch.cuda.is_available() else "cpu",
-            devices=self.num_gpus if self.num_gpus > 0 else 1,
-            strategy=self.strategy,
+            accelerator="gpu" if self.gpu_available else "cpu",
+            devices=1,  # Always use a single device
             callbacks=self._get_callbacks(),
             logger=self.wandb_logger,
             gradient_clip_val=1.0,
             accumulate_grad_batches=self.general_config.accumulation_steps,
             deterministic=True,
-            precision="16-mixed" if torch.cuda.is_available() else "32"
+            precision="16-mixed" if self.gpu_available else "32"
         )
         
         # Train model
@@ -189,6 +190,41 @@ class PTLTrainer:
                 return {"error": "Invalid class labels in test dataset"}
             raise  # Re-raise the exception if it's not the specific error we're handling
         
+        # Run inference on the inference split if available
+        inference_results = {}
+        try:
+            # Check if inference dataset exists and has samples
+            has_inference_data = False
+            try:
+                inference_loader = self.data_module.predict_dataloader()
+                has_inference_data = len(inference_loader.dataset) > 0
+            except (ValueError, AttributeError, TypeError) as e:
+                print(f"No inference data available: {str(e)}")
+                has_inference_data = False
+            
+            if has_inference_data:
+                print("Running final inference evaluation...")
+                inference_results = self._run_inference(trainer, lightning_module)
+                
+                # Log inference results
+                if self.wandb_logger and inference_results:
+                    for key, value in inference_results.items():
+                        self.wandb_logger.log_metrics({key: value})
+                    
+                # Print inference results
+                print("\nInference Results:")
+                print("-" * 40)
+                for key, value in inference_results.items():
+                    if isinstance(value, (int, float)):
+                        print(f"{key}: {value:.4f}")
+                    else:
+                        print(f"{key}: {value}")
+            else:
+                print("No inference data available, skipping inference evaluation.")
+        except Exception as e:
+            print(f"Error during inference: {str(e)}")
+            print("Continuing with training results...")
+        
         # Save model if enabled
         if self.general_config.save_model:
             model_path = Path("saved_models")
@@ -203,7 +239,176 @@ class PTLTrainer:
         if hasattr(lightning_module, 'best_val_accuracy'):
             results_dict['best_val_accuracy'] = lightning_module.best_val_accuracy
         
+        # Add inference results to the overall results
+        if inference_results:
+            for key, value in inference_results.items():
+                results_dict[key] = value
+        
         return results_dict
+    
+    def _run_inference(self, trainer: pl.Trainer, model: pl.LightningModule) -> Dict[str, Any]:
+        """
+        Run inference on the inference dataset.
+        
+        Args:
+            trainer: PyTorch Lightning trainer
+            model: Trained PyTorch Lightning module
+            
+        Returns:
+            Dictionary of inference results
+        """
+        try:
+            # Run prediction
+            print("Starting inference with predict...")
+            predictions = trainer.predict(
+                model=model,
+                datamodule=self.data_module
+            )
+            
+            if not predictions:
+                return {}
+            
+            # Get metrics from the model's stored metrics attribute
+            metrics = {}
+            
+            # Check if model has predict_metrics attribute (added in our fix)
+            if hasattr(model, 'predict_metrics') and model.predict_metrics:
+                metrics = {
+                    "inference_acc": model.predict_metrics.get("predict_acc", None),
+                    "inference_precision": model.predict_metrics.get("predict_precision", None),
+                    "inference_recall": model.predict_metrics.get("predict_recall", None),
+                    "inference_f1": model.predict_metrics.get("predict_f1", None)
+                }
+                
+                # Log metrics to wandb if wandb logger is enabled
+                if self.wandb_logger and all(metrics.values()):
+                    print("Logging prediction metrics to wandb...")
+                    self.wandb_logger.experiment.log({
+                        "inference_accuracy": metrics["inference_acc"],
+                        "inference_precision": metrics["inference_precision"],
+                        "inference_recall": metrics["inference_recall"],
+                        "inference_f1": metrics["inference_f1"]
+                    })
+            
+            # If metrics are not available from model attributes, calculate them manually
+            if not all(metrics.values()):
+                print("Metrics not found in model attributes, calculating manually...")
+            
+            # Collect all predictions and ground truth
+            all_preds = []
+            all_targets = []
+            
+            for batch_preds in predictions:
+                batch_pred_classes, batch_targets = batch_preds
+                all_preds.append(batch_pred_classes)
+                all_targets.append(batch_targets)
+            
+            # Concatenate all batches
+            all_preds = torch.cat(all_preds)
+            all_targets = torch.cat(all_targets)
+            
+            # Calculate metrics
+            from torchmetrics.functional import (
+                multiclass_accuracy,
+                multiclass_precision,
+                multiclass_recall,
+                multiclass_f1_score
+            )
+            
+            num_classes = self.data_module.num_classes
+            
+            # Calculate metrics
+            accuracy = multiclass_accuracy(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            precision = multiclass_precision(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            recall = multiclass_recall(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            f1 = multiclass_f1_score(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            # Update metrics
+            metrics = {
+                "inference_acc": accuracy,
+                "inference_precision": precision,
+                "inference_recall": recall,
+                "inference_f1": f1
+            }
+            
+            # Log manually calculated metrics to wandb if wandb logger is enabled
+            if self.wandb_logger:
+                print("Logging manually calculated metrics to wandb...")
+                self.wandb_logger.experiment.log({
+                    "inference_accuracy": metrics["inference_acc"],
+                    "inference_precision": metrics["inference_precision"],
+                    "inference_recall": metrics["inference_recall"],
+                    "inference_f1": metrics["inference_f1"]
+                })
+        
+        except Exception as e:
+            print(f"Error during inference: {str(e)}")
+            return {}
+        
+        # Create confusion matrix
+        # We still need to collect predictions to create the confusion matrix
+        all_preds = []
+        all_targets = []
+        
+        for batch_preds in predictions:
+            batch_pred_classes, batch_targets = batch_preds
+            all_preds.append(batch_pred_classes)
+            all_targets.append(batch_targets)
+        
+        # Concatenate all batches
+        all_preds = torch.cat(all_preds)
+        all_targets = torch.cat(all_targets)
+        
+        # Create confusion matrix
+        from torchmetrics.functional import confusion_matrix
+        conf_mat = confusion_matrix(
+            all_preds, all_targets, num_classes=self.data_module.num_classes
+        ).cpu().numpy()
+        
+        # Log confusion matrix if wandb is enabled
+        if self.wandb_logger:
+            import wandb
+            import matplotlib.pyplot as plt
+            import seaborn as sns
+            
+            # Get class names if available
+            class_names = None
+            try:
+                _, _, idx_to_class = self.data_module.get_class_info()
+                class_names = [idx_to_class[i] for i in range(self.data_module.num_classes)]
+            except (AttributeError, KeyError):
+                class_names = [str(i) for i in range(self.data_module.num_classes)]
+            
+            # Create confusion matrix plot
+            plt.figure(figsize=(10, 8))
+            sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',
+                        xticklabels=class_names, yticklabels=class_names)
+            plt.xlabel('Predicted')
+            plt.ylabel('True')
+            plt.title('Inference Confusion Matrix')
+            
+            # Log to wandb
+            self.wandb_logger.experiment.log({
+                "inference_confusion_matrix": wandb.Image(plt),
+                "final_inference_accuracy": metrics["inference_acc"],
+                "final_inference_precision": metrics["inference_precision"],
+                "final_inference_recall": metrics["inference_recall"],
+                "final_inference_f1": metrics["inference_f1"]
+            })
+            plt.close()
+        
+        return metrics
     
     def k_fold_cross_validation(self) -> Dict[str, Any]:
         """
@@ -232,8 +437,10 @@ class PTLTrainer:
                 name=self.wandb_config.name,
                 tags=self.wandb_config.tags if self.wandb_config.tags else [],
                 notes=self.wandb_config.notes,
-                log_model=True,
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config)
+                log_model=False,
+                save_dir="wandb",
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
+                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
             )
         
         # Train on each fold
@@ -280,15 +487,14 @@ class PTLTrainer:
             # Create trainer for this fold
             trainer = pl.Trainer(
                 max_epochs=self.general_config.epochs,
-                accelerator="gpu" if torch.cuda.is_available() else "cpu",
-                devices=self.num_gpus if self.num_gpus > 0 else 1,
-                strategy=self.strategy,
+                accelerator="gpu" if self.gpu_available else "cpu",
+                devices=1,  # Always use a single device
                 callbacks=fold_callbacks,
                 logger=self.wandb_logger,
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,
-                precision="16-mixed" if torch.cuda.is_available() else "32"
+                precision="16-mixed" if self.gpu_available else "32"
             )
             
             # Train on this fold
@@ -343,9 +549,69 @@ class PTLTrainer:
                     f"fold_{fold+1}_final_val_precision": val_precision,
                     f"fold_{fold+1}_final_val_recall": val_recall
                 })
+            
+            # Run inference evaluation for this fold if available
+            try:
+                # Check if inference dataset exists and has samples
+                has_inference_data = False
+                try:
+                    inference_loader = self.data_module.predict_dataloader()
+                    has_inference_data = len(inference_loader.dataset) > 0
+                except (ValueError, AttributeError, TypeError) as e:
+                    print(f"No inference data available for fold {fold+1}: {str(e)}")
+                    has_inference_data = False
+                
+                if has_inference_data:
+                    print(f"Running inference evaluation for fold {fold+1}...")
+                    inference_results = self._run_inference(trainer, lightning_module)
+                    
+                    # Add inference results to fold results
+                    for key, value in inference_results.items():
+                        fold_results[key] = value
+                    
+                    # Log inference results for this fold to WandB
+                    if self.general_config.use_wandb:
+                        fold_inference_metrics = {
+                            f"fold_{fold+1}_inference_acc": inference_results.get("inference_acc", 0.0),
+                            f"fold_{fold+1}_inference_f1": inference_results.get("inference_f1", 0.0),
+                            f"fold_{fold+1}_inference_precision": inference_results.get("inference_precision", 0.0),
+                            f"fold_{fold+1}_inference_recall": inference_results.get("inference_recall", 0.0)
+                        }
+                        wandb.log(fold_inference_metrics)
+                    
+                    # Print inference results
+                    print(f"\nInference Results for Fold {fold+1}:")
+                    print("-" * 40)
+                    for key, value in inference_results.items():
+                        if isinstance(value, (int, float)):
+                            print(f"{key}: {value:.4f}")
+                        else:
+                            print(f"{key}: {value}")
+                else:
+                    print(f"No inference data available for fold {fold+1}, skipping inference evaluation.")
+            except Exception as e:
+                print(f"Error during inference for fold {fold+1}: {str(e)}")
+                print("Continuing with next fold...")
         
         # Calculate average metrics
         avg_metrics = self._calculate_average_metrics(all_fold_results)
+        
+        # Calculate average inference metrics if available
+        inference_metrics_keys = ["inference_acc", "inference_f1", "inference_precision", "inference_recall"]
+        avg_inference_metrics = {}
+        
+        for key in inference_metrics_keys:
+            values = [fold_result.get(key, None) for fold_result in all_fold_results]
+            values = [v for v in values if v is not None]  # Filter out None values
+            
+            if values:
+                avg_value = sum(values) / len(values)
+                std_value = np.std(values) if len(values) > 1 else 0.0
+                avg_inference_metrics[f"average_{key}"] = avg_value
+                avg_inference_metrics[f"std_{key}"] = std_value
+        
+        # Add average inference metrics to overall average metrics
+        avg_metrics.update(avg_inference_metrics)
         
         # Log average metrics to WandB
         if self.general_config.use_wandb:

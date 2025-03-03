@@ -3,10 +3,11 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy
-import wandb
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
+import time
+import wandb
 
 from configs.configs_demo import GeneralConfig
 import re
@@ -52,6 +53,15 @@ class AudioClassifier(pl.LightningModule):
         
         # Enable automatic optimization
         self.automatic_optimization = True
+
+        # Simplify timing variables
+        self.train_start_time = None
+        self.test_start_time = None
+        self.total_train_time = 0
+        self.total_test_time = 0
+        
+        # Initialize prediction metrics dictionary to store results
+        self.predict_metrics = {}
         
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -73,6 +83,16 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
         self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
         
+        # Prediction metrics
+        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
+        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
+        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
+        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        
+        # Initialize prediction metrics storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
+        
     def forward(self, x):
         """Forward pass through the model."""
         # Ensure input is float32
@@ -86,6 +106,116 @@ class AudioClassifier(pl.LightningModule):
             return outputs.logits
         else:
             return outputs
+    
+    def _format_time(self, seconds):
+        """Convert seconds to mm:ss format"""
+        minutes = int(seconds // 60)
+        seconds = int(seconds % 60)
+        return f"{minutes:02d}:{seconds:02d}"
+        
+    def on_train_epoch_start(self):
+        """Called at the beginning of training epoch"""
+        self.train_start_time = time.time()
+        
+    def on_train_epoch_end(self):
+        """Called at the end of training epoch"""
+        if self.train_start_time is not None:
+            self.total_train_time += time.time() - self.train_start_time
+            
+    def on_fit_end(self):
+        """Log final training time at the end of fitting (after training completes)"""
+        formatted_time = self._format_time(self.total_train_time)
+        if wandb.run is not None:
+            wandb.log({"total_train_time": formatted_time})
+
+    def on_test_epoch_start(self):
+        """Called at the beginning of test epoch"""
+        self.test_start_time = time.time()
+        
+    def on_test_epoch_end(self):
+        """Called at the end of test epoch"""
+        if self.test_start_time is not None:
+            self.total_test_time += time.time() - self.test_start_time
+            
+    def on_test_model_end(self):
+        """Log final test time at the end of testing"""
+        formatted_time = self._format_time(self.total_test_time)
+        if wandb.run is not None:
+            wandb.log({"total_test_time": formatted_time})
+        
+    def on_predict_start(self):
+        """Called at the beginning of prediction."""
+        print("Starting prediction...")
+        # Reset prediction metrics storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
+    
+    def predict_step(self, batch, batch_idx):
+        """Prediction step."""
+        x, y = batch
+        
+        # Forward pass
+        y_pred = self(x)
+        
+        # Get predicted classes
+        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+        
+        # Store predictions and targets for later metric calculation
+        self.predict_batch_preds.append(y_pred_class)
+        self.predict_batch_targets.append(y)
+        
+        # Update metrics for this batch
+        self.predict_accuracy(y_pred_class, y)
+        self.predict_precision(y_pred_class, y)
+        self.predict_recall(y_pred_class, y)
+        self.predict_f1(y_pred_class, y)
+        
+        # Display batch metrics in progress bar (without logging)
+        batch_acc = self.predict_accuracy.compute()
+        batch_f1 = self.predict_f1.compute()
+        if batch_idx % 10 == 0:  # Display every 10 batches to avoid clutter
+            print(f"Batch {batch_idx} - Acc: {batch_acc:.4f}, F1: {batch_f1:.4f}")
+        
+        return y_pred_class, y
+    
+    def on_predict_epoch_end(self):
+        """Called at the end of the prediction epoch."""
+        # Concatenate all predictions and targets
+        if self.predict_batch_preds and self.predict_batch_targets:
+            all_preds = torch.cat(self.predict_batch_preds)
+            all_targets = torch.cat(self.predict_batch_targets)
+            
+            # Calculate final metrics
+            final_accuracy = self.predict_accuracy.compute()
+            final_precision = self.predict_precision.compute()
+            final_recall = self.predict_recall.compute()
+            final_f1 = self.predict_f1.compute()
+            
+            # Store metrics as attributes so they can be accessed later
+            # Convert tensor values to Python scalars
+            self.predict_metrics = {
+                "predict_acc": final_accuracy.item() if isinstance(final_accuracy, torch.Tensor) else final_accuracy,
+                "predict_precision": final_precision.item() if isinstance(final_precision, torch.Tensor) else final_precision,
+                "predict_recall": final_recall.item() if isinstance(final_recall, torch.Tensor) else final_recall,
+                "predict_f1": final_f1.item() if isinstance(final_f1, torch.Tensor) else final_f1
+            }
+            
+            # Print final metrics
+            print("\nPrediction Metrics:")
+            print(f"Accuracy: {self.predict_metrics['predict_acc']:.4f}")
+            print(f"Precision: {self.predict_metrics['predict_precision']:.4f}")
+            print(f"Recall: {self.predict_metrics['predict_recall']:.4f}")
+            print(f"F1 Score: {self.predict_metrics['predict_f1']:.4f}")
+            
+            # Reset metrics
+            self.predict_accuracy.reset()
+            self.predict_precision.reset()
+            self.predict_recall.reset()
+            self.predict_f1.reset()
+            
+            # Clear storage
+            self.predict_batch_preds = []
+            self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
         """Training step."""
@@ -186,18 +316,6 @@ class AudioClassifier(pl.LightningModule):
         
         return loss
     
-    def predict_step(self, batch, batch_idx):
-        """Prediction step."""
-        x, y = batch
-        
-        # Forward pass
-        y_pred = self(x)
-        
-        # Get predicted classes
-        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        
-        return y_pred_class, y
-    
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
         # Choose optimizer based on model type
@@ -222,4 +340,4 @@ class AudioClassifier(pl.LightningModule):
                 "interval": "epoch",
                 "frequency": 1
             }
-        } 
+        }

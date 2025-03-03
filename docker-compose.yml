@@ -14,9 +14,7 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
-      - NVIDIA_VISIBLE_DEVICES=all  # Changed from CUDA_VISIBLE_DEVICES
-      - NVIDIA_DRIVER_CAPABILITIES=compute,utility  # Add driver capabilities
-      - PL_TRAINER_STRATEGY=auto  # Add environment variable for PyTorch Lightning strategy
+      - CUDA_VISIBLE_DEVICES=0  # Single GPU only
 
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
@@ -27,8 +25,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
-              capabilities: [gpu, compute, utility]  # Added more capabilities
+              count: 1
+              capabilities: [gpu]  # Simplified capabilities
     # command: python3 script.py
     command: python3 main.py
     # command: python3 sweeps.py
@@ -40,8 +38,8 @@ services:
     user: root
     networks:
       - app_network
-    shm_size: 8gb  # Add shared memory size for DDP communication
-    # runtime: nvidia  # Add explicit nvidia runtime
+
+    # shm_size: 8gb  # Removed shared memory allocation used for DDP
 
 volumes:
   datasets:

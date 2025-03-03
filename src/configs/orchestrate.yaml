@@ -5,20 +5,26 @@ SEND_MESSAGE: false
 
 runs:
   - id: 0
-    type: script
-    changes:
-
-      general:
-        use_wandb: true
-        num_classes: 31
-  - id: 1
     type: sweep
     changes:
-
-      sweep:
-        project: demo-ddp
+      wandb:
+        name: demo-with-inf-2
+        
       general:
+        model_type: resnet18
+        use_wandb: true
         num_classes: 31
+        inference_size: 0.1
+
+  # - id: 1
+  #   type: script
+  #   changes:
+
+  #     wandb:
+  #       name: demo-without-inf
+        
+  #     general:
+  #       inference_size: 0
 
  
 

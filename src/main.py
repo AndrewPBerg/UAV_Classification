@@ -4,15 +4,11 @@ import sys
 from icecream import ic
 
 # Print GPU information
-num_gpus = torch.cuda.device_count()
 print("-" * 50)
 print(f"PyTorch version: {torch.__version__}")
 print(f"CUDA available: {torch.cuda.is_available()}")
-print(f"Number of GPUs: {num_gpus}")
-if num_gpus > 0:
-    for i in range(num_gpus):
-        print(f"  GPU {i}: {torch.cuda.get_device_name(i)}")
-print(f"Using DDP strategy: {num_gpus > 1}")
+if torch.cuda.is_available():
+    print(f"GPU: {torch.cuda.get_device_name(0)}")
 print("-" * 50)
 
 # Import the rest of the modules

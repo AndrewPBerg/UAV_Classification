@@ -102,15 +102,35 @@ def model_pipeline(sweep_config=None):
             results = trainer.k_fold_cross_validation()
             # Log results summary
             wandb.log(results["avg_metrics"])
+            
+            # Log inference metrics if available
+            inference_metrics = {k: v for k, v in results["avg_metrics"].items() if k.startswith("average_inference_") or k.startswith("std_inference_")}
+            if inference_metrics:
+                print("\nLogging inference metrics to sweep:")
+                for key, value in inference_metrics.items():
+                    print(f"  {key}: {value:.4f}")
         else:
             results = trainer.train()
             # Log final test metrics
             wandb.log(results)
+            
+            # Log inference metrics if available
+            inference_metrics = {k: v for k, v in results.items() if k.startswith("inference_")}
+            if inference_metrics:
+                print("\nLogging inference metrics to sweep:")
+                for key, value in inference_metrics.items():
+                    print(f"  {key}: {value:.4f}")
 
 def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Combine sweep configuration with general configuration.
     
+    Args:
+        general_config: General configuration dictionary
+        sweep_config: Sweep configuration dictionary
+        
+    Returns:
+        Mixed parameters dictionary
     """
 
     mixed_params = {}
@@ -138,7 +158,13 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
    
     # finally update the mixed_params with the correct peft config(sweep agnostic)
     mixed_params.update(general_config[peft_name])
+    
+    # Update with sweep config values
     mixed_params.update(sweep_config)
+    
+    # Ensure inference_size is properly set if not in sweep_config
+    if 'inference_size' not in sweep_config and 'inference_size' in general_config['general']:
+        mixed_params['inference_size'] = general_config['general']['inference_size']
     
     return mixed_params
 
@@ -154,6 +180,15 @@ def main():
     torch.manual_seed(SEED)
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
+    
+    # Print information about inference evaluation
+    inference_size = config['general'].get('inference_size', 0.0)
+    if inference_size > 0:
+        print(f"\nInference evaluation is enabled with {inference_size * 100:.1f}% of data reserved for inference.")
+        print("Inference metrics will be logged to WandB for each sweep run.")
+    else:
+        print("\nInference evaluation is disabled (inference_size is 0).")
+        print("To enable inference evaluation, set inference_size > 0 in config.yaml.")
     
     # Login to wandb
     wandb_login()

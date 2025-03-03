@@ -1,8 +1,8 @@
 general:
-  data_path: /app/src/datasets/static/9-augs-3-time_stretch-sin_distortion
+  data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: resnet152
+  model_type: resnet18
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -103,7 +103,7 @@ layernorm:
   task_type: AUDIO_CLASSIFICATION
 wandb:
   project: demo-ddp
-  name: demo-ddp
+  name: demo-with-inf-2
   reinit: false
   notes: null
   tags: null
