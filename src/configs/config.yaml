@@ -109,7 +109,7 @@ wandb:
   tags: null
   dir: wandb
 sweep:
-  project: edge-case-demo
+  project: demo-ddp
   name: test1
   method: random
   metric:
