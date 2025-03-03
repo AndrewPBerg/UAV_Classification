@@ -5,6 +5,7 @@ import numpy as np
 from pathlib import Path
 from typing import Dict, Any, Optional
 from icecream import ic
+import copy
 
 # Import the PyTorch Lightning implementation
 from ptl_trainer import PTLTrainer
@@ -35,31 +36,46 @@ def load_config(config_path: str = 'configs/config.yaml') -> Dict[str, Any]:
     return config
 
 def model_pipeline(sweep_config=None):
-    """
-    Pipeline function for wandb sweep agent.
-    
-    Args:
-        sweep_config: Configuration provided by wandb sweep
-    """
-    # Initialize wandb run
-    with wandb.init(config=sweep_config):
-        # Get the sweep configuration
-        config = wandb.config
+    try:
+        # Load the general configuration
+        config = load_config()
         
-        # Load general config
-        yaml_config = load_config(config_path="configs/config.yaml")
-
-        # Combine sweep config with general config
-        mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
+        # If this is a sweep run, merge the configurations
+        if sweep_config:
+            # Use a more robust merging of configurations
+            mixed_params = get_mixed_params(config, sweep_config)
+            # Make sure all required configurations exist with defaults if needed
+            if 'aug_config' not in locals() or 'aug_config' not in globals():
+                aug_config = {}  # Default empty dict to avoid UnboundLocalError
+            
+            # Create a copy to avoid modifying the original during DDP
+            config_copy = copy.deepcopy(mixed_params)
+        else:
+            config_copy = copy.deepcopy(config)
         
-        # mixed_params_table = wandb.Table(data=[mixed_params])
-        # broken code for adding the mixed params to a wandb table
-        # columns = [f"col_{i}" for i in range(54)]
-        # mixed_params_table = wandb.Table(data=[mixed_params], columns=columns)
+        # Initialize wandb if needed for this process
+        if "wandb" in config_copy and not wandb.run:
+            try:
+                wandb.init(
+                    config=config_copy,
+                    **config_copy.get("wandb", {})
+                )
+            except Exception as e:
+                ic("Error initializing wandb:", e)
+                # Continue without wandb if it fails
+                pass
+                
+        # Get the number of GPUs and set up DDP strategy
+        num_gpus = torch.cuda.device_count()
+        print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if num_gpus > 1 else 'auto'}")
         
-        # # Update wandb config with the mixed parameters
-        # wandb.log({"mixed_params_table": mixed_params_table})
-
+        # Make sure strategy is properly passed to Trainer
+        trainer_kwargs = config_copy.get("trainer", {})
+        if num_gpus > 1:
+            trainer_kwargs["strategy"] = "ddp"
+            # Add find_unused_parameters to avoid DDP issues with unused model parameters
+            trainer_kwargs["strategy_kwargs"] = {"find_unused_parameters": False}
+        
         # load into pydantic models w/ load_configs()
         (
         general_config,
@@ -68,7 +84,7 @@ def model_pipeline(sweep_config=None):
         wandb_config,
         sweep_config,
         augmentation_config
-         ) = load_configs(mixed_params)
+         ) = load_configs(config_copy)
         
         # Create data module
         data_module = AudioDataModule(
@@ -106,41 +122,57 @@ def model_pipeline(sweep_config=None):
             results = trainer.train()
             # Log final test metrics
             wandb.log(results)
+    except Exception as e:
+        ic(f"Error in model_pipeline: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise
 
 def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Combine sweep configuration with general configuration.
-    
+    Merge general config with sweep config with improved error handling for DDP.
     """
-
-    mixed_params = {}
-    
-    # general
-    mixed_params.update(general_config['general'])
-    # augmentations
-    mixed_params.update(general_config['augmentations'])
-    # feature extraction
-    mixed_params.update(general_config['feature_extraction'])
-    # wandb
-    mixed_params.update(general_config['wandb'])
-    # sweep
-    mixed_params.update(general_config['sweep'])
-
-    # sweep project and name (this isn't needed, but for my peace of mind)
-    mixed_params['project'] = general_config['sweep']['project']
-    mixed_params['name'] = general_config['sweep']['name']
-    
-    try: 
-        peft_name = str(sweep_config['adapter_type'])
-    except KeyError as e:
-        ic("the adapter type is not included in the sweep config, defaulting to general config's: ", e)
-        peft_name = str(general_config['general']['adapter_type']) 
-   
-    # finally update the mixed_params with the correct peft config(sweep agnostic)
-    mixed_params.update(general_config[peft_name])
-    mixed_params.update(sweep_config)
-    
-    return mixed_params
+    try:
+        # Create a deep copy to avoid modifying the original during DDP
+        mixed_params = copy.deepcopy(general_config)
+        
+        # Safely merge sweep parameters
+        for key, value in sweep_config.items():
+            # For nested configurations, use defensive coding
+            if key in mixed_params and isinstance(mixed_params[key], dict) and isinstance(value, dict):
+                # Recursively update nested dictionaries
+                mixed_params[key].update(value)
+            else:
+                # Direct assignment for non-nested or new parameters
+                mixed_params[key] = value
+                
+        # Ensure critical configurations have defaults
+        if 'adapter_type' not in mixed_params:
+            try:
+                mixed_params['adapter_type'] = general_config.get('adapter_type', 'default')
+                ic("the adapter type is not included in the sweep config, defaulting to general config's: ", 
+                   e=KeyError('adapter_type'))
+            except KeyError as e:
+                ic("Key error occurred, defaulting to sweeps case: ", e=e)
+                mixed_params['adapter_type'] = 'default'
+                
+        # Ensure augmentations configuration exists
+        if 'augmentations' not in mixed_params or not isinstance(mixed_params.get('augmentations'), dict):
+            mixed_params['augmentations'] = {}
+            ic("Key error occurred, defaulting to sweeps case: ", 
+               e=KeyError('augmentations is not a dict'))
+                
+        return mixed_params
+        
+    except Exception as e:
+        ic(f"Error in get_mixed_params: {str(e)}")
+        # Return a minimal valid configuration to avoid crashing
+        return {
+            'adapter_type': 'default',
+            'augmentations': {},
+            'learning_rate': sweep_config.get('learning_rate', 0.001),
+            'seed': sweep_config.get('seed', 42)
+        }
 
 def main():
     """
