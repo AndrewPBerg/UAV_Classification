@@ -177,15 +177,15 @@ def main():
                 sweep_main()
         
             run_count += 1
+        ic('All runs completed.')
+                
+        if oc.get('SEND_MESSAGE'):
+            send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
+            
     except Exception as e:
         ic('Error occurred during orchestration:', e)
         if oc.get('SEND_MESSAGE'):
                 send_message(f'Your Symphony has failed @ run number: {run_count}.\n\n Traceback: {e}')
-            
-    if oc.get('SEND_MESSAGE'):
-        send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
-        
-    ic('All runs completed.')
 
 if __name__ == "__main__":
     main()

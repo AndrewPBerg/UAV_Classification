@@ -1,5 +1,5 @@
 general:
-  data_path: /app/src/datasets/static/9-augs-3-time_stretch-sin_distortion
+  data_path: /app/src/datasets/static/9-augs-3-time_stretch-sin_distortion/
   num_classes: 31
   save_dataloader: false
   model_type: resnet152
