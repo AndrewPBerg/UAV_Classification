@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import types
 from typing import Dict, Tuple, Any, Optional, Union, Callable
+import os
 from torchvision.models import (
     # ResNet variants
     resnet18, ResNet18_Weights,
@@ -31,7 +32,9 @@ from torchvision.models import (
 from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierFTConfig, LNTuningConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
-from transformers import PreTrainedModel
+from transformers import (
+    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor
+)
 import math
 
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
@@ -70,34 +73,40 @@ class ModelFactory:
         # else:
         #     torch.hub.set_dir('C:/app/src/model_cache')  # Set custom cache directory for Windows
         
+        # set model cache directory (for both transformer and torch-hub models)
         torch.hub.set_dir('./model_cache')
+        CACHE_DIR = os.path.join(os.path.dirname(__file__), "..", "model_cache")
+        
         model_type = general_config.model_type.lower()
         num_classes = general_config.num_classes
         
-        # Get feature extractor and input shape
-        input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
         ic(model_type)
-        # Create model based on type
-        if model_type == "ast":
-            # Use the new ASTModel class
-            model, _, _ = ASTModel.create_model(
-                num_classes=num_classes,
-                adapter_type=general_config.adapter_type,
-                peft_config=peft_config,
-                model_name=general_config.ast_model_name,
-                device=None  # Let PyTorch Lightning handle device placement
-            )
-            return model, feature_extractor
-        elif model_type.startswith("vit"):
-            model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("resnet"):
-            model = ModelFactory._create_resnet_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("mobilenet"):
-            model = ModelFactory._create_mobilenet_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("efficientnet"):
-            model = ModelFactory._create_efficientnet_model(model_type, num_classes, input_shape)
+        
+        # handle models downloaded from huggingface
+        if model_type in ["ast", "mert"]:
+            
+            # Create model and feature extractor based on type
+            if model_type == "ast":
+                # Use the new ASTModel class
+                model, feature_extractor = ModelFactory._create_ast_model(model_type, num_classes, input_shape, CACHE_DIR)
+            elif model_type == "mert":
+                model, feature_extractor = ModelFactory._create_mert_model(model_type, num_classes, input_shape, CACHE_DIR)
+        
+        # handle models downloaded from torch-hub
         else:
-            raise ValueError(f"Unsupported model type: {model_type}")
+            # Get feature extractor and input shape
+            input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
+            # Create model based on type
+            if model_type == "vit":
+                model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("resnet"):
+                model = ModelFactory._create_resnet_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("mobilenet"):
+                model = ModelFactory._create_mobilenet_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("efficientnet"):
+                model = ModelFactory._create_efficientnet_model(model_type, num_classes, input_shape)
+            else:
+                raise ValueError(f"Unsupported model type: {model_type}")
         
         # Set up PEFT if requested and supported by model
         # Other models don't support PEFT directly
@@ -149,6 +158,47 @@ class ModelFactory:
             raise ValueError(f"Unsupported feature extraction type: {feature_type}")
         
         return input_shape, feature_extractor
+    
+    @staticmethod
+    def _create_mert_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], CACHE_DIR: str) -> nn.Module:
+        """
+        Create a MERT model.
+        """
+        
+        pretrained_MERT_model="m-a-p/MERT-v1-330M"
+        
+        try:
+            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+        
+        try:
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+            
+        return model, feature_extractor
+    
+    @staticmethod
+    def _create_ast_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], CACHE_DIR: str) -> nn.Module:
+        """
+        Create an AST model.
+        """
+        
+        pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
+
+        try:
+            model = ASTModel.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            model = ASTModel.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        try:
+            feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
+        return model, feature_extractor
+        
     
     @staticmethod
     def _create_vit_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int]) -> nn.Module:
