@@ -182,6 +182,21 @@ class ModelFactory:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
+        # Save original forward method
+        original_forward = model.forward
+        
+        # Define a new forward method to handle input shape issues
+        def new_forward(self, x):
+            # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
+            if len(x.shape) == 5:
+                # Remove the extra dimension by reshaping
+                # From [batch, channels, height, extra_dim, width] to [batch, channels, height, width]
+                x = x.squeeze(3)  # Remove the 4th dimension (index 3)
+            return original_forward(x)
+        
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
         
         try:
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
