@@ -19,6 +19,9 @@ instructions.md
 /checkpoints/
 lightning_logs/
 checkpoints/
+src/copy_paste_config
+*/copy_paste_config/
+*/copy_paste_config
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
