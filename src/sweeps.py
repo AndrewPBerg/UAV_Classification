@@ -167,6 +167,32 @@ def model_pipeline(sweep_config=None):
                 wandb_config,
                 sweep_config
             ) = load_configs(config_copy)
+            
+            # For distributed workers, create a complete dummy wandb_config
+            if is_distributed and local_rank > 0:
+                # Create a more complete dummy wandb_config with all required attributes
+                wandb_config = SimpleNamespace(
+                    project="dummy_project",
+                    entity="dummy_entity",
+                    name="dummy_run",
+                    mode="disabled",
+                    tags=[],  # Add empty tags list
+                    notes="",
+                    group="",
+                    job_type="",
+                    id="",
+                    save_code=False,
+                    log_model=False,
+                    reinit=False,
+                    dir="",
+                    config={},
+                    settings=SimpleNamespace(
+                        start_method="thread",
+                        _disable_stats=True,
+                        _disable_meta=True
+                    )
+                )
+                
         except Exception as e:
             if local_rank <= 0:  # Only print from main process
                 print(f"Error in configuration/initialization: {str(e)}")
@@ -194,6 +220,31 @@ def model_pipeline(sweep_config=None):
                 sweep_config
             ) = load_configs(config_copy)
             
+            # For distributed workers, create a complete dummy wandb_config
+            if is_distributed and local_rank > 0:
+                # Create a more complete dummy wandb_config with all required attributes
+                wandb_config = SimpleNamespace(
+                    project="dummy_project",
+                    entity="dummy_entity",
+                    name="dummy_run",
+                    mode="disabled",
+                    tags=[],  # Add empty tags list
+                    notes="",
+                    group="",
+                    job_type="",
+                    id="",
+                    save_code=False,
+                    log_model=False,
+                    reinit=False,
+                    dir="",
+                    config={},
+                    settings=SimpleNamespace(
+                        start_method="thread",
+                        _disable_stats=True,
+                        _disable_meta=True
+                    )
+                )
+        
         # Safely access data
         data_module = AudioDataModule(
             general_config=general_config,
@@ -393,16 +444,19 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
 def main():
     # Check if running as distributed worker
     local_rank = int(os.environ.get("LOCAL_RANK", -1))
+    global_rank = int(os.environ.get("RANK", 0))
+    world_size = int(os.environ.get("WORLD_SIZE", 1))
     
-    if local_rank >= 0:
-        # Running as distributed worker
-        print(f"Running as distributed worker with local_rank={local_rank}")
-        
-        # Set environment variable to disable wandb for worker processes
-        os.environ["WANDB_MODE"] = "disabled"
-        
-        # Load the full configuration - don't use a dummy config
-        try:
+    try:
+        if local_rank >= 0:
+            # Running as distributed worker
+            print(f"Running as distributed worker with local_rank={local_rank}")
+            
+            # Set environment variable to disable wandb for worker processes
+            if local_rank > 0:  # Non-main processes should disable wandb
+                os.environ["WANDB_MODE"] = "disabled"
+            
+            # Load the full configuration
             config = load_config('configs/config.yaml')
             
             # Set seed for reproducibility
@@ -413,7 +467,20 @@ def main():
             if torch.cuda.is_available():
                 torch.cuda.manual_seed_all(seed)
             
-            # Run the model pipeline with the complete config, not a dummy one
+            # For distributed workers, ensure wandb section exists
+            if 'wandb' not in config:
+                config['wandb'] = {
+                    'project': 'default_project',
+                    'entity': 'default_entity',
+                    'tags': [],
+                    'notes': '',
+                    'group': '',
+                    'job_type': '',
+                    'save_code': False,
+                    'log_model': False
+                }
+            
+            # Run the model pipeline with the complete config
             model_pipeline(config)
             print(f"Worker rank {local_rank} finished")
             
@@ -421,42 +488,42 @@ def main():
             if torch.distributed.is_initialized():
                 torch.distributed.destroy_process_group()
                 
-        except Exception as e:
-            print(f"Worker process error: {str(e)}")
-            traceback.print_exc()
-            raise e
-    else:
-        # Main process that handles wandb agent
-        print("Starting main process for wandb sweep")
-        
-        # Load configuration
-        config = load_config('configs/config.yaml')
-        
-        # Set seed for reproducibility
-        seed = config['general'].get('seed', 42)
-        random.seed(seed)
-        np.random.seed(seed)
-        torch.manual_seed(seed)
-        if torch.cuda.is_available():
-            torch.cuda.manual_seed_all(seed)
-        
-        # Get sweep configuration
-        sweep_config = config['sweep']
-        
-        # Initialize sweep
-        sweep_id = wandb.sweep(
-            sweep_config,
-            project=config['sweep']['project']
-        )
-        
-        # Run sweep agent
-        wandb.agent(
-            sweep_id,
-            function=model_pipeline,
-            count=config['general'].get('sweep_count', 10)
-        )
-        
-        print("All runs completed.")
+        else:
+            # Main process that handles wandb agent
+            print("Starting main process for wandb sweep")
+            
+            # Load configuration
+            config = load_config('configs/config.yaml')
+            
+            # Set seed for reproducibility
+            seed = config['general'].get('seed', 42)
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(seed)
+            
+            # Get sweep configuration
+            sweep_config = config['sweep']
+            
+            # Initialize sweep
+            sweep_id = wandb.sweep(
+                sweep_config,
+                project=config['sweep']['project']
+            )
+            
+            # Run sweep agent
+            wandb.agent(
+                sweep_id,
+                function=model_pipeline,
+                count=config['general'].get('sweep_count', 10)
+            )
+            
+            print("All runs completed.")
+    except Exception as e:
+        print(f"Error in main function: {str(e)}")
+        traceback.print_exc()
+        raise e
 
 if __name__ == "__main__":
     import os

@@ -47,8 +47,8 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu, compute, utility]
-    # Use the torchrun launcher with explicit processes
-    command: python -m torch.distributed.launch --nproc_per_node=2 --master_port=12355 sweeps.py
+    # Use torchrun instead of the deprecated torch.distributed.launch
+    command: python -m torch.distributed.run --nproc_per_node=2 --master_port=12355 sweeps.py
     
     # Alternative command for non-DDP execution
     # command: python sweeps.py

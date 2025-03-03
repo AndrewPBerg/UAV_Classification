@@ -23,51 +23,66 @@ class PTLTrainer:
     """
     def __init__(
         self,
-        general_config: GeneralConfig,
-        feature_extraction_config: FeatureExtractionConfig,
-        peft_config: Any,
-        wandb_config: WandbConfig,
-        sweep_config: SweepConfig,
-        data_module: AudioDataModule,
-        model_factory: Callable,
+        general_config,
+        model_config,
+        train_config,
+        aug_config,
+        wandb_config=None,
+        sweep_config=None,
+        **kwargs
     ):
         """
-        Initialize the PTLTrainer.
+        Initialize the trainer with the given configurations.
         
         Args:
-            general_config: General configuration
-            feature_extraction_config: Feature extraction configuration
-            peft_config: PEFT configuration
-            wandb_config: WandB configuration
-            sweep_config: Sweep configuration
-            data_module: Audio data module
-            model_factory: Model factory function
+            general_config: General configuration.
+            model_config: Model configuration.
+            train_config: Training configuration.
+            aug_config: Augmentation configuration.
+            wandb_config: Weights & Biases configuration.
+            sweep_config: Sweep configuration.
+            **kwargs: Additional keyword arguments.
         """
         self.general_config = general_config
-        self.feature_extraction_config = feature_extraction_config
-        self.peft_config = peft_config
+        self.model_config = model_config
+        self.train_config = train_config
+        self.aug_config = aug_config
         self.wandb_config = wandb_config
         self.sweep_config = sweep_config
-        self.data_module = data_module
-        self.model_factory = model_factory
+        
+        # Check if running in distributed mode
+        self.local_rank = int(os.environ.get("LOCAL_RANK", -1))
+        self.is_distributed = self.local_rank >= 0
+        
+        # Safely access wandb_config attributes with defaults
+        wandb_project = getattr(self.wandb_config, 'project', 'default_project') if self.wandb_config else 'default_project'
+        wandb_name = getattr(self.wandb_config, 'name', None) if self.wandb_config else None
+        wandb_tags = getattr(self.wandb_config, 'tags', []) if self.wandb_config else []
+        wandb_group = getattr(self.wandb_config, 'group', None) if self.wandb_config else None
+        wandb_save_code = getattr(self.wandb_config, 'save_code', False) if self.wandb_config else False
+        
+        # Only use wandb logger for main process in distributed setting
+        use_wandb = self.wandb_config is not None and (not self.is_distributed or self.local_rank == 0)
+        
+        if use_wandb:
+            # Initialize wandb logger only for main process
+            self.logger = WandbLogger(
+                project=wandb_project,
+                name=wandb_name,
+                tags=wandb_tags,
+                group=wandb_group,
+                save_code=wandb_save_code,
+                log_model=False,
+                reinit=True
+            )
+        else:
+            # Use a simple logger for non-main processes
+            self.logger = None
         
         # Determine device strategy based on available resources
         self.num_gpus = torch.cuda.device_count()
         self.strategy = 'ddp' if self.num_gpus > 1 else None
         print(f"Available GPUs: {self.num_gpus}, using strategy: {self.strategy or 'default'}")
-        
-        # Set up wandb logger
-        self.wandb_logger = None
-        if self.general_config.use_wandb:
-            wandb_login()
-            self.wandb_logger = WandbLogger(
-                project=self.wandb_config.project,
-                name=self.wandb_config.name,
-                tags=self.wandb_config.tags if self.wandb_config.tags else [],
-                notes=self.wandb_config.notes,
-                log_model=True,
-                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
-            )
         
         # Set device
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -150,7 +165,7 @@ class PTLTrainer:
             devices=self.num_gpus if self.num_gpus > 0 else 1,
             strategy=self.strategy,
             callbacks=self._get_callbacks(),
-            logger=self.wandb_logger,
+            logger=self.logger,
             gradient_clip_val=1.0,
             accumulate_grad_batches=self.general_config.accumulation_steps,
             deterministic=True,
@@ -225,9 +240,9 @@ class PTLTrainer:
         
         # Initialize WandB for all folds if enabled
         # We'll use a single WandB run for all folds
-        if self.general_config.use_wandb and self.wandb_logger is None:
+        if self.general_config.use_wandb and self.logger is None:
             wandb_login()
-            self.wandb_logger = WandbLogger(
+            self.logger = WandbLogger(
                 project=self.wandb_config.project,
                 name=self.wandb_config.name,
                 tags=self.wandb_config.tags if self.wandb_config.tags else [],
@@ -284,7 +299,7 @@ class PTLTrainer:
                 devices=self.num_gpus if self.num_gpus > 0 else 1,
                 strategy=self.strategy,
                 callbacks=fold_callbacks,
-                logger=self.wandb_logger,
+                logger=self.logger,
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,
