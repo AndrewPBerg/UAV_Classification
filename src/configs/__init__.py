@@ -8,11 +8,8 @@ This module contains various configuration classes and utilities for the project
 from .configs_demo import (
     GeneralConfig,
     FeatureExtractionConfig,
-    ModelConfig,
-    TrainingConfig,
-    DataConfig,
-    AugmentationConfig,
-    get_config
+    wandb_config_dict,
+    load_configs
 )
 
 # Import augmentation configurations
@@ -44,11 +41,8 @@ __all__ = [
     # configs_demo exports
     'GeneralConfig',
     'FeatureExtractionConfig',
-    'ModelConfig',
-    'TrainingConfig',
-    'DataConfig',
-    'AugmentationConfig',
-    'get_config',
+    'wandb_config_dict',
+    'load_configs',
     
     # augmentation_config exports
     'AugConfig',
