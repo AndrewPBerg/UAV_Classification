@@ -603,7 +603,7 @@ class AudioDataModule(pl.LightningDataModule):
             inference_path = f"{path}/inference_dataloader.pth"
             metadata_path = f"{path}/metadata.json"  # Path to the metadata file
             
-            if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path, metadata_path]):
+            if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path]):
                 raise FileNotFoundError(f"One or more dataloader files not found in {path}")
 
             # Load metadata

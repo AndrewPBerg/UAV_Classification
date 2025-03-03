@@ -1,8 +1,8 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_31
+  data_path: /app/src/datasets/static/9-augs-3-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
-  model_type: resnet34
+  model_type: resnet152
   batch_size: 32
   seed: 42
   num_cuda_workers: 10
@@ -16,8 +16,8 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 10
-  use_wandb: false
-  use_sweep: false
+  use_wandb: true
+  use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
@@ -102,8 +102,8 @@ layernorm:
   - layernorm
   task_type: AUDIO_CLASSIFICATION
 wandb:
-  project: demo-kfold
-  name: testing-main-2
+  project: demo-ddp
+  name: demo-ddp
   reinit: false
   notes: null
   tags: null
@@ -129,16 +129,3 @@ sweep:
       - 0.002
       - 0.003
       - 0.004
-    augmentations:
-      values:
-      - - sin_distortion
-      - - time_stretch
-    r:
-      values:
-      - 1000
-      - 2000
-      - 3000
-      - 4000
-    adapter_type:
-      values:
-      - lora
