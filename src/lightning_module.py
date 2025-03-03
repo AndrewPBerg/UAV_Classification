@@ -192,19 +192,20 @@ class AudioClassifier(pl.LightningModule):
             final_f1 = self.predict_f1.compute()
             
             # Store metrics as attributes so they can be accessed later
+            # Convert tensor values to Python scalars
             self.predict_metrics = {
-                "predict_acc": final_accuracy,
-                "predict_precision": final_precision,
-                "predict_recall": final_recall,
-                "predict_f1": final_f1
+                "predict_acc": final_accuracy.item() if isinstance(final_accuracy, torch.Tensor) else final_accuracy,
+                "predict_precision": final_precision.item() if isinstance(final_precision, torch.Tensor) else final_precision,
+                "predict_recall": final_recall.item() if isinstance(final_recall, torch.Tensor) else final_recall,
+                "predict_f1": final_f1.item() if isinstance(final_f1, torch.Tensor) else final_f1
             }
             
             # Print final metrics
             print("\nPrediction Metrics:")
-            print(f"Accuracy: {final_accuracy:.4f}")
-            print(f"Precision: {final_precision:.4f}")
-            print(f"Recall: {final_recall:.4f}")
-            print(f"F1 Score: {final_f1:.4f}")
+            print(f"Accuracy: {self.predict_metrics['predict_acc']:.4f}")
+            print(f"Precision: {self.predict_metrics['predict_precision']:.4f}")
+            print(f"Recall: {self.predict_metrics['predict_recall']:.4f}")
+            print(f"F1 Score: {self.predict_metrics['predict_f1']:.4f}")
             
             # Reset metrics
             self.predict_accuracy.reset()

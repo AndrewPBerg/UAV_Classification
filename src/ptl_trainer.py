@@ -272,7 +272,7 @@ class PTLTrainer:
             metrics = {}
             
             # Check if model has predict_metrics attribute (added in our fix)
-            if hasattr(model, 'predict_metrics'):
+            if hasattr(model, 'predict_metrics') and model.predict_metrics:
                 metrics = {
                     "inference_acc": model.predict_metrics.get("predict_acc", None),
                     "inference_precision": model.predict_metrics.get("predict_precision", None),
@@ -280,10 +280,15 @@ class PTLTrainer:
                     "inference_f1": model.predict_metrics.get("predict_f1", None)
                 }
                 
-                # Convert tensor values to Python scalars
-                for key, value in metrics.items():
-                    if isinstance(value, torch.Tensor):
-                        metrics[key] = value.item()
+                # Log metrics to wandb if wandb logger is enabled
+                if self.wandb_logger and all(metrics.values()):
+                    print("Logging prediction metrics to wandb...")
+                    self.wandb_logger.experiment.log({
+                        "inference_accuracy": metrics["inference_acc"],
+                        "inference_precision": metrics["inference_precision"],
+                        "inference_recall": metrics["inference_recall"],
+                        "inference_f1": metrics["inference_f1"]
+                    })
             
             # If metrics are not available from model attributes, calculate them manually
             if not all(metrics.values()):
@@ -336,6 +341,16 @@ class PTLTrainer:
                 "inference_recall": recall,
                 "inference_f1": f1
             }
+            
+            # Log manually calculated metrics to wandb if wandb logger is enabled
+            if self.wandb_logger:
+                print("Logging manually calculated metrics to wandb...")
+                self.wandb_logger.experiment.log({
+                    "inference_accuracy": metrics["inference_acc"],
+                    "inference_precision": metrics["inference_precision"],
+                    "inference_recall": metrics["inference_recall"],
+                    "inference_f1": metrics["inference_f1"]
+                })
         
         except Exception as e:
             print(f"Error during inference: {str(e)}")
@@ -385,7 +400,11 @@ class PTLTrainer:
             
             # Log to wandb
             self.wandb_logger.experiment.log({
-                "inference_confusion_matrix": wandb.Image(plt)
+                "inference_confusion_matrix": wandb.Image(plt),
+                "final_inference_accuracy": metrics["inference_acc"],
+                "final_inference_precision": metrics["inference_precision"],
+                "final_inference_recall": metrics["inference_recall"],
+                "final_inference_f1": metrics["inference_f1"]
             })
             plt.close()
         
