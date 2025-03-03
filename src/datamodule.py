@@ -605,10 +605,6 @@ class AudioDataModule(pl.LightningDataModule):
             
             if not all(os.path.exists(p) for p in [train_path, val_path, test_path, inference_path]):
                 raise FileNotFoundError(f"One or more dataloader files not found in {path}")
-
-            # Load metadata
-            with open(metadata_path, 'r') as f:
-                metadata = json.load(f)
             
             # You can now access metadata['data_path'], metadata['batch_size'], etc.
             
@@ -661,6 +657,9 @@ class AudioDataModule(pl.LightningDataModule):
             ic(f"Number of augmentations: {augmentations_per_sample}")
 
             return train_loader, val_loader, test_loader, inference_loader
+        
+        else:
+            raise NotImplementedError("K-fold loading is not supported. Loaders will not be loaded.")
 
     def run_sweep(self, model_pipeline_fn: Callable, config_path: str = 'configs/config.yaml'):
         """
