@@ -156,15 +156,38 @@ def model_pipeline(sweep_config=None):
             )
             
             # Create PTL trainer with all necessary configurations
-            trainer = PTLTrainer(
-                general_config=general_config,
-                feature_extraction_config=feature_extraction_config,
-                peft_config=peft_config,
-                wandb_config=wandb_config if is_main_process else None,  # Only pass wandb_config on main process
-                sweep_config=None,  # We're not using a separate sweep config object here
-                data_module=data_module,
-                model_factory=model_factory
-            )
+            # IMPORTANT: For non-main processes, we still need to send a minimal wandb_config
+            # to avoid 'NoneType' has no attribute 'project' errors
+            if not is_main_process and wandb_config is None:
+                # Create a dummy wandb config with just enough attributes to avoid errors
+                # but disable actual logging for non-main processes
+                from types import SimpleNamespace
+                dummy_wandb_config = SimpleNamespace()
+                dummy_wandb_config.project = general_config.project if hasattr(general_config, 'project') else "dummy-project"
+                dummy_wandb_config.entity = general_config.entity if hasattr(general_config, 'entity') else None
+                dummy_wandb_config.mode = "disabled"  # Disable actual logging
+                
+                # Use the dummy config for non-main processes
+                trainer = PTLTrainer(
+                    general_config=general_config,
+                    feature_extraction_config=feature_extraction_config,
+                    peft_config=peft_config,
+                    wandb_config=dummy_wandb_config,
+                    sweep_config=None,
+                    data_module=data_module,
+                    model_factory=model_factory
+                )
+            else:
+                # Main process uses the real wandb_config
+                trainer = PTLTrainer(
+                    general_config=general_config,
+                    feature_extraction_config=feature_extraction_config,
+                    peft_config=peft_config,
+                    wandb_config=wandb_config,
+                    sweep_config=None,
+                    data_module=data_module,
+                    model_factory=model_factory
+                )
         except Exception as e:
             print(f"Error in configuration/initialization: {e}")
             import traceback
@@ -256,6 +279,22 @@ def main():
     """
     Main function to initialize and run the sweep.
     """
+    # Import necessary modules for distributed setup
+    import os
+    import torch.distributed as dist
+    from pytorch_lightning.utilities.rank_zero import rank_zero_only
+    
+    # Determine rank for DDP coordination
+    local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+    global_rank = int(os.environ.get("RANK", "0"))
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    is_distributed = world_size > 1
+    is_main_process = global_rank == 0
+    
+    # Only print from main process to avoid duplicate outputs
+    if is_main_process:
+        print(f"Starting with rank={global_rank}, local_rank={local_rank}, world_size={world_size}")
+    
     # Load configuration
     config = load_config(config_path="configs/config.yaml")
     
@@ -265,25 +304,45 @@ def main():
     torch.cuda.manual_seed(SEED)
     np.random.seed(SEED)
     
-    # Login to wandb
-    wandb_login()
-    
-    # Get sweep configuration
-    sweep_config = config['sweep']
+    # In distributed mode, only login to wandb on the main process
+    if is_main_process:
+        # Login to wandb
+        wandb_login()
+        
+        # Get sweep configuration
+        sweep_config = config['sweep']
 
-    # Initialize sweep
-    sweep_id = wandb.sweep(
-        sweep_config,
-        project=config['sweep']['project']
-    )
+        # Initialize sweep
+        sweep_id = wandb.sweep(
+            sweep_config,
+            project=config['sweep']['project']
+        )
+        
+        # Run sweep agent
+        wandb.agent(
+            sweep_id,
+            function=model_pipeline,
+            count=config['general'].get('sweep_count', 10)
+        )
+        
+        print("All runs completed.")
+    else:
+        # Non-main processes should just call model_pipeline once
+        # They will synchronize with the main process during distributed training
+        print(f"Rank {global_rank}: waiting for main process to coordinate training")
+        # Use a dummy sweep config with the same keys that would be in the real one
+        dummy_sweep = {
+            "learning_rate": config['general'].get('learning_rate', 0.001),
+            "seed": config['general'].get('seed', 42)
+        }
+        model_pipeline(dummy_sweep)
     
-    # Run sweep agent
-    wandb.agent(
-        sweep_id,
-        function=model_pipeline,
-        count=config['general'].get('sweep_count', 10)
-    )
+    # Clean up distributed environment
+    if is_distributed and dist.is_initialized():
+        dist.destroy_process_group()
 
 if __name__ == "__main__":
+    # Display PyTorch and GPU information
+    print_pytorch_info()
     main()
     

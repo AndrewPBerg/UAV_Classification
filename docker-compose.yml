@@ -18,24 +18,25 @@ services:
       - NVIDIA_VISIBLE_DEVICES=all
       - NVIDIA_DRIVER_CAPABILITIES=compute,utility
       - PL_TRAINER_STRATEGY=ddp
-      - TORCH_DISTRIBUTED_DEBUG=DETAIL
+      - TORCH_DISTRIBUTED_DEBUG=INFO  # Lower level to reduce noise
       - NCCL_DEBUG=INFO
       - NCCL_SOCKET_IFNAME=eth0
-      - NCCL_P2P_DISABLE=0  # Try enabling P2P now
+      - NCCL_P2P_DISABLE=0
       - NCCL_IB_DISABLE=1
-      - NCCL_BLOCKING_WAIT=1  # Use blocking wait for better stability
-      - TORCH_NCCL_ASYNC_ERROR_HANDLING=1  # Enable async error handling
+      - NCCL_BLOCKING_WAIT=1
+      - TORCH_NCCL_ASYNC_ERROR_HANDLING=1
       - WANDB_START_METHOD=thread
-      - WANDB_AGENT_DISABLE_FLAPPING=true  # Prevent wandb agent from stopping on failures
+      - WANDB_AGENT_DISABLE_FLAPPING=true
       - MASTER_ADDR=localhost
-      - MASTER_PORT=12355  # Specific port for DDP communication
-      - TORCH_CPP_LOG_LEVEL=INFO  # More verbose PyTorch logging
-      - TORCH_SHOW_CPP_STACKTRACES=1  # Show C++ stack traces for better debugging
+      - MASTER_PORT=12355
+      - TORCH_CPP_LOG_LEVEL=INFO
+      - TORCH_SHOW_CPP_STACKTRACES=1
+      - PYTHONPATH=/app
 
     volumes:
-      - ./src:/app/src  # Only mount the src directory as read-only
+      - ./src:/app/src
       - ./src/datasets/.:/app/src/datasets
-      - ./src/model_cache:/app/src/model_cache  # Mount the model_cache directory
+      - ./src/model_cache:/app/src/model_cache
     deploy:
       resources:
         reservations:
@@ -43,10 +44,9 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu, compute, utility]
-    # Change the command to explicitly use sweeps.py for testing
-    # command: python3 script.py
-    # command: python3 main.py
-    command: python3 -m torch.distributed.run --nproc_per_node=2 sweeps.py
+    # Use a simpler command that's more compatible with wandb
+    # command: python3 -m torch.distributed.run --nproc_per_node=2 sweeps.py
+    command: python3 sweeps.py  # Use the standard command and let PTL handle DDP
     # command: /bin/bash # interactive shell new
     stdin_open: true
     tty: true
@@ -54,12 +54,11 @@ services:
     user: root
     networks:
       - app_network
-    shm_size: 16gb  # Increase shared memory for better DDP performance
+    shm_size: 16gb
     ipc: host
     ulimits:
       memlock: -1
       stack: 67108864
-    # Add healthcheck to make sure container stays healthy
     healthcheck:
       test: ["CMD", "nvidia-smi"]
       interval: 60s
