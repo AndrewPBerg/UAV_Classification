@@ -119,16 +119,28 @@ class PTLTrainer:
     
     def train(self) -> Dict[str, Any]:
         """
-        Train the model using PyTorch Lightning.
+        Train the model.
         
         Returns:
-            Dictionary of training results
+            Dict[str, Any]: Test results
         """
+        import torch
+        
+        # Check if deterministic algorithms are enabled and disable them if needed
+        # This is necessary for operations like interpolation that don't have deterministic implementations
+        if torch.are_deterministic_algorithms_enabled():
+            print("Deterministic algorithms are enabled. Disabling for compatibility with certain operations.")
+            torch.use_deterministic_algorithms(False)
+        
         # Create model
         model, feature_extractor = self.model_factory(self.device)
         
+        # Create trainer
+        trainer = self._create_trainer()
+        ic("trainer created")
+        
         # Ensure data module is set up
-        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes is None:
+        if not self.data_module.is_setup:
             self.data_module.setup()
             
         # Validate number of classes
@@ -138,7 +150,7 @@ class PTLTrainer:
         # Log number of classes for debugging
         print(f"Number of classes in data module: {self.data_module.num_classes}")
         
-        # Create Lightning module
+        # Create lightning module
         lightning_module = AudioClassifier(
             model=model,
             general_config=self.general_config,
@@ -146,23 +158,12 @@ class PTLTrainer:
             num_classes=self.data_module.num_classes
         )
         
-        # Create trainer
-        trainer = pl.Trainer(
-            max_epochs=self.general_config.epochs,
-            accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,  # Always use a single device
-            callbacks=self._get_callbacks(),
-            logger=self.wandb_logger,
-            gradient_clip_val=1.0,
-            accumulate_grad_batches=self.general_config.accumulation_steps,
-            deterministic=True,
-            precision="16-mixed" if self.gpu_available else "32"
-        )
-        
-        # start timer (outside of trainer.fit, so it properly captures loading times)
-        start_time = time.time() 
-        
         # Train model
+        ic("Starting regular training")
+        
+        # Start timer
+        start_time = time.time()
+        
         try:
             trainer.fit(
                 model=lightning_module,

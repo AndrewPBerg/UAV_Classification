@@ -233,15 +233,25 @@ class AudioDataset(Dataset):
                 
                 # AST expects specific input dimensions
                 # Make sure we're using the right parameters for feature extraction
-                features = self.feature_extractor(
-                    audio_np,
-                    sampling_rate=self.target_sr,
-                    return_tensors="pt",
-                    padding="max_length",  # Use max_length padding to ensure consistent dimensions
-                    max_length=1024,       # Set a fixed max length that works with the model
-                    truncation=True        # Truncate if needed
-                )
-                logger.debug(f"AST raw features shape: {features.input_values.shape}")
+                try:
+                    features = self.feature_extractor(
+                        audio_np,
+                        sampling_rate=self.target_sr,
+                        return_tensors="pt",
+                        padding="max_length",  # Use max_length padding to ensure consistent dimensions
+                        max_length=1024,       # Set a fixed max length that works with the model
+                        truncation=True        # Truncate if needed
+                    )
+                    logger.debug(f"AST raw features shape: {features.input_values.shape}")
+                except Exception as e:
+                    logger.error(f"Error in AST feature extraction with padding: {e}")
+                    # Fallback to basic extraction
+                    features = self.feature_extractor(
+                        audio_np,
+                        sampling_rate=self.target_sr,
+                        return_tensors="pt"
+                    )
+                    logger.debug(f"AST fallback features shape: {features.input_values.shape}")
                 
                 # Get the features and ensure it has the right shape
                 feature_values = features.input_values.squeeze(0)
