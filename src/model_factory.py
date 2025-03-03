@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
+import types
 from typing import Dict, Tuple, Any, Optional, Union, Callable
+import os
 from torchvision.models import (
     # ResNet variants
     resnet18, ResNet18_Weights,
@@ -30,11 +32,14 @@ from torchvision.models import (
 from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierFTConfig, LNTuningConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
-from transformers import PreTrainedModel
+from transformers import (
+    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor
+)
+import math
 
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
-from ast_model import ASTModel
+
 
 
 class ModelFactory:
@@ -68,45 +73,44 @@ class ModelFactory:
         # else:
         #     torch.hub.set_dir('C:/app/src/model_cache')  # Set custom cache directory for Windows
         
-        torch.hub.set_dir('./model_cache')
+        # set model cache directory (for both transformer and torch-hub models)
+
+        CACHE_DIR = './model_cache'
+        torch.hub.set_dir(CACHE_DIR)
+        
         model_type = general_config.model_type.lower()
         num_classes = general_config.num_classes
         
-        # Get feature extractor and input shape
-        input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
+        ic(model_type)
         
-        # Create model based on type
-        if model_type == "ast":
-            # Use the new ASTModel class
-            model, _, _ = ASTModel.create_model(
-                num_classes=num_classes,
-                adapter_type=general_config.adapter_type,
-                peft_config=peft_config,
-                model_name=general_config.ast_model_name,
-                device=None  # Let PyTorch Lightning handle device placement
-            )
-            return model, feature_extractor
-        elif model_type.startswith("vit"):
-            model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("resnet"):
-            model = ModelFactory._create_resnet_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("mobilenet"):
-            model = ModelFactory._create_mobilenet_model(model_type, num_classes, input_shape)
-        elif model_type.startswith("efficientnet"):
-            model = ModelFactory._create_efficientnet_model(model_type, num_classes, input_shape)
+        # handle models downloaded from huggingface
+        if model_type in ["ast", "mert"]:
+            
+            # Create model and feature extractor based on type
+            if model_type == "ast":
+                # Use the new ASTModel class
+                model, feature_extractor = ModelFactory._create_ast_model(num_classes, CACHE_DIR)
+            elif model_type == "mert":
+                model, feature_extractor = ModelFactory._create_mert_model(CACHE_DIR)
+                
+            
+        
+        # handle models downloaded from torch-hub
         else:
-            raise ValueError(f"Unsupported model type: {model_type}")
+            # Get feature extractor and input shape
+            input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
+            # Create model based on type
+            if model_type == "vit":
+                model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("resnet"):
+                model = ModelFactory._create_resnet_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("mobilenet"):
+                model = ModelFactory._create_mobilenet_model(model_type, num_classes, input_shape)
+            elif model_type.startswith("efficientnet"):
+                model = ModelFactory._create_efficientnet_model(model_type, num_classes, input_shape)
+            else:
+                raise ValueError(f"Unsupported model type: {model_type}")
         
-        # Set up PEFT if requested and supported by model
-        # Other models don't support PEFT directly
-        if peft_config is not None and not isinstance(peft_config, str) and model_type == "ast":
-            model = get_peft_model(model, peft_config)
-            if hasattr(model, "print_trainable_parameters"):
-                model.print_trainable_parameters()
-        
-        # Don't move model to device - PyTorch Lightning will handle this
-        # Remove: if device is not None and model is not None:
-        #     model = model.to(device)
         
         return model, feature_extractor
     
@@ -149,17 +153,221 @@ class ModelFactory:
         return input_shape, feature_extractor
     
     @staticmethod
+    def _create_mert_model(CACHE_DIR: str) -> nn.Module:
+        """
+        Create a MERT model.
+        """
+        
+        pretrained_MERT_model="m-a-p/MERT-v1-330M"
+        
+        try:
+            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+        
+        try:
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
+            
+        return model, feature_extractor
+    
+    @staticmethod
+    def _create_ast_model(num_classes: int, CACHE_DIR: str) -> nn.Module:
+        """
+        Create an AST model.
+        """
+        import logging
+        import sys
+        import torch.nn.functional as F
+        import torch
+        
+        # Set up detailed logging
+        logging.basicConfig(
+            level=logging.CRITICAL,  # This will effectively disable most logging
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+            stream=sys.stdout
+        )
+        logger = logging.getLogger("AST_MODEL")
+        
+        pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
+
+        try:
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        model.config.num_labels = num_classes
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
+        
+        # Get the expected sequence length from the position embeddings
+        expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]
+        logger.debug(f"Expected sequence length from position embeddings: {expected_seq_length}")
+        
+        # Save original embeddings forward method
+        original_embeddings_forward = model.audio_spectrogram_transformer.embeddings.forward
+        
+        # Define a new embeddings forward method to handle sequence length mismatch
+        def new_embeddings_forward(self, input_values):
+            logger.debug(f"Embeddings input shape: {input_values.shape}")
+            
+            # Get patch embeddings
+            embeddings = self.patch_embeddings(input_values)
+            logger.debug(f"Patch embeddings shape: {embeddings.shape}")
+            
+            # Check if sequence length matches expected length
+            current_seq_length = embeddings.shape[1]
+            
+            if current_seq_length != expected_seq_length:
+                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
+                
+                # Use a deterministic approach instead of interpolation
+                # We'll use a learned projection layer to change the sequence length
+                if not hasattr(self, 'seq_adapter'):
+                    # Create a sequence adapter if it doesn't exist
+                    # This is a simple linear layer that projects from current_seq_length to expected_seq_length
+                    self.seq_adapter = torch.nn.Linear(
+                        current_seq_length, 
+                        expected_seq_length
+                    ).to(embeddings.device)
+                    logger.debug("Created sequence adapter layer")
+                
+                # Apply the sequence adapter
+                # [batch_size, seq_len, hidden_dim] -> [batch_size, hidden_dim, seq_len]
+                embeddings = embeddings.transpose(1, 2)
+                # Apply linear projection to change sequence length
+                embeddings = self.seq_adapter(embeddings)
+                # [batch_size, hidden_dim, seq_len] -> [batch_size, seq_len, hidden_dim]
+                embeddings = embeddings.transpose(1, 2)
+                
+                logger.debug(f"Adapted embeddings shape: {embeddings.shape}")
+            
+            # Add position embeddings
+            embeddings = embeddings + self.position_embeddings
+            embeddings = self.dropout(embeddings)
+            
+            return embeddings
+        
+        # Replace the embeddings forward method
+        model.audio_spectrogram_transformer.embeddings.forward = types.MethodType(
+            new_embeddings_forward, 
+            model.audio_spectrogram_transformer.embeddings
+        )
+        
+        # Save original forward method
+        original_forward = model.forward
+        
+        # Define a new forward method to handle input shape issues
+        def new_forward(self, x):
+            # Debug logging
+            logger.debug(f"AST model input shape before processing: {x.shape}")
+            
+            # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
+            if len(x.shape) == 5:
+                logger.debug(f"Detected 5D input tensor with shape: {x.shape}")
+                
+                # Get the dimensions
+                batch_size, channels, height, extra_dim, width = x.shape
+                
+                # Reshape to 4D tensor that conv2d can accept
+                # We need to reshape from [batch, channels, height, extra_dim, width] to [batch, channels, height*extra_dim, width]
+                try:
+                    x = x.reshape(batch_size, channels, height * extra_dim, width)
+                    logger.debug(f"Reshaped tensor to: {x.shape}")
+                except Exception as e:
+                    logger.error(f"Error reshaping tensor: {e}")
+                    
+                    # Alternative approach: try to squeeze out the extra dimension if it's 1
+                    if extra_dim == 1:
+                        try:
+                            x = x.squeeze(3)  # Remove the 4th dimension (index 3)
+                            logger.debug(f"Squeezed tensor to: {x.shape}")
+                        except Exception as e2:
+                            logger.error(f"Error squeezing tensor: {e2}")
+                            
+                            # Last resort: try to view the tensor differently
+                            try:
+                                x = x.view(batch_size, channels, height, width)
+                                logger.debug(f"Viewed tensor as: {x.shape}")
+                            except Exception as e3:
+                                logger.error(f"Error viewing tensor: {e3}")
+            
+            # Final shape check before passing to original forward
+            logger.debug(f"Final tensor shape before original forward: {x.shape}")
+            
+            try:
+                return original_forward(x)
+            except Exception as e:
+                logger.error(f"Error in original_forward: {e}")
+                logger.error(f"Input tensor shape: {x.shape}")
+                raise
+        
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
+        
+        # Also patch the patch_embeddings projection method directly
+        original_patch_embeddings_forward = model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward
+        
+        def new_patch_embeddings_forward(self, input_values):
+            logger.debug(f"Patch embeddings input shape: {input_values.shape}")
+            
+            # Handle 5D input directly at the patch embeddings level
+            if len(input_values.shape) == 5:
+                logger.debug("Fixing 5D input at patch embeddings level")
+                batch_size, channels, height, extra_dim, width = input_values.shape
+                
+                # Try different approaches
+                if extra_dim == 1:
+                    # If extra dimension is 1, just squeeze it out
+                    input_values = input_values.squeeze(3)
+                    logger.debug(f"Squeezed to shape: {input_values.shape}")
+                else:
+                    # Otherwise reshape
+                    try:
+                        input_values = input_values.reshape(batch_size, channels, height * extra_dim, width)
+                        logger.debug(f"Reshaped to: {input_values.shape}")
+                    except Exception as e:
+                        logger.error(f"Error reshaping in patch embeddings: {e}")
+            
+            # Call original method with fixed input
+            try:
+                result = original_patch_embeddings_forward(input_values)
+                logger.debug(f"Patch embeddings output shape: {result.shape}")
+                return result
+            except Exception as e:
+                logger.error(f"Error in original patch embeddings forward: {e}")
+                logger.error(f"Input shape: {input_values.shape}")
+                # Try one more approach if it fails
+                if len(input_values.shape) == 4:
+                    logger.debug("Attempting alternative approach for 4D input")
+                    # Try to use the projection directly
+                    try:
+                        result = self.projection(input_values).flatten(2).transpose(1, 2)
+                        logger.debug(f"Direct projection successful, shape: {result.shape}")
+                        return result
+                    except Exception as e2:
+                        logger.error(f"Direct projection failed: {e2}")
+                raise
+        
+        # Replace the patch embeddings forward method
+        model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward = types.MethodType(
+            new_patch_embeddings_forward, 
+            model.audio_spectrogram_transformer.embeddings.patch_embeddings
+        )
+        
+        try:
+            feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+        except OSError:
+            feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
+        return model, feature_extractor
+        
+    
+    @staticmethod
     def _create_vit_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int]) -> nn.Module:
         """
         Create a ViT model.
-        
-        Args:
-            model_type: Model type (e.g., 'vit_b_16')
-            num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
-            
-        Returns:
-            ViT model
         """
         # Parse model size from model type
         if "b_16" in model_type:
@@ -174,15 +382,11 @@ class ModelFactory:
             model = vit_h_14(weights=ViT_H_14_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported ViT model type: {model_type}")
-        
-        # Modify the model for audio input
+
+        # Add resize layer to match ViT's expected input size
         model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         
-        # Store original forward method
-        original_forward = model.forward
-        
-        # Define new forward method
         def new_forward(self, x):
             # Handle input
             x = x.float()
@@ -192,16 +396,57 @@ class ModelFactory:
             # Resize input to match ViT's expected size
             x = resize_layer(x)
             
-            # Call original forward method
-            return original_forward(x)
-        
-        # Replace forward method
-        model.forward = new_forward.__get__(model, type(model))
-        
-        # Replace classification head
-        in_features = model.heads.head.in_features
-        model.heads.head = nn.Linear(in_features, num_classes)
-        
+            # Process through convolutional projection
+            x = self.conv_proj(x)
+            
+            # Reshape to sequence
+            batch_size = x.shape[0]
+            x = x.flatten(2).transpose(1, 2)
+            
+            # Add class token
+            class_token = self.class_token.expand(batch_size, -1, -1)
+            x = torch.cat([class_token, x], dim=1)
+            
+            # Get position embeddings and adjust if necessary
+            pos_embedding = self.encoder.pos_embedding
+            if x.size(1) != pos_embedding.size(1):
+                # Remove class token from position embeddings
+                pos_tokens = pos_embedding[:, 1:]
+                # Reshape position embeddings to square grid
+                grid_size = int(math.sqrt(pos_tokens.size(1)))
+                pos_tokens = pos_tokens.reshape(-1, grid_size, grid_size, pos_embedding.size(-1))
+                
+                # Interpolate position embeddings to match sequence length
+                new_grid_size = int(math.sqrt(x.size(1) - 1))  # -1 for class token
+                pos_tokens = torch.nn.functional.interpolate(
+                    pos_tokens.permute(0, 3, 1, 2),
+                    size=(new_grid_size, new_grid_size),
+                    mode='bilinear',
+                    align_corners=False
+                )
+                pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
+                
+                # Add class token position embedding back
+                new_pos_embedding = torch.cat([pos_embedding[:, :1], pos_tokens], dim=1)
+                x = x + new_pos_embedding
+            else:
+                x = x + pos_embedding
+            
+            # Forward through encoder and classification head
+            for block in self.encoder.layers:
+                x = block(x)
+            x = self.encoder.ln(x)
+            x = x[:, 0]
+            x = self.heads(x)
+            
+            return x
+
+        # Update model components
+        model.forward = types.MethodType(new_forward, model)
+        model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
+        hidden_dim = model.conv_proj.out_channels
+        model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
+
         return model
     
     @staticmethod
@@ -350,4 +595,4 @@ class ModelFactory:
                 device=device
             )
         
-        return factory_fn 
+        return factory_fn

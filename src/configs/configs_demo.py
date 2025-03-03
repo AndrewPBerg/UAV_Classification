@@ -28,7 +28,8 @@ class _ModelNames(BaseModel):
                              "ast", 
                              "mert",
                              "resnet18", "resnet34", "resnet50", "resnet101", "resnet152",
-                             "densenet121", "densenet161", "densenet169", "densenet201",
+                             "efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3", "efficientnet_b4", 
+                             "efficientnet_b5", "efficientnet_b6", "efficientnet_b7",
                              "mobilenet_v3_small", "mobilenet_v3_large",
                             ]
 

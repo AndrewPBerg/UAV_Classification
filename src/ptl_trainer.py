@@ -14,6 +14,7 @@ from lightning_module import AudioClassifier
 from datamodule import AudioDataModule
 from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from helper.util import wandb_login
+import time
 
 
 class PTLTrainer:
@@ -118,32 +119,21 @@ class PTLTrainer:
     
     def train(self) -> Dict[str, Any]:
         """
-        Train the model using PyTorch Lightning.
+        Train the model.
         
         Returns:
-            Dictionary of training results
+            Dict[str, Any]: Test results
         """
+        import torch
+        
+        # Check if deterministic algorithms are enabled and disable them if needed
+        # This is necessary for operations like interpolation that don't have deterministic implementations
+        if torch.are_deterministic_algorithms_enabled():
+            print("Deterministic algorithms are enabled. Disabling for compatibility with certain operations.")
+            torch.use_deterministic_algorithms(False)
+        
         # Create model
         model, feature_extractor = self.model_factory(self.device)
-        
-        # Ensure data module is set up
-        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes is None:
-            self.data_module.setup()
-            
-        # Validate number of classes
-        if self.data_module.num_classes <= 0:
-            raise ValueError(f"Invalid number of classes: {self.data_module.num_classes}. Must be positive.")
-            
-        # Log number of classes for debugging
-        print(f"Number of classes in data module: {self.data_module.num_classes}")
-        
-        # Create Lightning module
-        lightning_module = AudioClassifier(
-            model=model,
-            general_config=self.general_config,
-            peft_config=self.peft_config,
-            num_classes=self.data_module.num_classes
-        )
         
         # Create trainer
         trainer = pl.Trainer(
@@ -154,11 +144,39 @@ class PTLTrainer:
             logger=self.wandb_logger,
             gradient_clip_val=1.0,
             accumulate_grad_batches=self.general_config.accumulation_steps,
-            deterministic=True,
+            deterministic=False,  # Set to False to avoid issues with operations that don't have deterministic implementations
             precision="16-mixed" if self.gpu_available else "32"
+        )
+        ic("trainer created")
+        
+        # Ensure data module is set up - call setup directly
+        try:
+            self.data_module.setup()
+        except Exception as e:
+            print(f"Warning: Error during data module setup: {str(e)}")
+            print("This may be normal if the data module is already set up.")
+            
+        # Validate number of classes
+        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes <= 0:
+            raise ValueError(f"Invalid number of classes: {getattr(self.data_module, 'num_classes', None)}. Must be positive.")
+            
+        # Log number of classes for debugging
+        print(f"Number of classes in data module: {self.data_module.num_classes}")
+        
+        # Create lightning module
+        lightning_module = AudioClassifier(
+            model=model,
+            general_config=self.general_config,
+            peft_config=self.peft_config,
+            num_classes=self.data_module.num_classes
         )
         
         # Train model
+        ic("Starting regular training")
+        
+        # Start timer
+        start_time = time.time()
+        
         try:
             trainer.fit(
                 model=lightning_module,
@@ -173,6 +191,23 @@ class PTLTrainer:
                 print("Please check your dataset preprocessing and ensure all labels are correctly mapped.")
                 return {"error": "Invalid class labels in dataset"}
             raise  # Re-raise the exception if it's not the specific error we're handling
+        
+        
+        def _format_time(seconds):
+            """Convert seconds to mm:ss format"""
+            minutes = int(seconds // 60)
+            seconds = int(seconds % 60)
+            return f"{minutes:02d}:{seconds:02d}"
+        
+        
+        end_time = time.time() - start_time
+        formatted_end_time = _format_time(end_time)
+        # total train time
+        ic(formatted_end_time)
+        if self.wandb_logger :
+                            self.wandb_logger.experiment.log({
+                                "total_train_time": formatted_end_time
+                            })
         
         # Test model
         try:

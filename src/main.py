@@ -26,6 +26,7 @@ from sweeps import main as sweep_main
 import yaml
 from typing import Any
 from helper.teleBot import send_message
+import traceback
 
 def change_config_value(file_path: str, key: str, value: Any) -> None:
     """
@@ -180,6 +181,8 @@ def main():
             
     except Exception as e:
         ic('Error occurred during orchestration:', e)
+        traceback_str = ''.join(traceback.format_exc())
+        ic(traceback_str)
         if oc.get('SEND_MESSAGE'):
                 send_message(f'Your Symphony has failed @ run number: {run_count}.\n\n Traceback: {e}')
 

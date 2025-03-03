@@ -1,7 +1,6 @@
 import os
 import torch
 import torch.nn as nn
-import logging
 from typing import Tuple, Dict, Any, Optional, Union
 from transformers import (
     ASTFeatureExtractor, 
@@ -12,11 +11,6 @@ from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
 from pathlib import Path
-
-# Set up logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-logging.getLogger('transformers').setLevel(logging.ERROR)
 
 # Constants
 CACHE_DIR = os.path.join("/app/src/model_cache")
@@ -112,7 +106,7 @@ class ASTModel:
             )
         except OSError:
             # If not in cache, download it
-            logger.info(f"Model not found in cache. Downloading {model_name}...")
+            print(f"Model not found in cache. Downloading {model_name}...")
             try:
                 return ASTForAudioClassification.from_pretrained(
                     model_name, 
@@ -120,7 +114,7 @@ class ASTModel:
                     cache_dir=CACHE_DIR
                 )
             except Exception as e:
-                logger.error(f"Failed to download model: {str(e)}")
+                print(f"Failed to download model: {str(e)}")
                 return None
     
     @staticmethod
@@ -143,14 +137,14 @@ class ASTModel:
             )
         except OSError:
             # If not in cache, download it
-            logger.info(f"Processor not found in cache. Downloading {model_name}...")
+            print(f"Processor not found in cache. Downloading {model_name}...")
             try:
                 return ASTFeatureExtractor.from_pretrained(
                     model_name, 
                     cache_dir=CACHE_DIR
                 )
             except Exception as e:
-                logger.error(f"Failed to download processor: {str(e)}")
+                print(f"Failed to download processor: {str(e)}")
                 return None
     
     @staticmethod

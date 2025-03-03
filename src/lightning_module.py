@@ -6,8 +6,6 @@ from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, M
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
-import time
-import wandb
 
 from configs.configs_demo import GeneralConfig
 import re
@@ -54,12 +52,6 @@ class AudioClassifier(pl.LightningModule):
         # Enable automatic optimization
         self.automatic_optimization = True
 
-        # Simplify timing variables
-        self.train_start_time = None
-        self.test_start_time = None
-        self.total_train_time = 0
-        self.total_test_time = 0
-        
         # Initialize prediction metrics dictionary to store results
         self.predict_metrics = {}
         
@@ -95,53 +87,72 @@ class AudioClassifier(pl.LightningModule):
         
     def forward(self, x):
         """Forward pass through the model."""
+        
+        
         # Ensure input is float32
         x = x.float()
         
+        # Debug input shape
+        
+        
+        # Check for problematic 5D input shape for AST model specifically
+        # Properly detect if this is an AST model
+        is_ast_model = False
+
+        # Check if this is an AST model by looking for specific attributes
+        if hasattr(self.model, 'audio_spectrogram_transformer'):
+            is_ast_model = True
+            
+        elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
+            is_ast_model = True
+
+            
+        
+        # Handle 5D input for AST models
+        if is_ast_model and len(x.shape) == 5:
+          
+
+            # If we have a 5D tensor [batch, channels, height, extra_dim, width]
+            batch_size, channels, height, extra_dim, width = x.shape
+            
+            # Try different approaches to reshape
+            if extra_dim == 1:
+                # If the extra dimension is 1, we can just squeeze it out
+                x = x.squeeze(3)
+                
+            else:
+                # Otherwise reshape to combine dimensions
+                x = x.reshape(batch_size, channels, height * extra_dim, width)
+                
+        
+        
         # Forward pass
+        
+
         outputs = self.model(x)
+
+            
+            # If we're using an AST model and get an error, try one more approach
+        if is_ast_model:                    
+            # Try to reshape the input to match expected dimensions
+            if len(x.shape) == 4:  # [batch, channels, height, width]
+                # AST expects specific input dimensions, try to adapt
+                batch_size, channels, height, width = x.shape
+                # Reshape to match expected input shape for AST
+                # The exact reshape depends on the model's expectations
+                x = x.view(batch_size, channels, height, width)
+                
+                outputs = self.model(x)
+                    
+            else:
+                raise Exception("Model is not in correct AST model format")
+
         
         # Handle different model output formats
         if hasattr(outputs, "logits"):
             return outputs.logits
         else:
             return outputs
-    
-    def _format_time(self, seconds):
-        """Convert seconds to mm:ss format"""
-        minutes = int(seconds // 60)
-        seconds = int(seconds % 60)
-        return f"{minutes:02d}:{seconds:02d}"
-        
-    def on_train_epoch_start(self):
-        """Called at the beginning of training epoch"""
-        self.train_start_time = time.time()
-        
-    def on_train_epoch_end(self):
-        """Called at the end of training epoch"""
-        if self.train_start_time is not None:
-            self.total_train_time += time.time() - self.train_start_time
-            
-    def on_fit_end(self):
-        """Log final training time at the end of fitting (after training completes)"""
-        formatted_time = self._format_time(self.total_train_time)
-        if wandb.run is not None:
-            wandb.log({"total_train_time": formatted_time})
-
-    def on_test_epoch_start(self):
-        """Called at the beginning of test epoch"""
-        self.test_start_time = time.time()
-        
-    def on_test_epoch_end(self):
-        """Called at the end of test epoch"""
-        if self.test_start_time is not None:
-            self.total_test_time += time.time() - self.test_start_time
-            
-    def on_test_model_end(self):
-        """Log final test time at the end of testing"""
-        formatted_time = self._format_time(self.total_test_time)
-        if wandb.run is not None:
-            wandb.log({"total_test_time": formatted_time})
         
     def on_predict_start(self):
         """Called at the beginning of prediction."""
