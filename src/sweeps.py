@@ -9,6 +9,8 @@ import copy
 import os
 import os
 from pytorch_lightning.loggers import WandbLogger
+import torch.distributed as dist
+import pytorch_lightning as pl
 
 # Import the PyTorch Lightning implementation
 from ptl_trainer import PTLTrainer
@@ -40,7 +42,26 @@ def load_config(config_path: str = 'configs/config.yaml') -> Dict[str, Any]:
 
 def model_pipeline(sweep_config=None):
     try:
-        # Load the general configuration
+        # Import needed modules
+        import os
+        import copy
+        import torch
+        import torch.distributed as dist
+        import pytorch_lightning as pl
+        from pytorch_lightning.loggers import WandbLogger
+        
+        # Determine rank for DDP coordination
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
+        global_rank = int(os.environ.get("RANK", "0"))
+        world_size = int(os.environ.get("WORLD_SIZE", "1"))
+        is_distributed = world_size > 1
+        is_main_process = global_rank == 0
+        
+        # Basic configuration tracking
+        if is_main_process:
+            print(f"DDP Configuration: world_size={world_size}, rank={global_rank}, local_rank={local_rank}")
+        
+        # Load the general configuration - should be identical on all ranks
         config = load_config()
         
         # If this is a sweep run, merge the configurations
@@ -48,8 +69,7 @@ def model_pipeline(sweep_config=None):
             # Use a more robust merging of configurations
             mixed_params = get_mixed_params(config, sweep_config)
             # Make sure all required configurations exist with defaults if needed
-            if 'aug_config' not in locals() or 'aug_config' not in globals():
-                aug_config = {}  # Default empty dict to avoid UnboundLocalError
+            aug_config = {}  # Default empty dict to avoid UnboundLocalError
             
             # Create a copy to avoid modifying the original during DDP
             config_copy = copy.deepcopy(mixed_params)
@@ -58,100 +78,126 @@ def model_pipeline(sweep_config=None):
         
         # Get the number of GPUs and set up DDP strategy
         num_gpus = torch.cuda.device_count()
-        print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if num_gpus > 1 else 'auto'}")
+        if is_main_process:
+            print(f"Available GPUs: {num_gpus}, using strategy: {'ddp' if num_gpus > 1 else 'auto'}")
         
-        # Make sure strategy is properly passed to Trainer
-        trainer_kwargs = config_copy.get("trainer", {})
-        if num_gpus > 1:
+        # Create DDP strategy configuration consistently across all ranks
+        trainer_kwargs = config_copy.get("trainer", {}).copy()
+        if is_distributed:
+            # Use explicit strategy for DDP to avoid discrepancies
+            trainer_kwargs["accelerator"] = "gpu"
+            trainer_kwargs["devices"] = [local_rank]  # Each process uses its specific GPU
             trainer_kwargs["strategy"] = "ddp"
-            # Add find_unused_parameters to avoid DDP issues with unused model parameters
-            trainer_kwargs["plugins"] = [{"class_path": "pytorch_lightning.plugins.environments.LightningEnvironment"}]
-            trainer_kwargs["strategy_kwargs"] = {"find_unused_parameters": False}
+            trainer_kwargs["num_nodes"] = 1
+            trainer_kwargs["use_distributed_sampler"] = True
+            
+            # Set strategy_kwargs only if not already set to avoid overwriting
+            if "strategy_kwargs" not in trainer_kwargs:
+                trainer_kwargs["strategy_kwargs"] = {"find_unused_parameters": False}
         
-        # Set up wandb configuration properly for DDP
-        # Only initialize wandb on the main process for DDP
-        local_rank = int(os.environ.get("LOCAL_RANK", 0))
-        is_main_process = local_rank == 0
-        
-        # Configure a proper WandbLogger for PyTorch Lightning
-        if "wandb" in config_copy:
+        # Configure wandb properly - ONLY on the main process
+        if is_main_process and "wandb" in config_copy:
             try:
-                # Make sure we don't have conflicting runs
-                if wandb.run is not None and is_main_process:
+                # Finish any existing wandb runs to avoid conflicts
+                if wandb.run is not None:
                     wandb.finish()
                 
-                # Extract wandb config
+                # Extract and clean wandb config
                 wandb_config = config_copy.get("wandb", {}).copy()
-                # Remove problematic nested configurations
                 if "config" in wandb_config:
                     del wandb_config["config"]
                 
-                # Only log from rank 0 in DDP
+                # Create WandbLogger for Lightning - simpler and more compatible with DDP
                 wandb_logger = WandbLogger(
-                    log_model=True,
                     save_dir="./wandb",
+                    log_model=True,
                     **wandb_config,
                     settings=wandb.Settings(start_method="thread")
                 )
                 
-                # Add logger to trainer args
-                if "logger" not in trainer_kwargs:
-                    trainer_kwargs["logger"] = wandb_logger
+                # Set logger in trainer args
+                trainer_kwargs["logger"] = wandb_logger
             except Exception as e:
-                ic("Error setting up wandb logger:", e)
-                # Continue without wandb if it fails
+                print(f"Error setting up wandb: {e}")
+        else:
+            # For non-main processes, use a dummy logger
+            trainer_kwargs["logger"] = False
         
-        # load into pydantic models w/ load_configs()
-        (
-        general_config,
-        feature_extraction_config,
-        peft_config,
-        wandb_config,
-        sweep_config,
-        augmentation_config
-         ) = load_configs(config_copy)
+        # Synchronize all processes before model creation to ensure consistency
+        if is_distributed and dist.is_initialized():
+            dist.barrier()
         
-        # Create data module
-        data_module = AudioDataModule(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            augmentation_config=augmentation_config,
-            wandb_config=wandb_config,
-            sweep_config=sweep_config
-        )
-        
-        # Get model factory function
-        model_factory = ModelFactory.get_model_factory(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            peft_config=peft_config
-        )
-        
-        # Create PTL trainer
-        trainer = PTLTrainer(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            peft_config=peft_config,
-            wandb_config=wandb_config,
-            sweep_config=None,  # We're not using a separate sweep config object here
-            data_module=data_module,
-            model_factory=model_factory
-        )
-        
-        # Create the model
-        from Model import AudioClassifier
-        model = AudioClassifier(config_copy)
-        
-        # Run the training
+        # load into pydantic models w/ load_configs() - critical part where errors occur
         try:
-            results = trainer.train()
+            # Note: This is where the models are created from config
+            # Make sure this code path is identical on all ranks
+            (
+                general_config,
+                feature_extraction_config,
+                peft_config,
+                wandb_config,
+                sweep_config,
+                aug_config,
+            ) = load_configs(config_copy)
+            
+            # Safely access data
+            data_module = AudioDataModule(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                augmentation_config=aug_config,
+                wandb_config=wandb_config,
+                sweep_config=sweep_config
+            )
+            
+            model_factory = ModelFactory.get_model_factory(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                peft_config=peft_config
+            )
+            
+            # Create PTL trainer with all necessary configurations
+            trainer = PTLTrainer(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                peft_config=peft_config,
+                wandb_config=wandb_config if is_main_process else None,  # Only pass wandb_config on main process
+                sweep_config=None,  # We're not using a separate sweep config object here
+                data_module=data_module,
+                model_factory=model_factory
+            )
         except Exception as e:
-            ic(f"Error during training: {str(e)}")
+            print(f"Error in configuration/initialization: {e}")
+            import traceback
+            traceback.print_exc()
             raise
         
-        # Only log from main process
-        if is_main_process and wandb.run:
+        # Synchronize again before training
+        if is_distributed and dist.is_initialized():
+            dist.barrier()
+        
+        # Run the training with proper error handling
+        try:
+            # Disable wandb syncing for non-main processes
+            if not is_main_process and wandb.run is not None:
+                os.environ["WANDB_MODE"] = "offline"
+            
+            results = trainer.train()
+            
+        except Exception as e:
+            print(f"Error during training: {str(e)}")
+            # Clean up distributed environment on error
+            if is_distributed and dist.is_initialized():
+                dist.destroy_process_group()
+            raise
+        
+        # Final cleanup
+        if is_main_process and wandb.run is not None:
             wandb.finish()
+            
+        # Wait for all processes to finish
+        if is_distributed and dist.is_initialized():
+            dist.barrier()
+            dist.destroy_process_group()
             
         return results
     except Exception as e:
