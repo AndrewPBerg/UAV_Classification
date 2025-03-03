@@ -87,86 +87,66 @@ class AudioClassifier(pl.LightningModule):
         
     def forward(self, x):
         """Forward pass through the model."""
-        import logging
-        import sys
         
-        # Set up detailed logging
-        logging.basicConfig(
-            level=logging.DEBUG,
-            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            stream=sys.stdout
-        )
-        logger = logging.getLogger("LIGHTNING_MODULE")
         
         # Ensure input is float32
         x = x.float()
         
         # Debug input shape
-        logger.debug(f"Input shape in lightning module forward: {x.shape}")
+        
         
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
         is_ast_model = False
-        try:
-            # Check if this is an AST model by looking for specific attributes
-            if hasattr(self.model, 'audio_spectrogram_transformer'):
-                is_ast_model = True
-                logger.debug("Detected AST model")
-            elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
-                is_ast_model = True
-                logger.debug("Detected AST model via config")
-        except Exception as e:
-            logger.error(f"Error detecting model type: {e}")
+
+        # Check if this is an AST model by looking for specific attributes
+        if hasattr(self.model, 'audio_spectrogram_transformer'):
+            is_ast_model = True
+            
+        elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
+            is_ast_model = True
+
+            
         
         # Handle 5D input for AST models
         if is_ast_model and len(x.shape) == 5:
-            logger.debug(f"Handling 5D input for AST model: {x.shape}")
-            try:
-                # If we have a 5D tensor [batch, channels, height, extra_dim, width]
-                batch_size, channels, height, extra_dim, width = x.shape
+          
+
+            # If we have a 5D tensor [batch, channels, height, extra_dim, width]
+            batch_size, channels, height, extra_dim, width = x.shape
+            
+            # Try different approaches to reshape
+            if extra_dim == 1:
+                # If the extra dimension is 1, we can just squeeze it out
+                x = x.squeeze(3)
                 
-                # Try different approaches to reshape
-                if extra_dim == 1:
-                    # If the extra dimension is 1, we can just squeeze it out
-                    x = x.squeeze(3)
-                    logger.debug(f"Squeezed tensor to: {x.shape}")
-                else:
-                    # Otherwise reshape to combine dimensions
-                    x = x.reshape(batch_size, channels, height * extra_dim, width)
-                    logger.debug(f"Reshaped tensor to: {x.shape}")
-            except Exception as e:
-                logger.error(f"Error reshaping tensor in lightning module: {e}")
+            else:
+                # Otherwise reshape to combine dimensions
+                x = x.reshape(batch_size, channels, height * extra_dim, width)
+                
+        
         
         # Forward pass
-        logger.debug(f"Tensor shape before model forward: {x.shape}")
-        try:
-            outputs = self.model(x)
-            logger.debug("Model forward pass successful")
-        except Exception as e:
-            logger.error(f"Error in model forward pass: {e}")
-            logger.error(f"Input tensor shape: {x.shape}")
+        
+
+        outputs = self.model(x)
+
             
             # If we're using an AST model and get an error, try one more approach
-            if is_ast_model:
-                try:
-                    logger.debug("Attempting alternative approach for AST model")
-                    # Try to reshape the input to match expected dimensions
-                    if len(x.shape) == 4:  # [batch, channels, height, width]
-                        # AST expects specific input dimensions, try to adapt
-                        batch_size, channels, height, width = x.shape
-                        # Reshape to match expected input shape for AST
-                        # The exact reshape depends on the model's expectations
-                        x = x.view(batch_size, channels, height, width)
-                        logger.debug(f"Reshaped for AST to: {x.shape}")
-                        outputs = self.model(x)
-                        logger.debug("Alternative approach successful")
-                    else:
-                        raise e
-                except Exception as e2:
-                    logger.error(f"Alternative approach failed: {e2}")
-                    raise e  # Raise the original error
+        if is_ast_model:                    
+            # Try to reshape the input to match expected dimensions
+            if len(x.shape) == 4:  # [batch, channels, height, width]
+                # AST expects specific input dimensions, try to adapt
+                batch_size, channels, height, width = x.shape
+                # Reshape to match expected input shape for AST
+                # The exact reshape depends on the model's expectations
+                x = x.view(batch_size, channels, height, width)
+                
+                outputs = self.model(x)
+                    
             else:
-                raise
+                raise Exception("Model is not in correct AST model format")
+
         
         # Handle different model output formats
         if hasattr(outputs, "logits"):

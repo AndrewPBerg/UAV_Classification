@@ -184,7 +184,7 @@ class ModelFactory:
         
         # Set up detailed logging
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.INFO,  # Changed from DEBUG to INFO to turn off debugging logs
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             stream=sys.stdout
         )
