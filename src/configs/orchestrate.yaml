@@ -5,7 +5,7 @@ SEND_MESSAGE: false
 
 runs:
   - id: 0
-    type: script
+    type: sweep
     changes:
       wandb:
         name: demo-with-inf-2
