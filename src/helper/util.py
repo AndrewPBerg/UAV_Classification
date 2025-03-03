@@ -196,7 +196,7 @@ class AudioDataset(Dataset):
         
         # Set up detailed logging
         logging.basicConfig(
-            level=logging.DEBUG,
+            level=logging.CRITICAL,
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             stream=sys.stdout
         )
