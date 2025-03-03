@@ -89,9 +89,11 @@ class ModelFactory:
             # Create model and feature extractor based on type
             if model_type == "ast":
                 # Use the new ASTModel class
-                model, feature_extractor = ModelFactory._create_ast_model(CACHE_DIR)
+                model, feature_extractor = ModelFactory._create_ast_model(num_classes, CACHE_DIR)
             elif model_type == "mert":
                 model, feature_extractor = ModelFactory._create_mert_model(CACHE_DIR)
+                
+            
         
         # handle models downloaded from torch-hub
         else:
@@ -171,7 +173,7 @@ class ModelFactory:
         return model, feature_extractor
     
     @staticmethod
-    def _create_ast_model(CACHE_DIR: str) -> nn.Module:
+    def _create_ast_model(num_classes: int, CACHE_DIR: str) -> nn.Module:
         """
         Create an AST model.
         """
@@ -194,6 +196,10 @@ class ModelFactory:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        
+        model.config.num_labels = num_classes
+        in_features = model.classifier.dense.in_features
+        model.classifier.dense = nn.Linear(in_features, num_classes)
         
         # Get the expected sequence length from the position embeddings
         expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]

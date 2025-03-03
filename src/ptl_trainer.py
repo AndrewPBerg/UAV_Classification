@@ -149,13 +149,16 @@ class PTLTrainer:
         )
         ic("trainer created")
         
-        # Ensure data module is set up
-        if not self.data_module.is_setup:
+        # Ensure data module is set up - call setup directly
+        try:
             self.data_module.setup()
+        except Exception as e:
+            print(f"Warning: Error during data module setup: {str(e)}")
+            print("This may be normal if the data module is already set up.")
             
         # Validate number of classes
-        if self.data_module.num_classes <= 0:
-            raise ValueError(f"Invalid number of classes: {self.data_module.num_classes}. Must be positive.")
+        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes <= 0:
+            raise ValueError(f"Invalid number of classes: {getattr(self.data_module, 'num_classes', None)}. Must be positive.")
             
         # Log number of classes for debugging
         print(f"Number of classes in data module: {self.data_module.num_classes}")
