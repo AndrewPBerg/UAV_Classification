@@ -267,7 +267,78 @@ class PTLTrainer:
         if not predictions:
             return {}
         
-        # Collect all predictions and ground truth
+        # Get metrics from the model's logged metrics
+        # The metrics are automatically logged in the on_predict_epoch_end method
+        metrics = {}
+        
+        # Try to get metrics from the trainer's callback_metrics
+        if hasattr(trainer, 'callback_metrics'):
+            metrics = {
+                "inference_acc": trainer.callback_metrics.get("predict_acc", None),
+                "inference_precision": trainer.callback_metrics.get("predict_precision", None),
+                "inference_recall": trainer.callback_metrics.get("predict_recall", None),
+                "inference_f1": trainer.callback_metrics.get("predict_f1", None)
+            }
+            
+            # Convert tensor values to Python scalars
+            for key, value in metrics.items():
+                if isinstance(value, torch.Tensor):
+                    metrics[key] = value.item()
+        
+        # If metrics are not available from callback_metrics, calculate them manually
+        if not all(metrics.values()):
+            print("Metrics not found in callback_metrics, calculating manually...")
+            
+            # Collect all predictions and ground truth
+            all_preds = []
+            all_targets = []
+            
+            for batch_preds in predictions:
+                batch_pred_classes, batch_targets = batch_preds
+                all_preds.append(batch_pred_classes)
+                all_targets.append(batch_targets)
+            
+            # Concatenate all batches
+            all_preds = torch.cat(all_preds)
+            all_targets = torch.cat(all_targets)
+            
+            # Calculate metrics
+            from torchmetrics.functional import (
+                multiclass_accuracy,
+                multiclass_precision,
+                multiclass_recall,
+                multiclass_f1_score
+            )
+            
+            num_classes = self.data_module.num_classes
+            
+            # Calculate metrics
+            accuracy = multiclass_accuracy(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            precision = multiclass_precision(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            recall = multiclass_recall(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            f1 = multiclass_f1_score(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
+            
+            # Update metrics
+            metrics = {
+                "inference_acc": accuracy,
+                "inference_precision": precision,
+                "inference_recall": recall,
+                "inference_f1": f1
+            }
+        
+        # Create confusion matrix
+        # We still need to collect predictions to create the confusion matrix
         all_preds = []
         all_targets = []
         
@@ -280,37 +351,10 @@ class PTLTrainer:
         all_preds = torch.cat(all_preds)
         all_targets = torch.cat(all_targets)
         
-        # Calculate metrics
-        from torchmetrics.functional import (
-            multiclass_accuracy,
-            multiclass_precision,
-            multiclass_recall,
-            multiclass_f1_score
-        )
-        
-        num_classes = self.data_module.num_classes
-        
-        # Calculate metrics
-        accuracy = multiclass_accuracy(
-            all_preds, all_targets, num_classes=num_classes, average="weighted"
-        ).item()
-        
-        precision = multiclass_precision(
-            all_preds, all_targets, num_classes=num_classes, average="weighted"
-        ).item()
-        
-        recall = multiclass_recall(
-            all_preds, all_targets, num_classes=num_classes, average="weighted"
-        ).item()
-        
-        f1 = multiclass_f1_score(
-            all_preds, all_targets, num_classes=num_classes, average="weighted"
-        ).item()
-        
         # Create confusion matrix
         from torchmetrics.functional import confusion_matrix
         conf_mat = confusion_matrix(
-            all_preds, all_targets, num_classes=num_classes
+            all_preds, all_targets, num_classes=self.data_module.num_classes
         ).cpu().numpy()
         
         # Log confusion matrix if wandb is enabled
@@ -323,9 +367,9 @@ class PTLTrainer:
             class_names = None
             try:
                 _, _, idx_to_class = self.data_module.get_class_info()
-                class_names = [idx_to_class[i] for i in range(num_classes)]
+                class_names = [idx_to_class[i] for i in range(self.data_module.num_classes)]
             except (AttributeError, KeyError):
-                class_names = [str(i) for i in range(num_classes)]
+                class_names = [str(i) for i in range(self.data_module.num_classes)]
             
             # Create confusion matrix plot
             plt.figure(figsize=(10, 8))
@@ -341,13 +385,7 @@ class PTLTrainer:
             })
             plt.close()
         
-        # Return metrics
-        return {
-            "inference_acc": accuracy,
-            "inference_precision": precision,
-            "inference_recall": recall,
-            "inference_f1": f1
-        }
+        return metrics
     
     def k_fold_cross_validation(self) -> Dict[str, Any]:
         """

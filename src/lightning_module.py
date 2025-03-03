@@ -80,6 +80,16 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
         self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
         
+        # Prediction metrics
+        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
+        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
+        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
+        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        
+        # Initialize prediction metrics storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
+        
     def forward(self, x):
         """Forward pass through the model."""
         # Ensure input is float32
@@ -130,7 +140,77 @@ class AudioClassifier(pl.LightningModule):
         if wandb.run is not None:
             wandb.log({"total_test_time": formatted_time})
         
-
+    def on_predict_start(self):
+        """Called at the beginning of prediction."""
+        print("Starting prediction...")
+        # Reset prediction metrics storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
+    
+    def predict_step(self, batch, batch_idx):
+        """Prediction step."""
+        x, y = batch
+        
+        # Forward pass
+        y_pred = self(x)
+        
+        # Get predicted classes
+        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+        
+        # Store predictions and targets for later metric calculation
+        self.predict_batch_preds.append(y_pred_class)
+        self.predict_batch_targets.append(y)
+        
+        # Update metrics for this batch
+        self.predict_accuracy(y_pred_class, y)
+        self.predict_precision(y_pred_class, y)
+        self.predict_recall(y_pred_class, y)
+        self.predict_f1(y_pred_class, y)
+        
+        # Log batch metrics if logger is available
+        if self.logger:
+            self.log("predict_batch_acc", self.predict_accuracy, on_step=True, on_epoch=False, prog_bar=True)
+            self.log("predict_batch_f1", self.predict_f1, on_step=True, on_epoch=False, prog_bar=True)
+        
+        return y_pred_class, y
+    
+    def on_predict_epoch_end(self):
+        """Called at the end of the prediction epoch."""
+        # Concatenate all predictions and targets
+        if self.predict_batch_preds and self.predict_batch_targets:
+            all_preds = torch.cat(self.predict_batch_preds)
+            all_targets = torch.cat(self.predict_batch_targets)
+            
+            # Calculate final metrics
+            final_accuracy = self.predict_accuracy.compute()
+            final_precision = self.predict_precision.compute()
+            final_recall = self.predict_recall.compute()
+            final_f1 = self.predict_f1.compute()
+            
+            # Log final metrics
+            if self.logger:
+                self.log("predict_acc", final_accuracy, on_step=False, on_epoch=True)
+                self.log("predict_precision", final_precision, on_step=False, on_epoch=True)
+                self.log("predict_recall", final_recall, on_step=False, on_epoch=True)
+                self.log("predict_f1", final_f1, on_step=False, on_epoch=True)
+            
+            # Print final metrics
+            print("\nPrediction Metrics:")
+            print(f"Accuracy: {final_accuracy:.4f}")
+            print(f"Precision: {final_precision:.4f}")
+            print(f"Recall: {final_recall:.4f}")
+            print(f"F1 Score: {final_f1:.4f}")
+            
+            # Reset metrics
+            self.predict_accuracy.reset()
+            self.predict_precision.reset()
+            self.predict_recall.reset()
+            self.predict_f1.reset()
+            
+            # Clear storage
+            self.predict_batch_preds = []
+            self.predict_batch_targets = []
+    
     def training_step(self, batch, batch_idx):
         """Training step."""
         x, y = batch
@@ -229,18 +309,6 @@ class AudioClassifier(pl.LightningModule):
         self.log('test_recall', self.test_recall, on_step=False, on_epoch=True)
         
         return loss
-    
-    def predict_step(self, batch, batch_idx):
-        """Prediction step."""
-        x, y = batch
-        
-        # Forward pass
-        y_pred = self(x)
-        
-        # Get predicted classes
-        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        
-        return y_pred_class, y
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
