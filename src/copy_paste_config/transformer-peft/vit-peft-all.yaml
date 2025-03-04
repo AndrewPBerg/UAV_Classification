@@ -1,5 +1,4 @@
-SEND_MESSAGE: true
-
+```md
 runs:
 
   - id: 0
@@ -66,6 +65,7 @@ runs:
       general:
         model_type: vit_b_16
         adapter_type: oft
+
   - id: 6
     type: script
     changes:
@@ -85,7 +85,28 @@ runs:
       general:
         model_type: vit_b_16
         adapter_type: hra
+
   - id: 8
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_b_16-ssf
+      general:
+        model_type: vit_b_16
+        adapter_type: ssf
+
+  - id: 9
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_b_16-bitfit
+      general:
+        model_type: vit_b_16
+        adapter_type: bitfit
+
+  - id: 10
     type: script
     changes:
       wandb:
@@ -95,7 +116,7 @@ runs:
         model_type: vit_b_32
         adapter_type: none-classifier
   
-  - id: 9
+  - id: 11
     type: script
     changes:
       wandb:
@@ -105,7 +126,7 @@ runs:
         model_type: vit_b_32
         adapter_type: none-full
 
-  - id: 10
+  - id: 12
     type: script
     changes:
       wandb:
@@ -117,7 +138,7 @@ runs:
       lora:
         r: 8
 
-  - id: 11
+  - id: 13
     type: script
     changes:
       wandb:
@@ -127,7 +148,7 @@ runs:
         model_type: vit_b_32
         adapter_type: ia3
   
-  - id: 12
+  - id: 14
     type: script
     changes:
       wandb:
@@ -137,7 +158,7 @@ runs:
         model_type: vit_b_32
         adapter_type: adalora
   
-  - id: 13
+  - id: 15
     type: script
     changes:
       wandb:
@@ -146,7 +167,8 @@ runs:
       general:
         model_type: vit_b_32
         adapter_type: oft
-  - id: 14
+
+  - id: 16
     type: script
     changes:
       wandb:
@@ -156,7 +178,7 @@ runs:
         model_type: vit_b_32
         adapter_type: layernorm
         
-  - id: 15
+  - id: 17
     type: script
     changes:
       wandb:
@@ -166,7 +188,27 @@ runs:
         model_type: vit_b_32
         adapter_type: hra
 
-  - id: 16
+  - id: 18
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_b_32-ssf
+      general:
+        model_type: vit_b_32
+        adapter_type: ssf
+
+  - id: 19
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_b_32-bitfit
+      general:
+        model_type: vit_b_32
+        adapter_type: bitfit
+
+  - id: 20
     type: script
     changes:
       wandb:
@@ -179,7 +221,7 @@ runs:
         num_classes: 9
         adapter_type: none-classifier
   
-  - id: 17
+  - id: 21
     type: script
     changes:
       wandb:
@@ -189,7 +231,7 @@ runs:
         model_type: vit_l_16
         adapter_type: none-full
 
-  - id: 18
+  - id: 22
     type: script
     changes:
       wandb:
@@ -201,7 +243,7 @@ runs:
       lora:
         r: 8
 
-  - id: 19
+  - id: 23
     type: script
     changes:
       wandb:
@@ -211,7 +253,7 @@ runs:
         model_type: vit_l_16
         adapter_type: ia3
   
-  - id: 20
+  - id: 24
     type: script
     changes:
       wandb:
@@ -221,7 +263,7 @@ runs:
         model_type: vit_l_16
         adapter_type: adalora
   
-  - id: 21
+  - id: 25
     type: script
     changes:
       wandb:
@@ -230,7 +272,8 @@ runs:
       general:
         model_type: vit_l_16
         adapter_type: oft
-  - id: 22
+
+  - id: 26
     type: script
     changes:
       wandb:
@@ -240,7 +283,7 @@ runs:
         model_type: vit_l_16
         adapter_type: layernorm
         
-  - id: 23
+  - id: 27
     type: script
     changes:
       wandb:
@@ -250,7 +293,27 @@ runs:
         model_type: vit_l_16
         adapter_type: hra
 
-  - id: 24
+  - id: 28
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_l_16-ssf
+      general:
+        model_type: vit_l_16
+        adapter_type: ssf
+
+  - id: 29
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_l_16-bitfit
+      general:
+        model_type: vit_l_16
+        adapter_type: bitfit
+
+  - id: 30
     type: script
     changes:
       wandb:
@@ -263,7 +326,7 @@ runs:
         num_classes: 9
         adapter_type: none-classifier
   
-  - id: 25
+  - id: 31
     type: script
     changes:
       wandb:
@@ -273,7 +336,7 @@ runs:
         model_type: vit_l_32
         adapter_type: none-full
 
-  - id: 26
+  - id: 32
     type: script
     changes:
       wandb:
@@ -285,7 +348,7 @@ runs:
       lora:
         r: 8
 
-  - id: 27
+  - id: 33
     type: script
     changes:
       wandb:
@@ -295,7 +358,7 @@ runs:
         model_type: vit_l_32
         adapter_type: ia3
   
-  - id: 28
+  - id: 34
     type: script
     changes:
       wandb:
@@ -305,7 +368,7 @@ runs:
         model_type: vit_l_32
         adapter_type: adalora
   
-  - id: 5
+  - id: 35
     type: script
     changes:
       wandb:
@@ -314,7 +377,8 @@ runs:
       general:
         model_type: vit_l_32
         adapter_type: oft
-  - id: 29
+
+  - id: 36
     type: script
     changes:
       wandb:
@@ -324,7 +388,7 @@ runs:
         model_type: vit_l_32
         adapter_type: layernorm
         
-  - id: 30
+  - id: 37
     type: script
     changes:
       wandb:
@@ -334,7 +398,27 @@ runs:
         model_type: vit_l_32
         adapter_type: hra
 
-  - id: 31
+  - id: 38
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_l_32-ssf
+      general:
+        model_type: vit_l_32
+        adapter_type: ssf
+
+  - id: 39
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_l_32-bitfit
+      general:
+        model_type: vit_l_32
+        adapter_type: bitfit
+
+  - id: 40
     type: script
     changes:
       wandb:
@@ -344,7 +428,7 @@ runs:
         model_type: vit_h_14
         adapter_type: none-classifier
   
-  - id: 32
+  - id: 41
     type: script
     changes:
       wandb:
@@ -354,7 +438,7 @@ runs:
         model_type: vit_h_14
         adapter_type: none-full
 
-  - id: 33
+  - id: 42
     type: script
     changes:
       wandb:
@@ -366,7 +450,7 @@ runs:
       lora:
         r: 8
 
-  - id: 34
+  - id: 43
     type: script
     changes:
       wandb:
@@ -376,7 +460,7 @@ runs:
         model_type: vit_h_14
         adapter_type: ia3
   
-  - id: 35
+  - id: 44
     type: script
     changes:
       wandb:
@@ -386,7 +470,7 @@ runs:
         model_type: vit_h_14
         adapter_type: adalora
   
-  - id: 36
+  - id: 45
     type: script
     changes:
       wandb:
@@ -395,7 +479,8 @@ runs:
       general:
         model_type: vit_h_14
         adapter_type: oft
-  - id: 37
+
+  - id: 46
     type: script
     changes:
       wandb:
@@ -405,7 +490,7 @@ runs:
         model_type: vit_h_14
         adapter_type: layernorm
         
-  - id: 38
+  - id: 47
     type: script
     changes:
       wandb:
@@ -414,3 +499,24 @@ runs:
       general:
         model_type: vit_h_14
         adapter_type: hra
+
+  - id: 48
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_h_14-ssf
+      general:
+        model_type: vit_h_14
+        adapter_type: ssf
+
+  - id: 49
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit_h_14-bitfit
+      general:
+        model_type: vit_h_14
+        adapter_type: bitfit
+```
