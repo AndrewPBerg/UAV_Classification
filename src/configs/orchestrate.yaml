@@ -90,16 +90,16 @@ runs:
   #       model_type: ast
   #       adapter_type: hra
         
-  - id: 7
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-ssf
-      general:
-        model_type: ast
-        adapter_type: ssf
-        use_wandb: false
+  # - id: 7
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: ast-ssf
+  #     general:
+  #       model_type: ast
+  #       adapter_type: ssf
+  #       use_wandb: false
         
   - id: 7
     type: script
