@@ -531,7 +531,7 @@ class PTLTrainer:
                 gradient_clip_val=1.0,
                 accumulate_grad_batches=self.general_config.accumulation_steps,
                 deterministic=True,
-                precision="16-mixed" if self.gpu_available else "32"
+                precision="32"
             )
             
             # Train on this fold

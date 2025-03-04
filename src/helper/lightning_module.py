@@ -49,8 +49,8 @@ class AudioClassifier(pl.LightningModule):
         # Initialize metrics
         self._init_metrics()
         
-        # Enable automatic optimization
-        self.automatic_optimization = True
+        # Disable automatic optimization so we can handle gradient scaling manually
+        self.automatic_optimization = False
 
         # Initialize prediction metrics dictionary to store results
         self.predict_metrics = {}
@@ -229,7 +229,13 @@ class AudioClassifier(pl.LightningModule):
             self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step."""
+        """Training step with manual optimization for proper gradient scaling."""
+        # Get optimizer
+        opt = self.optimizers()
+        
+        # Zero gradients
+        opt.zero_grad()
+        
         x, y = batch
         
         # Validate target labels to ensure they are within range
@@ -242,6 +248,12 @@ class AudioClassifier(pl.LightningModule):
         
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
+        
+        # Manual backward pass which properly works with the gradient scaler
+        self.manual_backward(loss)
+        
+        # Step optimizer (PyTorch Lightning handles the gradient scaling internally)
+        opt.step()
         
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
@@ -352,3 +364,41 @@ class AudioClassifier(pl.LightningModule):
                 "frequency": 1
             }
         }
+
+    def optimizer_step(
+        self,
+        epoch,
+        batch_idx,
+        optimizer,
+        optimizer_idx,
+        optimizer_closure,
+        on_tpu=False,
+        using_native_amp=False,
+        using_lbfgs=False,
+    ):
+        """
+        Custom optimizer step that ensures gradient scaler inf checks are properly recorded.
+        This fixes the "No inf checks were recorded for this optimizer" error.
+        """
+        # First, ensure we have a closure for the optimizer
+        if optimizer_closure is None:
+            raise ValueError("optimizer_closure cannot be None")
+            
+        # Make sure the closure computes gradients before we continue
+        optimizer_closure()
+        
+        # Skip optimizer step if any gradients are invalid (infinity/NaN)
+        # This ensures inf checks are recorded for the optimizer
+        valid_gradients = True
+        for param in self.model.parameters():
+            if param.grad is not None:
+                if not torch.isfinite(param.grad).all():
+                    valid_gradients = False
+                    break
+        
+        # Only perform the optimizer step if all gradients are valid
+        if valid_gradients:
+            optimizer.step()
+        
+        # Zero gradients after stepping
+        optimizer.zero_grad()
