@@ -49,7 +49,7 @@ class AudioClassifier(pl.LightningModule):
         # Initialize metrics
         self._init_metrics()
         
-        # Enable automatic optimization (keeping this as true for compatibility with gradient clipping)
+        # Enable automatic optimization for compatibility with gradient clipping
         self.automatic_optimization = True
 
         # Initialize prediction metrics dictionary to store results
@@ -229,13 +229,7 @@ class AudioClassifier(pl.LightningModule):
             self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step with manual optimization for proper gradient scaling."""
-        # Get optimizer
-        opt = self.optimizers()
-        
-        # Zero gradients
-        opt.zero_grad()
-        
+        """Training step with automatic optimization."""
         x, y = batch
         
         # Validate target labels to ensure they are within range
@@ -249,20 +243,14 @@ class AudioClassifier(pl.LightningModule):
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
-        # Manual backward pass which properly works with the gradient scaler
-        self.manual_backward(loss)
-        
-        # Step optimizer (PyTorch Lightning handles the gradient scaling internally)
-        opt.step()
-        
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
         # Update metrics
         self.train_accuracy(y_pred_class, y)
+        self.train_f1(y_pred_class, y)
         self.train_precision(y_pred_class, y)
         self.train_recall(y_pred_class, y)
-        self.train_f1(y_pred_class, y)
         
         # Log metrics
         self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
