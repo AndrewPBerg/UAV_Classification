@@ -28,37 +28,38 @@ runs:
   #       model_type: ast
   #       adapter_type: none-full
 
-  - id: 2
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-lora
-      general:
-        model_type: ast
-        adapter_type: lora
-      lora:
-        r: 8
+  # - id: 2
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: ast-lora
+  #     general:
+  #       model_type: ast
+  #       adapter_type: lora
+  #     lora:
+  #       r: 8
 
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-ia3
-      general:
-        model_type: ast
-        adapter_type: ia3
+  # - id: 3
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: ast-ia3
+  #     general:
+  #       batch_size: 8
+  #       model_type: ast
+  #       adapter_type: ia3
   
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-adalora
-      general:
-        model_type: ast
-        adapter_type: adalora
+  # - id: 4
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: ast-adalora
+  #     general:
+  #       model_type: ast
+  #       adapter_type: adalora
   
   - id: 5
     type: script
