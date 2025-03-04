@@ -85,5 +85,23 @@ runs:
       general:
         model_type: mert
         adapter_type: hra
+  - id: 8
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-ssf
+      general:
+        model_type: mert
+        adapter_type: ssf
+  - id: 9
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-bitfit
+      general:
+        model_type: mert
+        adapter_type: bitfit
 
       
