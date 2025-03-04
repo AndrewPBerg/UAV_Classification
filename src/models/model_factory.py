@@ -67,9 +67,9 @@ class ModelFactory:
             # Create model and feature extractor based on type
             if model_type == "ast":
                 # Use the new ASTModel class
-                model, feature_extractor = TransformerModel._create_ast_model(num_classes, CACHE_DIR)
+                model, feature_extractor = TransformerModel._create_ast_model(num_classes=num_classes, general_config=general_config, peft_config=peft_config,CACHE_DIR=CACHE_DIR)
             elif model_type == "mert":
-                model, feature_extractor = TransformerModel._create_mert_model(num_classes, CACHE_DIR)
+                model, feature_extractor = TransformerModel._create_mert_model(num_classes=num_classes,general_config=general_config, peft_config=peft_config, CACHE_DIR=CACHE_DIR)
                 
             
         

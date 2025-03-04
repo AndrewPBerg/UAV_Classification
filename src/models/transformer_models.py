@@ -15,7 +15,7 @@ import math
 import logging
 import sys
 import torch.nn.functional as F
-from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, LNTuningConfig, get_peft_config_from_dict, HRAConfig
+from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, LNTuningConfig, HRAConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
 import torch
