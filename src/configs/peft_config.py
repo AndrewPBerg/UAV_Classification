@@ -2,6 +2,10 @@ from typing import Optional, Literal, Dict, Any, List, Union, TypeVar
 import yaml
 from icecream import ic
 import sys
+import torch
+from dataclasses import dataclass, field
+from peft.utils.peft_types import TaskType
+from peft import LoraConfig as PeftLoraConfig
 
 from peft import (
     LoraConfig, 
@@ -12,7 +16,6 @@ from peft import (
     LNTuningConfig,
     TaskType
 )
-from dataclasses import dataclass, field
 
 # Define custom configs for options not available in PEFT
 @dataclass
@@ -69,11 +72,30 @@ class SSFConfig:
             "init_shift": self.init_shift
         }
 
+@dataclass
+class BitFitConfig:
+    """BitFit configuration (bias-term fine-tuning)"""
+    adapter_type: str = "bitfit"
+    task_type: str = "SEQ_CLS"
+    trainable_components: List[str] = field(default_factory=lambda: ["bias"])
+    
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+        yield "trainable_components", self.trainable_components
+        
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type,
+            "trainable_components": self.trainable_components
+        }
+
 # Define valid PEFT types
-VALID_PEFT_TYPES = ["lora", "ia3", "adalora", "oft", "layernorm", "hra"]
+VALID_PEFT_TYPES = ["lora", "ia3", "adalora", "oft", "layernorm", "hra", "bitfit"]
 
 # Define PEFTConfig type alias
-PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig, SSFConfig]
+PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig, SSFConfig, BitFitConfig]
 
 def get_peft_config(config: dict) -> Optional[PEFTConfig]:
     """
@@ -139,6 +161,9 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
                 sweep_config["task_type"] = "SEQ_CLS"
                 return SSFConfig(**sweep_config)
 
+            case "bitfit":
+                return BitFitConfig()
+
             case _:
                 raise ValueError(f"Unsupported adapter type: {adapter_type}")
                 
@@ -199,6 +224,9 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
                     sweep_config = config.copy()
                     sweep_config["task_type"] = "SEQ_CLS"
                     return SSFConfig(**sweep_config)
+
+                case "bitfit":
+                    return BitFitConfig()
 
                 case _:
                     raise ValueError(f"Unsupported adapter type: {adapter_type}")

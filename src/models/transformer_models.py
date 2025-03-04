@@ -27,7 +27,7 @@ from configs import PEFTConfig, GeneralConfig, NoneClassifierConfig, NoneFullCon
 from src.configs.peft_config import (
     PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoraConfig as CustomLoraConfig,
     IA3Config as CustomIA3Config, AdaLoraConfig as CustomAdaLoraConfig,
-    OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig
+    OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig, BitFitConfig
 )
 from src.models.ssf_adapter import apply_ssf_to_model
 
@@ -62,6 +62,19 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             verbose=True
         )
         
+    elif isinstance(peft_config, BitFitConfig):
+        # Implement BitFit: freeze all parameters except biases
+        for name, param in model.named_parameters():
+            param.requires_grad = False
+            # Unfreeze bias terms
+            if 'bias' in name:
+                param.requires_grad = True
+        
+        # Always unfreeze classifier for the task
+        if hasattr(model, 'classifier'):
+            for param in model.classifier.parameters():
+                param.requires_grad = True
+    
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
             # Generic approach to handle ModulesToSaveWrapper issue
