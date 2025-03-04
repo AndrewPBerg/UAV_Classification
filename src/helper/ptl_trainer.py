@@ -10,10 +10,10 @@ from pathlib import Path
 from icecream import ic
 from datetime import datetime
 
-from lightning_module import AudioClassifier
-from datamodule import AudioDataModule
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
-from helper.util import wandb_login
+from .lightning_module import AudioClassifier
+from .datamodule import AudioDataModule
+from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
+from .util import wandb_login
 import time
 
 
@@ -68,7 +68,8 @@ class PTLTrainer:
                 log_model=False,
                 save_dir="wandb",
                 config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
-                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
+                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
+                reinit=True  # Force reinitialize a new wandb run
             )
         
         # Set device
@@ -475,7 +476,8 @@ class PTLTrainer:
                 log_model=False,
                 save_dir="wandb",
                 config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
-                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None
+                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
+                reinit=True  # Force reinitialize a new wandb run
             )
         
         # Train on each fold

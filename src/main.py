@@ -12,10 +12,10 @@ if torch.cuda.is_available():
 print("-" * 50)
 
 # Import the rest of the modules
-from ptl_trainer import PTLTrainer
-from datamodule import AudioDataModule
-from model_factory import ModelFactory
-from configs.configs_demo import (
+from helper.ptl_trainer import PTLTrainer
+from helper.datamodule import AudioDataModule
+from models.model_factory import ModelFactory
+from configs import (
     load_configs,
 )
 
@@ -27,6 +27,7 @@ import yaml
 from typing import Any
 from helper.teleBot import send_message
 import traceback
+import wandb
 
 def change_config_value(file_path: str, key: str, value: Any) -> None:
     """
@@ -162,6 +163,11 @@ def main():
             
             id, changes, type = run.get('id'), run.get('changes'), run.get('type')
             
+            # Finish any active wandb run before starting a new one
+            if wandb.run is not None:
+                ic(f"Finishing previous wandb run: {wandb.run.name}")
+                wandb.finish()
+            
             ic(f'{id}: applying changes to config.yaml...')
             alter(changes, 'configs/config.yaml')
 
@@ -175,11 +181,21 @@ def main():
         
             run_count += 1
         ic('All runs completed.')
+        
+        # Make sure to finish the last wandb run
+        if wandb.run is not None:
+            ic(f"Finishing final wandb run: {wandb.run.name}")
+            wandb.finish()
                 
         if oc.get('SEND_MESSAGE'):
             send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
             
     except Exception as e:
+        # Make sure to finish the wandb run even if there's an error
+        if wandb.run is not None:
+            ic(f"Finishing wandb run due to error: {wandb.run.name}")
+            wandb.finish()
+            
         ic('Error occurred during orchestration:', e)
         traceback_str = ''.join(traceback.format_exc())
         ic(traceback_str)

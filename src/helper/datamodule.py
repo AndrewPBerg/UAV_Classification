@@ -14,13 +14,13 @@ import wandb
 import yaml
 
 # Import from existing code
-from helper.util import AudioDataset, wandb_login
-from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
+from .util import AudioDataset, wandb_login
+from .cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 
 # Import Pydantic configs
-from configs.augmentation_config import AugmentationConfig
-from configs.configs_demo import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
+from configs import AugConfig as AugmentationConfig
+from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
 
 
 class AudioDataModule(pl.LightningDataModule):
@@ -778,7 +778,7 @@ class AudioDataModule(pl.LightningDataModule):
 # Example usage
 def example_usage():
     """Example of how to use the AudioDataModule"""
-    from configs.configs_demo import load_configs
+    from configs import load_configs
     import yaml
     
     # Load configuration
