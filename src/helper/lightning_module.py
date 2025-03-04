@@ -402,3 +402,56 @@ class AudioClassifier(pl.LightningModule):
         
         # Zero gradients after stepping
         optimizer.zero_grad()
+
+    # Alternative training_step for manual optimization with gradient clipping
+    # If you want to use manual optimization, set self.automatic_optimization = False in __init__
+    # and uncomment this method (comment out the current training_step method)
+    """
+    def training_step(self, batch, batch_idx):
+        \"""Training step with manual optimization and gradient clipping.\"""
+        # Get optimizer
+        opt = self.optimizers()
+        
+        # Zero gradients
+        opt.zero_grad()
+        
+        x, y = batch
+        
+        # Validate target labels to ensure they are within range
+        if torch.any(y < 0) or torch.any(y >= self.num_classes):
+            invalid_labels = y[(y < 0) | (y >= self.num_classes)]
+            raise ValueError(f"Invalid target labels found: {invalid_labels.tolist()}. Labels must be in range [0, {self.num_classes-1}]")
+        
+        # Forward pass
+        y_pred = self(x)
+        
+        # Calculate loss
+        loss = self.loss_fn(y_pred, y)
+        
+        # Manual backward pass which properly works with the gradient scaler
+        self.manual_backward(loss)
+        
+        # Manual gradient clipping (since we can't use automatic gradient clipping with manual optimization)
+        torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=1.0)
+        
+        # Step optimizer (PyTorch Lightning handles the gradient scaling internally)
+        opt.step()
+        
+        # Get predicted classes
+        y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
+        
+        # Update metrics
+        self.train_accuracy(y_pred_class, y)
+        self.train_precision(y_pred_class, y)
+        self.train_recall(y_pred_class, y)
+        self.train_f1(y_pred_class, y)
+        
+        # Log metrics
+        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True)
+        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True)
+        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True)
+        
+        return loss
+    """
