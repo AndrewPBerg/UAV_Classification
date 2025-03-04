@@ -20,7 +20,9 @@ from torchvision.models import (
 
 import torch
 import torch.nn as nn
-from typing import Tuple
+from typing import Tuple, Optional, Any
+from src.configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig
+from src.models.ssf_adapter import apply_ssf_to_model
 
 
 
@@ -149,6 +151,41 @@ class CNNModel:
         # Replace classification head
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
+        
+        return model
+    
+    def apply_peft(self, model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module:
+        """Apply parameter-efficient fine-tuning method to the model"""
+        if peft_config is None:
+            return model
+        
+        if isinstance(peft_config, NoneClassifierConfig):
+            # Only fine-tune the classifier layer
+            for param in model.parameters():
+                param.requires_grad = False
+            
+            if hasattr(model, 'classifier'):
+                for param in model.classifier.parameters():
+                    param.requires_grad = True
+            elif hasattr(model, 'fc'):
+                for param in model.fc.parameters():
+                    param.requires_grad = True
+        
+        elif isinstance(peft_config, NoneFullConfig):
+            # Fine-tune the entire model
+            for param in model.parameters():
+                param.requires_grad = True
+        
+        elif isinstance(peft_config, SSFConfig):
+            # Apply SSF adapter to the model
+            model = apply_ssf_to_model(
+                model=model,
+                init_scale=peft_config.init_scale,
+                init_shift=peft_config.init_shift,
+                verbose=True
+            )
+        
+        # Add other PEFT methods as needed
         
         return model
     

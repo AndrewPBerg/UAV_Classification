@@ -94,6 +94,9 @@ hra:
   - key
   - value
   - dense
+ssf:
+  init_scale: 1.0
+  init_shift: 0.0
 wandb:
   project: model-peft-test
   name: ast-adalora

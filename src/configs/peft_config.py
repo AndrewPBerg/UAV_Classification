@@ -12,7 +12,7 @@ from peft import (
     LNTuningConfig,
     TaskType
 )
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 # Define custom configs for options not available in PEFT
 @dataclass
@@ -47,11 +47,33 @@ class NoneFullConfig:
             "task_type": self.task_type
         }
 
+@dataclass
+class SSFConfig:
+    """Scale-Shift Factor configuration"""
+    adapter_type: str = "ssf"
+    task_type: str = "SEQ_CLS"
+    init_scale: float = 1.0
+    init_shift: float = 0.0
+    
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+        yield "init_scale", self.init_scale
+        yield "init_shift", self.init_shift
+        
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type,
+            "init_scale": self.init_scale,
+            "init_shift": self.init_shift
+        }
+
 # Define valid PEFT types
 VALID_PEFT_TYPES = ["lora", "ia3", "adalora", "oft", "layernorm", "hra"]
 
 # Define PEFTConfig type alias
-PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig]
+PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig, SSFConfig]
 
 def get_peft_config(config: dict) -> Optional[PEFTConfig]:
     """
@@ -112,6 +134,11 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
             case "none-full":
                 return NoneFullConfig()
 
+            case "ssf":
+                sweep_config = config.copy()
+                sweep_config["task_type"] = "SEQ_CLS"
+                return SSFConfig(**sweep_config)
+
             case _:
                 raise ValueError(f"Unsupported adapter type: {adapter_type}")
                 
@@ -167,6 +194,11 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
                 
                 case "none-full":
                     return NoneFullConfig()
+
+                case "ssf":
+                    sweep_config = config.copy()
+                    sweep_config["task_type"] = "SEQ_CLS"
+                    return SSFConfig(**sweep_config)
 
                 case _:
                     raise ValueError(f"Unsupported adapter type: {adapter_type}")

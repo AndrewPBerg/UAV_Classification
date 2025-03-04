@@ -15,7 +15,7 @@ import math
 import logging
 import sys
 import torch.nn.functional as F
-from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, LNTuningConfig, HRAConfig
+from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, TaskType
 from peft.utils.peft_types import TaskType
 from icecream import ic
 import torch
@@ -24,6 +24,12 @@ import types
 from typing import Dict, Tuple, Any, Optional, Union, Callable
 import os
 from configs import PEFTConfig, GeneralConfig, NoneClassifierConfig, NoneFullConfig
+from src.configs.peft_config import (
+    PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoraConfig as CustomLoraConfig,
+    IA3Config as CustomIA3Config, AdaLoraConfig as CustomAdaLoraConfig,
+    OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig
+)
+from src.models.ssf_adapter import apply_ssf_to_model
 
 
 def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: GeneralConfig) -> nn.Module:
@@ -31,18 +37,30 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     Apply PEFT to the model based on the peft_config and general_config
     """
     adapter_type = general_config.adapter_type
-    if isinstance(peft_config, (NoneClassifierConfig)):
-        # freeze all the parameters
+    if isinstance(peft_config, NoneClassifierConfig):
+        # Only train the classification head
+        # Freeze all parameters except those in the classification head
         for param in model.parameters():
             param.requires_grad = False
-        # unfreeze the classifier
-        for param in model.classifier.parameters():
-            param.requires_grad = True
+        
+        # Unfreeze classification head
+        if hasattr(model, 'classifier'):
+            for param in model.classifier.parameters():
+                param.requires_grad = True
         
     elif isinstance(peft_config, (NoneFullConfig)):
         # turn on all the parameters
         for param in model.parameters():
             param.requires_grad = True
+    
+    elif isinstance(peft_config, SSFConfig):
+        # Apply SSF adapter to the model
+        model = apply_ssf_to_model(
+            model=model,
+            init_scale=peft_config.init_scale,
+            init_shift=peft_config.init_shift,
+            verbose=True
+        )
         
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
