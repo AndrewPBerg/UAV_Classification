@@ -21,13 +21,31 @@ class NoneClassifierConfig:
     adapter_type: str = "none-classifier"
     task_type: str = "SEQ_CLS"
 
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type
+        }
+
 @dataclass
 class NoneFullConfig:
     """Full configuration"""
     adapter_type: str = "none-full"
     task_type: str = "SEQ_CLS"
-        
 
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type
+        }
 
 # Define valid PEFT types
 VALID_PEFT_TYPES = ["lora", "ia3", "adalora", "oft", "layernorm", "hra"]
@@ -160,7 +178,8 @@ def main():
     with open('config.yaml', 'r') as file:
         config = yaml.safe_load(file)
     peft_config = get_peft_config(config)
-    ic(peft_config)
+
+    ic(peft_config.to_dict())
 
 if __name__ == '__main__':
     main()
