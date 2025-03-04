@@ -157,9 +157,9 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
                 return NoneFullConfig()
 
             case "ssf":
-                sweep_config = config.copy()
-                sweep_config["task_type"] = "SEQ_CLS"
-                return SSFConfig(**sweep_config)
+                ssf_config = config['ssf'].copy()
+                ssf_config["task_type"] = "SEQ_CLS"
+                return SSFConfig(**ssf_config)
 
             case "bitfit":
                 return BitFitConfig()

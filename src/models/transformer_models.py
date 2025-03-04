@@ -24,12 +24,12 @@ import types
 from typing import Dict, Tuple, Any, Optional, Union, Callable
 import os
 from configs import PEFTConfig, GeneralConfig, NoneClassifierConfig, NoneFullConfig
-from src.configs.peft_config import (
+from configs.peft_config import (
     PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoraConfig as CustomLoraConfig,
     IA3Config as CustomIA3Config, AdaLoraConfig as CustomAdaLoraConfig,
     OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig, BitFitConfig
 )
-from src.models.ssf_adapter import apply_ssf_to_model
+from models.ssf_adapter import apply_ssf_to_model
 
 
 def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: GeneralConfig) -> nn.Module:
@@ -59,7 +59,7 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             model=model,
             init_scale=peft_config.init_scale,
             init_shift=peft_config.init_shift,
-            verbose=True
+            verbose=False
         )
         
     elif isinstance(peft_config, BitFitConfig):

@@ -21,8 +21,8 @@ from torchvision.models import (
 import torch
 import torch.nn as nn
 from typing import Tuple, Optional, Any
-from src.configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig
-from src.models.ssf_adapter import apply_ssf_to_model
+from configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig
+from models.ssf_adapter import apply_ssf_to_model
 
 
 

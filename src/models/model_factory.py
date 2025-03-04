@@ -18,7 +18,7 @@ from configs import GeneralConfig, FeatureExtractionConfig, PEFTConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from models.transformer_models import TransformerModel
 from models.cnn_models import CNNModel
-from src.configs.peft_config import NoneClassifierConfig, NoneFullConfig, SSFConfig
+from configs.peft_config import NoneClassifierConfig, NoneFullConfig, SSFConfig
 
 
 class ModelFactory:
@@ -34,7 +34,8 @@ class ModelFactory:
     ) -> Tuple[nn.Module, Any]:
         """Create a model based on the configurations"""
         model_type = general_config.model_type
-        cache_dir = None if not hasattr(general_config, "cache_dir") else general_config.cache_dir
+        CACHE_DIR = './model_cache'
+        torch.hub.set_dir(CACHE_DIR)
         
         # Get input shape and feature extractor
         input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
@@ -58,9 +59,9 @@ class ModelFactory:
             # Create transformer model
             transformer_model = TransformerModel()
             if model_type == "ast":
-                model = transformer_model._create_ast_model(num_classes, cache_dir, general_config, peft_config)
+                model, feature_extractor = transformer_model._create_ast_model(num_classes, CACHE_DIR, general_config, peft_config)
             elif model_type == "mert":
-                model = transformer_model._create_mert_model(num_classes, cache_dir, general_config, peft_config)
+                model, feature_extractor = transformer_model._create_mert_model(num_classes, CACHE_DIR, general_config, peft_config)
             elif model_type == "vit":
                 model = transformer_model._create_vit_model(model_type, num_classes, input_shape, general_config, peft_config)
             else:

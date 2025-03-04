@@ -16,12 +16,12 @@ general:
   accumulation_steps: 2
   learning_rate: 0.002
   patience: 10
-  use_wandb: true
+  use_wandb: false
   use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: adalora
+  adapter_type: ssf
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -99,10 +99,10 @@ ssf:
   init_shift: 0.0
 bitfit:
   trainable_components:
-    - bias
+  - bias
 wandb:
   project: model-peft-test
-  name: ast-adalora
+  name: ast-ssf
   reinit: true
   notes: null
   tags: null
