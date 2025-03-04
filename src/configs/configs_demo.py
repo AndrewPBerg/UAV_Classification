@@ -176,7 +176,7 @@ def wandb_config_dict(general_config, feature_extraction_config, peft_config, wa
     res = {}
     res['wandb_config'] = dict(wandb_config)
     res['general_config'] = dict(general_config)
-    res['peft_config'] = dict(peft_config)
+    res['peft_config'] = dict(peft_config.to_dict())
     res['feature_extraction_config'] = dict(feature_extraction_config)
     
     return res

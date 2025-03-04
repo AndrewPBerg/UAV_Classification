@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -96,7 +96,7 @@ hra:
   - dense
 wandb:
   project: model-peft-test
-  name: ast-none-classifier
+  name: ast-none-full
   reinit: true
   notes: null
   tags: null
