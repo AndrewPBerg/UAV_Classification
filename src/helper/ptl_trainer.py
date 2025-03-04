@@ -139,19 +139,19 @@ class PTLTrainer:
         # Create trainer - ALTERNATE CONFIGURATION
         # If you want to use manual optimization (automatic_optimization=False in the Lightning module),
         # uncomment the following code block and comment out the current trainer configuration
-        """
-        trainer = pl.Trainer(
-            max_epochs=self.general_config.epochs,
-            accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,  # Always use a single device
-            callbacks=self._get_callbacks(),
-            logger=self.wandb_logger,
-            # No gradient_clip_val for manual optimization
-            accumulate_grad_batches=self.general_config.accumulation_steps,
-            deterministic=False,
-            precision="16-mixed" if self.gpu_available else "32"
-        )
-        """
+
+        # trainer = pl.Trainer(
+        #     max_epochs=self.general_config.epochs,
+        #     accelerator="gpu" if self.gpu_available else "cpu",
+        #     devices=1,  # Always use a single device
+        #     callbacks=self._get_callbacks(),
+        #     logger=self.wandb_logger,
+        #     # No gradient_clip_val for manual optimization
+        #     accumulate_grad_batches=self.general_config.accumulation_steps,
+        #     deterministic=False,
+        #     precision="16-mixed" if self.gpu_available else "32"
+        # )
+
         
         # Current trainer configuration - for automatic optimization
         trainer = pl.Trainer(
