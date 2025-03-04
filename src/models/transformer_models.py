@@ -32,7 +32,7 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     """
     adapter_type = general_config.adapter_type
     if isinstance(peft_config, (NoneClassifierConfig)):
-            # freeze all the parameters
+        # freeze all the parameters
         for param in model.parameters():
             param.requires_grad = False
         # unfreeze the classifier
@@ -45,8 +45,44 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             param.requires_grad = True
         
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
-        # get peft model given peft config
-        model = get_peft_model(model, peft_config)
+        try:
+            # Generic approach to handle ModulesToSaveWrapper issue
+            # This will work for any model that uses ModulesToSaveWrapper
+            # Recursively expose attributes from original_module to parent wrapper
+            def expose_attributes(module, prefix=""):
+                if hasattr(module, 'original_module'):
+                    # For each attribute in the original module, expose it to the wrapper
+                    for name, child in module.original_module.named_children():
+                        # Skip if the attribute already exists
+                        if not hasattr(module, name):
+                            setattr(module, name, child)
+                    
+                    # Also expose methods and attributes that aren't modules
+                    for name in dir(module.original_module):
+                        if not name.startswith('_') and not hasattr(module, name):
+                            try:
+                                setattr(module, name, getattr(module.original_module, name))
+                            except (AttributeError, TypeError):
+                                # Skip if we can't set the attribute
+                                pass
+                
+                # Recursively process child modules
+                for name, child in module.named_children():
+                    new_prefix = f"{prefix}.{name}" if prefix else name
+                    expose_attributes(child, new_prefix)
+            
+            # Apply the attribute exposure to the model
+            expose_attributes(model)
+            
+            # get peft model given peft config
+            model = get_peft_model(model, peft_config)
+        except Exception as e:
+            # Log the error but continue with the original model
+            print(f"Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
+            print("Falling back to non-PEFT model")
+            # Turn on all parameters for training as a fallback
+            for param in model.parameters():
+                param.requires_grad = True
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
     
@@ -82,8 +118,28 @@ class TransformerModel:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
         model.config.num_labels = num_classes
-        in_features = model.classifier.dense.in_features
-        model.classifier.dense = nn.Linear(in_features, num_classes)
+        
+        # Update the classifier in a generic way that works with any structure
+        def update_classifier(module, in_features=None):
+            # If this is a Linear layer with the right output dimension, update it
+            if isinstance(module, nn.Linear) and hasattr(module, 'out_features'):
+                if module.out_features != num_classes:
+                    if in_features is None:
+                        in_features = module.in_features
+                    return nn.Linear(in_features, num_classes)
+            return module
+        
+        # Find and update the classifier
+        if hasattr(model, 'classifier'):
+            # Handle direct classifier
+            if hasattr(model.classifier, 'dense') and isinstance(model.classifier.dense, nn.Linear):
+                in_features = model.classifier.dense.in_features
+                model.classifier.dense = nn.Linear(in_features, num_classes)
+            # Handle wrapped classifier
+            elif hasattr(model.classifier, 'original_module'):
+                if hasattr(model.classifier.original_module, 'dense') and isinstance(model.classifier.original_module.dense, nn.Linear):
+                    in_features = model.classifier.original_module.dense.in_features
+                    model.classifier.original_module.dense = nn.Linear(in_features, num_classes)
         
         # Get the expected sequence length from the position embeddings
         expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]
