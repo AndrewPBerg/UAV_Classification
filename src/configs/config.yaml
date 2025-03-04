@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: lora
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -96,7 +96,7 @@ hra:
   - dense
 wandb:
   project: model-peft-test
-  name: ast-none-full
+  name: ast-lora
   reinit: true
   notes: null
   tags: null
