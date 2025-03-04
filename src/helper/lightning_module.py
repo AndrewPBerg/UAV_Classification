@@ -49,8 +49,8 @@ class AudioClassifier(pl.LightningModule):
         # Initialize metrics
         self._init_metrics()
         
-        # Disable automatic optimization so we can handle gradient scaling manually
-        self.automatic_optimization = False
+        # Enable automatic optimization (keeping this as true for compatibility with gradient clipping)
+        self.automatic_optimization = True
 
         # Initialize prediction metrics dictionary to store results
         self.predict_metrics = {}
