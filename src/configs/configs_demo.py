@@ -5,10 +5,12 @@ from icecream import ic
 import sys
 try:
     from .peft_config import * # noqa: F403
+    from .peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
+    from peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from augmentation_config import create_augmentation_configs, AugmentationConfig
 
@@ -114,7 +116,7 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
 
     
 
