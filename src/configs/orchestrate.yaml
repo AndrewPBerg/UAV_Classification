@@ -4,81 +4,81 @@
 SEND_MESSAGE: true
 
 runs:
-  - id: 0
-    type: script
-    changes:
-      wandb:
-        project: model-full-test
-        name: ast
-      general:
-        model_type: ast
-        use_wandb: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
+  # - id: 0
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-full-test
+  #       name: ast
+  #     general:
+  #       model_type: ast
+  #       use_wandb: true
+  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       num_classes: 9
 
-  - id: 1
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b0
-      general:
-        model_type: efficientnet_b0
+  # - id: 1
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b0
+  #     general:
+  #       model_type: efficientnet_b0
 
-  - id: 2
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b1
-      general:
-        model_type: efficientnet_b1
+  # - id: 2
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b1
+  #     general:
+  #       model_type: efficientnet_b1
 
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b2
-      general:
-        model_type: efficientnet_b2
+  # - id: 3
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b2
+  #     general:
+  #       model_type: efficientnet_b2
 
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b3
-      general:
-        model_type: efficientnet_b3
+  # - id: 4
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b3
+  #     general:
+  #       model_type: efficientnet_b3
 
-  - id: 5
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b4
-      general:
-        model_type: efficientnet_b4
+  # - id: 5
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b4
+  #     general:
+  #       model_type: efficientnet_b4
 
-  - id: 6
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b5
-      general:
-        model_type: efficientnet_b5
+  # - id: 6
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b5
+  #     general:
+  #       model_type: efficientnet_b5
 
-  - id: 7
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b6
-      general:
-        model_type: efficientnet_b6
+  # - id: 7
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b6
+  #     general:
+  #       model_type: efficientnet_b6
 
-  - id: 8
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b7
-      general:
-        model_type: efficientnet_b7
+  # - id: 8
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       name: efficientnet_b7
+  #     general:
+  #       model_type: efficientnet_b7
 
   - id: 9
     type: script

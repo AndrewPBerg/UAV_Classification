@@ -104,7 +104,7 @@ class ModelFactory:
             # Get feature extractor and input shape
             input_shape, feature_extractor = ModelFactory._get_feature_extractor(feature_extraction_config)
             # Create model based on type
-            if model_type == "vit":
+            if model_type.startswith('vit'):
                 model = ModelFactory._create_vit_model(model_type, num_classes, input_shape)
             elif model_type.startswith("resnet"):
                 model = ModelFactory._create_resnet_model(model_type, num_classes, input_shape)
@@ -430,19 +430,20 @@ class ModelFactory:
         """
         Create a ViT model.
         """
-        # Parse model size from model type
-        if "b_16" in model_type:
-            model = vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
-        elif "b_32" in model_type:
-            model = vit_b_32(weights=ViT_B_32_Weights.DEFAULT)
-        elif "l_16" in model_type:
-            model = vit_l_16(weights=ViT_L_16_Weights.DEFAULT)
-        elif "l_32" in model_type:
-            model = vit_l_32(weights=ViT_L_32_Weights.DEFAULT)
-        elif "h_14" in model_type:
-            model = vit_h_14(weights=ViT_H_14_Weights.DEFAULT)
-        else:
+        # Map config model type to actual model function
+        vit_models = {
+            'vit_b_16': (vit_b_16, ViT_B_16_Weights.DEFAULT),
+            'vit_b_32': (vit_b_32, ViT_B_32_Weights.DEFAULT),
+            'vit_l_16': (vit_l_16, ViT_L_16_Weights.DEFAULT),
+            'vit_l_32': (vit_l_32, ViT_L_32_Weights.DEFAULT),
+            'vit_h_14': (vit_h_14, ViT_H_14_Weights.DEFAULT),
+        }
+        
+        if model_type not in vit_models:
             raise ValueError(f"Unsupported ViT model type: {model_type}")
+            
+        model_fn, weights = vit_models[model_type]
+        model = model_fn(weights=weights)
 
         # Add resize layer to match ViT's expected input size
         model.image_size = 224  # Set fixed size expected by ViT
