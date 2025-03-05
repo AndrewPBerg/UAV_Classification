@@ -81,6 +81,10 @@ def apply_ssf_to_model(
                         self.module = module
                         self.ssf_layer = ssf_layer
                         
+                        # Expose weight attribute for compatibility with existing code
+                        if hasattr(module, 'weight'):
+                            self.weight = module.weight
+                        
                     def forward(self, *args, **kwargs):
                         output = self.module(*args, **kwargs)
                         return self.ssf_layer(output)

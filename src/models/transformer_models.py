@@ -435,7 +435,18 @@ class TransformerModel:
             pooled_output = torch.mean(hidden_states, dim=1)
             
             # Ensure pooled output and classifier are on same device
-            pooled_output = pooled_output.to(self.classifier.weight.device)
+            # Check if classifier is wrapped by SSFWrapper
+            if hasattr(self.classifier, 'module') and hasattr(self.classifier.module, 'weight'):
+                # If it's an SSFWrapper, use the device of the wrapped module's weight
+                target_device = self.classifier.module.weight.device
+            elif hasattr(self.classifier, 'weight'):
+                # If it's a regular Linear layer, use its weight's device
+                target_device = self.classifier.weight.device
+            else:
+                # Fallback to the classifier's device
+                target_device = next(self.classifier.parameters()).device
+                
+            pooled_output = pooled_output.to(target_device)
             
             # Pass through classifier
             logits = self.classifier(pooled_output)
