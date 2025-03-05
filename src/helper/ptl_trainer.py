@@ -359,31 +359,49 @@ class PTLTrainer:
             all_targets = torch.cat(all_targets)
             
             # Calculate metrics
-            from torchmetrics.functional.classification import (
-                multiclass_accuracy,
-                multiclass_precision,
-                multiclass_recall,
-                multiclass_f1_score
-            )
+            # from torchmetrics.functional.classification import (
+            #     multiclass_accuracy,
+            #     multiclass_precision,
+            #     multiclass_recall,
+            #     multiclass_f1_score
+            # )
             
-            num_classes = self.data_module.num_classes
+            from torchmetrics.functional import accuracy, precision, recall, f1_score
             
             # Calculate metrics
-            accuracy = multiclass_accuracy(
-                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            accuracy_value = accuracy(
+                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
             ).item()
             
-            precision = multiclass_precision(
-                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            precision_value = precision(
+                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
             ).item()
             
-            recall = multiclass_recall(
-                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            recall_value = recall(
+                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
             ).item()
             
-            f1 = multiclass_f1_score(
-                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            f1_value = f1_score(
+                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
             ).item()
+            num_classes = self.data_module.num_classes
+            
+            # # Calculate metrics
+            # accuracy = multiclass_accuracy(
+            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
+            # ).item()
+            
+            # precision = multiclass_precision(
+            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
+            # ).item()
+            
+            # recall = multiclass_recall(
+            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
+            # ).item()
+            
+            # f1 = multiclass_f1_score(
+            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
+            # ).item()
             
             # Update metrics
             metrics = {
