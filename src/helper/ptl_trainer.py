@@ -218,8 +218,15 @@ class PTLTrainer:
                 # Print metrics in a nice format
                 print("\n" + "-"*50)
                 print(f"Epoch {trainer.current_epoch} Metrics:")
-                print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
-                print(f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+                
+                # Format metrics safely, handling None values
+                train_loss_str = f"{train_loss:.4f}" if train_loss is not None else "N/A"
+                train_acc_str = f"{train_acc:.4f}" if train_acc is not None else "N/A"
+                val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "N/A"
+                val_acc_str = f"{val_acc:.4f}" if val_acc is not None else "N/A"
+                
+                print(f"Train Loss: {train_loss_str} | Train Acc: {train_acc_str}")
+                print(f"Val Loss: {val_loss_str} | Val Acc: {val_acc_str}")
                 print("-"*50 + "\n")
         
         # Create trainer with our custom callbacks
