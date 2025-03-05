@@ -55,29 +55,33 @@ class AudioClassifier(pl.LightningModule):
         
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
+        # Get the current device
+        device = self.device
+        
         # Training metrics
-        self.train_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.train_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.train_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.train_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Test metrics
-        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Prediction metrics
-        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        # Prediction metrics - these will be re-initialized in on_predict_start
+        # but we initialize them here as well for completeness
+        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize prediction metrics storage
         self.predict_batch_preds = []
@@ -156,11 +160,14 @@ class AudioClassifier(pl.LightningModule):
         """Called at the beginning of the prediction stage.
         Initialize metrics for prediction.
         """
-        # Initialize metrics for prediction
-        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted")
-        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted")
-        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted")
-        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted")
+        # Get the current device
+        device = self.device
+        
+        # Initialize metrics for prediction and move them to the correct device
+        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize storage for predictions and targets
         self.predict_batch_preds = []

@@ -456,6 +456,9 @@ class PTLTrainer:
             # Get number of classes from data module
             num_classes = self.data_module.num_classes
             
+            # Get the current device
+            device = model.device
+            
             # Run prediction
             print("Starting inference with predict...")
             predictions = trainer.predict(
@@ -505,6 +508,10 @@ class PTLTrainer:
             # Concatenate all batches
             all_preds = torch.cat(all_preds)
             all_targets = torch.cat(all_targets)
+            
+            # Ensure tensors are on the same device
+            all_preds = all_preds.to(device)
+            all_targets = all_targets.to(device)
             
             # Calculate metrics
             from torchmetrics.functional.classification import (
@@ -562,6 +569,8 @@ class PTLTrainer:
     
         except Exception as e:
             print(f"Error during inference: {str(e)}")
+            import traceback
+            traceback.print_exc()
             return {}
         
         # Create confusion matrix
@@ -578,6 +587,10 @@ class PTLTrainer:
             # Concatenate all batches
             all_preds = torch.cat(all_preds)
             all_targets = torch.cat(all_targets)
+            
+            # Ensure tensors are on the same device
+            all_preds = all_preds.to(device)
+            all_targets = all_targets.to(device)
             
             # Create confusion matrix
             from torchmetrics.functional.classification import confusion_matrix
