@@ -120,10 +120,8 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
         except Exception as e:
             # Log the error but continue with the original model
             print(f"Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
-            print("Falling back to non-PEFT model")
-            # Turn on all parameters for training as a fallback
-            for param in model.parameters():
-                param.requires_grad = True
+
+            raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
     
@@ -466,9 +464,13 @@ class TransformerModel:
         if model_type.lower() not in vit_models:
             raise ValueError(f"Unsupported ViT model type: {model_type}. Must be one of: {list(vit_models.keys())}")
             
-        model_fn, weights = vit_models[model_type]
-        model = model_fn(weights=weights)
-    
+        model_fn, weights = vit_models[model_type.lower()]
+        try:
+            # Try to create model with specified weights
+            model = model_fn(weights=weights)
+        except Exception as e:
+            print(f"Failed to load model with weights, trying without: {e}")
+            model = model_fn()
         # Add resize layer to match ViT's expected input size
         model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)

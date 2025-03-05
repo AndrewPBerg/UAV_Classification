@@ -1,21 +1,22 @@
-SEND_MESSAGE: false
+SEND_MESSAGE: true
 
 runs:
 
-  - id: 0
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-none-classifier
-      general:
-        model_type: ast
-        use_wandb: false
-        epochs: 2
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
-        learning_rate: 0.02
+  # - id: 0
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-none-classifier
+  #     general:
+  #       model_type: mert
+  #       use_wandb: true
+  #       epochs: 2
+  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       num_classes: 9
+  #       adapter_type: none-classifier
+  #       learning_rate: 0.02
+      
   
   # - id: 1
   #   type: script
@@ -27,83 +28,123 @@ runs:
   #       model_type: mert
   #       adapter_type: none-full
 
-  # - id: 2
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-lora
-  #     general:
-  #       model_type: mert
-  #       adapter_type: lora
-  #     lora:
-  #       r: 8
+  - id: 2
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-lora
+      general:
+        model_type: mert
+        adapter_type: lora       
+      lora:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
 
-  # - id: 3
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-ia3
-  #     general:
-  #       model_type: mert
-  #       adapter_type: ia3
+
+  - id: 3
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-ia3
+      general:
+        model_type: mert
+        adapter_type: ia3
+      
+      ia3:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+      
   
-  # - id: 4
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-adalora
-  #     general:
-  #       model_type: mert
-  #       adapter_type: adalora
+  - id: 4
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-adalora
+      general:
+        model_type: mert
+        adapter_type: adalora
+      
+
+      adalora:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+      
   
-  # - id: 5
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-oft
-  #     general:
-  #       model_type: mert
-  #       adapter_type: oft
-  # - id: 6
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-layernorm
-  #     general:
-  #       model_type: mert
-  #       adapter_type: layernorm
+  - id: 5
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-oft
+      general:
+        model_type: mert
+        adapter_type: oft
+      oft: 
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+
+  - id: 6
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-layernorm
+      general:
+        model_type: mert
+        adapter_type: layernorm
         
-  # - id: 7
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-hra
-  #     general:
-  #       model_type: mert
-  #       adapter_type: hra
-  # - id: 8
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-ssf
-  #     general:
-  #       model_type: mert
-  #       adapter_type: ssf
-  # - id: 9
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-bitfit
-  #     general:
-  #       model_type: mert
-  #       adapter_type: bitfit
+  - id: 7
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-hra
+      general:
+        model_type: mert
+        adapter_type: hra
+      hra:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+  - id: 8
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-ssf
+      general:
+        model_type: mert
+        adapter_type: ssf
+  - id: 9
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-bitfit
+      general:
+        model_type: mert
+        adapter_type: bitfit
 
       

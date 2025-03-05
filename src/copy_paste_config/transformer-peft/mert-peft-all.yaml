@@ -1,7 +1,6 @@
 SEND_MESSAGE: true
 
 runs:
-
   - id: 0
     type: script
     changes:
@@ -11,9 +10,12 @@ runs:
       general:
         model_type: mert
         use_wandb: true
+        epochs: 2
         data_path: /app/src/datasets/UAV_Dataset_9
         num_classes: 9
         adapter_type: none-classifier
+        learning_rate: 0.02
+      
   
   - id: 1
     type: script
@@ -33,9 +35,15 @@ runs:
         name: mert-lora
       general:
         model_type: mert
-        adapter_type: lora
+        adapter_type: lora       
       lora:
-        r: 8
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+
 
   - id: 3
     type: script
@@ -46,6 +54,15 @@ runs:
       general:
         model_type: mert
         adapter_type: ia3
+      
+      ia3:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+      
   
   - id: 4
     type: script
@@ -56,6 +73,16 @@ runs:
       general:
         model_type: mert
         adapter_type: adalora
+      
+
+      adalora:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+      
   
   - id: 5
     type: script
@@ -66,6 +93,14 @@ runs:
       general:
         model_type: mert
         adapter_type: oft
+      oft: 
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
+
   - id: 6
     type: script
     changes:
@@ -85,6 +120,13 @@ runs:
       general:
         model_type: mert
         adapter_type: hra
+      hra:
+        target_modules:
+        - q_proj
+        - k_proj
+        - v_proj
+        - out_proj
+        - output_dense
   - id: 8
     type: script
     changes:
@@ -103,5 +145,3 @@ runs:
       general:
         model_type: mert
         adapter_type: bitfit
-
-      
