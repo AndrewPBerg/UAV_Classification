@@ -1,15 +1,9 @@
-from torchvision.models import (
-
-    # ViT variants
-    vit_b_16, ViT_B_16_Weights,
-    vit_b_32, ViT_B_32_Weights,
-    vit_l_16, ViT_L_16_Weights,
-    vit_l_32, ViT_L_32_Weights,
-    vit_h_14, ViT_H_14_Weights,
-)
+# Removed torchvision.models import as we're using Hugging Face models
 
 from transformers import (
-    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor
+    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor,
+    # Add ViT imports from Hugging Face
+    ViTForImageClassification, ViTImageProcessor
 )
 import math
 import logging
@@ -138,7 +132,7 @@ class TransformerModel:
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
                  'none-full', 'none-classifier', 'ssf', 'bitfit']
     
-    transformer_models = ['ast', 'mert','vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32', 'vit_h_14']
+    transformer_models = ['ast', 'mert', 'vit']  # Changed to just 'vit' instead of multiple variants
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
@@ -473,40 +467,56 @@ class TransformerModel:
     
     
     @staticmethod
-    def _create_vit_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_vit_model(model_type: str, CACHE_DIR: str, num_classes: int, input_shape: Tuple[int, int, int], general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
         """
-        Create a ViT model.
+        Create a ViT model using Hugging Face's implementation.
         """
-        # Map config model type to actual model function
-        vit_models = {
-            'vit_b_16': (vit_b_16, ViT_B_16_Weights.DEFAULT),
-            'vit_b_32': (vit_b_32, ViT_B_32_Weights.DEFAULT),
-            'vit_l_16': (vit_l_16, ViT_L_16_Weights.DEFAULT),
-            'vit_l_32': (vit_l_32, ViT_L_32_Weights.DEFAULT),
-            'vit_h_14': (vit_h_14, ViT_H_14_Weights.DEFAULT),
-        }
         
-        if model_type.lower() not in vit_models:
-            raise ValueError(f"Unsupported ViT model type: {model_type}. Must be one of: {list(vit_models.keys())}")
-            
-        model_fn, weights = vit_models[model_type.lower()]
+        # Use the Hugging Face ViT model
+        model_name = "google/vit-large-patch16-224"
+        
         try:
-            # Try to create model with specified weights
-            model = model_fn(weights=weights)
+            # Try to load the model with local_files_only first
+            model = ViTForImageClassification.from_pretrained(
+                model_name,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR,
+                local_files_only=True
+            )
+            processor = ViTImageProcessor.from_pretrained(
+                model_name,
+                cache_dir=CACHE_DIR,
+                local_files_only=True
+            )
         except Exception as e:
-            print(f"Failed to load model with weights, trying without: {e}")
-            model = model_fn()
+            print(f"Failed to load model with local_files_only=True, trying to download: {e}")
+            # If local loading fails, download the model
+            model = ViTForImageClassification.from_pretrained(
+                model_name,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR
+            )
+            processor = ViTImageProcessor.from_pretrained(
+                model_name,
+                cache_dir=CACHE_DIR
+            )
+        
         # Add resize layer to match ViT's expected input size
-        model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         
-        def new_forward(self, x=None, input_ids=None, attention_mask=None, **kwargs):
+        # Save original forward method
+        original_forward = model.forward
+        
+        # Define a new forward method to handle input shape issues
+        def new_forward(self, x=None, input_ids=None, attention_mask=None, pixel_values=None, **kwargs):
             # Handle different input types - PEFT might pass input_ids instead of x
             if x is None and input_ids is not None:
                 x = input_ids
+            elif x is None and pixel_values is not None:
+                x = pixel_values
             
             if x is None:
-                raise ValueError("Either x or input_ids must be provided to the forward method")
+                raise ValueError("Either x, input_ids, or pixel_values must be provided to the forward method")
                 
             # Handle input
             x = x.float()
@@ -516,58 +526,26 @@ class TransformerModel:
             # Resize input to match ViT's expected size
             x = resize_layer(x)
             
-            # Process through convolutional projection
-            x = self.conv_proj(x)
+            # Convert to RGB if input is grayscale (1 channel)
+            if x.shape[1] == 1:
+                x = x.repeat(1, 3, 1, 1)
             
-            # Reshape to sequence
-            batch_size = x.shape[0]
-            x = x.flatten(2).transpose(1, 2)
+            # Normalize the input as expected by the ViT model
+            # The ViT model expects normalized images with mean=[0.5, 0.5, 0.5] and std=[0.5, 0.5, 0.5]
+            mean = torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1).to(x.device)
+            std = torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1).to(x.device)
+            x = (x - mean) / std
             
-            # Add class token
-            class_token = self.class_token.expand(batch_size, -1, -1)
-            x = torch.cat([class_token, x], dim=1)
+            # Pass through the model
+            outputs = original_forward(pixel_values=x, **kwargs)
             
-            # Get position embeddings and adjust if necessary
-            pos_embedding = self.encoder.pos_embedding
-            if x.size(1) != pos_embedding.size(1):
-                # Remove class token from position embeddings
-                pos_tokens = pos_embedding[:, 1:]
-                # Reshape position embeddings to square grid
-                grid_size = int(math.sqrt(pos_tokens.size(1)))
-                pos_tokens = pos_tokens.reshape(-1, grid_size, grid_size, pos_embedding.size(-1))
-                
-                # Interpolate position embeddings to match sequence length
-                new_grid_size = int(math.sqrt(x.size(1) - 1))  # -1 for class token
-                pos_tokens = torch.nn.functional.interpolate(
-                    pos_tokens.permute(0, 3, 1, 2),
-                    size=(new_grid_size, new_grid_size),
-                    mode='bilinear',
-                    align_corners=False
-                )
-                pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
-                
-                # Add class token position embedding back
-                new_pos_embedding = torch.cat([pos_embedding[:, :1], pos_tokens], dim=1)
-                x = x + new_pos_embedding
-            else:
-                x = x + pos_embedding
-            
-            # Forward through encoder and classification head
-            for block in self.encoder.layers:
-                x = block(x)
-            x = self.encoder.ln(x)
-            x = x[:, 0]
-            x = self.heads(x)
-            
-            return x
-    
-        # Update model components
-        model.forward = types.MethodType(new_forward, model)
-        model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
-        hidden_dim = model.conv_proj.out_channels
-        model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
+            return outputs
         
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
+        
+        # Apply PEFT configuration
         model = apply_peft(model, peft_config, general_config)
-    
-        return model
+        
+        return model, processor
     
