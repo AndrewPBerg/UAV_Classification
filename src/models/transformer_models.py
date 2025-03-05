@@ -47,6 +47,16 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
         if hasattr(model, 'classifier'):
             for param in model.classifier.parameters():
                 param.requires_grad = True
+                print(f"Unfreezing classifier parameters with shape {param.shape}")
+        else:
+            print("Warning: Model does not have a 'classifier' attribute. No parameters were unfrozen.")
+            # Try to find classifier-like modules
+            for name, module in model.named_modules():
+                if 'classifier' in name.lower() or 'head' in name.lower() or 'output' in name.lower():
+                    print(f"Found potential classifier module: {name}")
+                    for param_name, param in module.named_parameters():
+                        param.requires_grad = True
+                        print(f"Unfreezing {name}.{param_name} with shape {param.shape}")
         
     elif isinstance(peft_config, (NoneFullConfig)):
         # turn on all the parameters
@@ -116,6 +126,11 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
                 param.requires_grad = True
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
+    
+    # Print trainable parameter summary
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    total_params = sum(p.numel() for p in model.parameters())
+    print(f"Trainable parameters: {trainable_params:,} ({trainable_params/total_params:.2%} of {total_params:,} total)")
     
     return model
 
@@ -362,9 +377,17 @@ class TransformerModel:
         # Save original forward method
         original_forward = model.forward
         
+        # Explicitly add a classifier head to the model
+        hidden_size = model.config.hidden_size
+        model.classifier = nn.Linear(hidden_size, num_classes)
+        logger.info(f"Added classifier head with {hidden_size} -> {num_classes}")
+        
         # Define new forward method to handle shape issues and device consistency
         def new_forward(self, x):
             logger.debug(f"Input shape: {x.shape}, device: {x.device}")
+            
+            # Ensure input is float32
+            x = x.float()
             
             # Ensure model is on same device as input
             if next(self.parameters()).device != x.device:
@@ -389,14 +412,8 @@ class TransformerModel:
                     x = x.squeeze(1)  # Remove channel dimension
                     logger.debug(f"Squeezed 3D input to: {x.shape}")
             
-            # Add classifier head if needed
-            if not hasattr(self, 'classifier'):
-                hidden_size = self.config.hidden_size
-                self.classifier = nn.Linear(hidden_size, num_classes).to(x.device)
-                logger.debug(f"Added classifier head with {hidden_size} -> {num_classes} on device {x.device}")
-            else:
-                # Ensure classifier is on same device as input
-                self.classifier = self.classifier.to(x.device)
+            # Ensure classifier is on same device as input
+            self.classifier = self.classifier.to(x.device)
             
             # Forward pass through MERT
             outputs = original_forward(x)
@@ -416,8 +433,18 @@ class TransformerModel:
         # Replace the forward method
         model.forward = types.MethodType(new_forward, model)
         
-        
+        # Apply PEFT configuration
         model = apply_peft(model, peft_config, general_config)
+        
+        # If using none-classifier, double-check that the classifier is trainable
+        if isinstance(peft_config, NoneClassifierConfig):
+            # Verify that all model parameters except classifier are frozen
+            for name, param in model.named_parameters():
+                if 'classifier' not in name:
+                    param.requires_grad = False
+                else:
+                    param.requires_grad = True
+                    logger.info(f"Ensuring classifier parameter {name} is trainable")
         
         return model, feature_extractor
     
