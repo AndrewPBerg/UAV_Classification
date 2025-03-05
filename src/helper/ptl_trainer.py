@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor, TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 import wandb
@@ -83,38 +83,75 @@ class PTLTrainer:
     
     def _get_callbacks(self) -> List[pl.Callback]:
         """
-        Get callbacks for training.
+        Get the callbacks for the trainer.
         
         Returns:
-            List of PyTorch Lightning callbacks
+            List of callbacks
         """
-        # Create checkpoint directory
-        checkpoint_dir = Path("checkpoints") / datetime.now().strftime("%Y%m%d_%H%M%S")
-        checkpoint_dir.mkdir(parents=True, exist_ok=True)
+        callbacks = []
         
-        callbacks = [
-            # Model checkpoint callback
-            ModelCheckpoint(
-                dirpath=str(checkpoint_dir),
-                filename="{epoch}-{val_loss:.4f}",
-                monitor="val_loss",
-                mode="min",
-                save_top_k=3,
-                save_last=True,
-                verbose=True
-            ),
-            
-            # Early stopping callback
-            EarlyStopping(
+        # Early stopping callback
+        if self.general_config.patience > 0:
+            early_stopping = EarlyStopping(
                 monitor="val_loss",
                 patience=self.general_config.patience,
                 mode="min",
                 verbose=True
-            ),
-            
-            # Learning rate monitor
-            LearningRateMonitor(logging_interval="epoch")
-        ]
+            )
+            callbacks.append(early_stopping)
+        
+        # Model checkpoint callback
+        checkpoint_callback = ModelCheckpoint(
+            dirpath="checkpoints",
+            filename="{epoch}-{val_loss:.4f}",
+            monitor="val_loss",
+            mode="min",
+            save_top_k=1,
+            verbose=True
+        )
+        callbacks.append(checkpoint_callback)
+        
+        # Learning rate monitor
+        lr_monitor = LearningRateMonitor(logging_interval="epoch")
+        callbacks.append(lr_monitor)
+        
+        # Custom progress bar with better metric display
+        class CustomProgressBar(TQDMProgressBar):
+            def get_metrics(self, trainer, model):
+                # Get metrics from parent class
+                items = super().get_metrics(trainer, model)
+                
+                # Format all metrics to 2 decimal places
+                for key in list(items.keys()):
+                    if key in ['v_num', 'epoch', 'step']:
+                        continue
+                    if isinstance(items[key], (float, int, torch.Tensor)):
+                        items[key] = f"{float(items[key]):.2f}"
+                
+                # Reorder metrics to show in desired order
+                ordered_items = {}
+                
+                # First show epoch and step
+                if 'epoch' in items:
+                    ordered_items['epoch'] = items['epoch']
+                if 'step' in items:
+                    ordered_items['step'] = items['step']
+                
+                # Then show train metrics
+                for metric in ['train_loss', 'train_acc']:
+                    if metric in items:
+                        ordered_items[metric] = items[metric]
+                
+                # Then show validation metrics
+                for metric in ['val_loss', 'val_acc']:
+                    if metric in items:
+                        ordered_items[metric] = items[metric]
+                
+                return ordered_items
+        
+        # Add custom progress bar
+        progress_bar = CustomProgressBar()
+        callbacks.append(progress_bar)
         
         return callbacks
     
@@ -136,24 +173,7 @@ class PTLTrainer:
         # Create model
         model, feature_extractor = self.model_factory(self.device)
         
-        # Create trainer - ALTERNATE CONFIGURATION
-        # If you want to use manual optimization (automatic_optimization=False in the Lightning module),
-        # uncomment the following code block and comment out the current trainer configuration
-
-        # trainer = pl.Trainer(
-        #     max_epochs=self.general_config.epochs,
-        #     accelerator="gpu" if self.gpu_available else "cpu",
-        #     devices=1,  # Always use a single device
-        #     callbacks=self._get_callbacks(),
-        #     logger=self.wandb_logger,
-        #     # No gradient_clip_val for manual optimization
-        #     accumulate_grad_batches=self.general_config.accumulation_steps,
-        #     deterministic=False,
-        #     precision="16-mixed" if self.gpu_available else "32"
-        # )
-
-        
-        # Current trainer configuration - for automatic optimization
+        # Create trainer with our custom callbacks
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
@@ -187,8 +207,11 @@ class PTLTrainer:
             num_classes=self.data_module.num_classes
         )
         
-        # Train model
-        ic("Starting regular training")
+        # Print training start message with clear formatting
+        print("\n" + "="*80)
+        print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print("="*80 + "\n")
         
         # Start timer
         start_time = time.time()
@@ -218,14 +241,46 @@ class PTLTrainer:
         
         end_time = time.time() - start_time
         formatted_end_time = _format_time(end_time)
-        # total train time
-        ic(formatted_end_time)
-        if self.wandb_logger :
-                            self.wandb_logger.experiment.log({
-                                "total_train_time": formatted_end_time
-                            })
+        # Print total train time
+        print(f"\nTotal training time: {formatted_end_time}")
+        
+        if self.wandb_logger:
+            self.wandb_logger.experiment.log({
+                "total_train_time": formatted_end_time
+            })
+        
+        # Print final training metrics in a nice table
+        print("\n" + "="*80)
+        print("FINAL TRAINING METRICS")
+        print("="*80)
+        
+        # Get the metrics from the trainer
+        metrics = trainer.callback_metrics
+        
+        # Format and print metrics in a table
+        print(f"{'Metric':<20} {'Value':<10}")
+        print("-"*30)
+        
+        # Print metrics in a specific order
+        metric_order = [
+            'train_loss', 'train_acc', 'train_f1', 'train_precision', 'train_recall',
+            'val_loss', 'val_acc', 'val_f1', 'val_precision', 'val_recall'
+        ]
+        
+        for metric_name in metric_order:
+            if metric_name in metrics:
+                value = metrics[metric_name]
+                if isinstance(value, torch.Tensor):
+                    value = value.item()
+                print(f"{metric_name:<20} {value:.2f}")
+        
+        print("="*80 + "\n")
         
         # Test model
+        print("\n" + "="*80)
+        print("RUNNING TEST EVALUATION")
+        print("="*80 + "\n")
+        
         try:
             test_results = trainer.test(
                 model=lightning_module,
@@ -241,6 +296,29 @@ class PTLTrainer:
                 return {"error": "Invalid class labels in test dataset"}
             raise  # Re-raise the exception if it's not the specific error we're handling
         
+        # Print test results in a nice table
+        if test_results:
+            print("\n" + "="*80)
+            print("TEST RESULTS")
+            print("="*80)
+            
+            print(f"{'Metric':<20} {'Value':<10}")
+            print("-"*30)
+            
+            # Print test metrics in a specific order
+            test_metric_order = [
+                'test_loss', 'test_acc', 'test_f1', 'test_precision', 'test_recall'
+            ]
+            
+            for metric_name in test_metric_order:
+                if metric_name in test_results[0]:
+                    value = test_results[0][metric_name]
+                    if isinstance(value, torch.Tensor):
+                        value = value.item()
+                    print(f"{metric_name:<20} {value:.2f}")
+            
+            print("="*80 + "\n")
+        
         # Run inference on the inference split if available
         inference_results = {}
         try:
@@ -254,22 +332,39 @@ class PTLTrainer:
                 has_inference_data = False
             
             if has_inference_data:
-                print("Running final inference evaluation...")
+                print("\n" + "="*80)
+                print("RUNNING INFERENCE EVALUATION")
+                print("="*80 + "\n")
+                
                 inference_results = self._run_inference(trainer, lightning_module)
+                
+                # Print inference results in a nice table
+                if inference_results:
+                    print("\n" + "="*80)
+                    print("INFERENCE RESULTS")
+                    print("="*80)
+                    
+                    print(f"{'Metric':<20} {'Value':<10}")
+                    print("-"*30)
+                    
+                    # Print inference metrics in a specific order
+                    inference_metric_order = [
+                        'inference_acc', 'inference_precision', 'inference_recall', 'inference_f1'
+                    ]
+                    
+                    for metric_name in inference_metric_order:
+                        if metric_name in inference_results:
+                            value = inference_results[metric_name]
+                            if isinstance(value, torch.Tensor):
+                                value = value.item()
+                            print(f"{metric_name:<20} {value:.2f}")
+                    
+                    print("="*80 + "\n")
                 
                 # Log inference results
                 if self.wandb_logger and inference_results:
                     for key, value in inference_results.items():
                         self.wandb_logger.log_metrics({key: value})
-                    
-                # Print inference results
-                print("\nInference Results:")
-                print("-" * 40)
-                for key, value in inference_results.items():
-                    if isinstance(value, (int, float)):
-                        print(f"{key}: {value:.4f}")
-                    else:
-                        print(f"{key}: {value}")
             else:
                 print("No inference data available, skipping inference evaluation.")
         except Exception as e:
@@ -282,6 +377,7 @@ class PTLTrainer:
             model_path.mkdir(parents=True, exist_ok=True)
             model_name = f"{self.general_config.model_type}_classifier.pt"
             trainer.save_checkpoint(str(model_path / model_name))
+            print(f"\nModel saved to {model_path / model_name}")
         
         # Ensure the return type is Dict[str, Any]
         results_dict: Dict[str, Any] = {} if not test_results else dict(test_results[0])
@@ -294,6 +390,33 @@ class PTLTrainer:
         if inference_results:
             for key, value in inference_results.items():
                 results_dict[key] = value
+        
+        # Print a summary of all metrics at the end
+        print("\n" + "="*80)
+        print("TRAINING SUMMARY")
+        print("="*80)
+        print(f"Model: {self.general_config.model_type}")
+        print(f"Total training time: {formatted_end_time}")
+        
+        if 'val_acc' in metrics:
+            val_acc = metrics['val_acc']
+            if isinstance(val_acc, torch.Tensor):
+                val_acc = val_acc.item()
+            print(f"Best validation accuracy: {val_acc:.2f}")
+        
+        if 'test_acc' in results_dict:
+            test_acc = results_dict['test_acc']
+            if isinstance(test_acc, torch.Tensor):
+                test_acc = test_acc.item()
+            print(f"Test accuracy: {test_acc:.2f}")
+        
+        if 'inference_acc' in results_dict:
+            inf_acc = results_dict['inference_acc']
+            if isinstance(inf_acc, torch.Tensor):
+                inf_acc = inf_acc.item()
+            print(f"Inference accuracy: {inf_acc:.2f}")
+        
+        print("="*80 + "\n")
         
         return results_dict
     
@@ -317,6 +440,7 @@ class PTLTrainer:
             )
             
             if not predictions:
+                print("No predictions returned from trainer.predict()")
                 return {}
             
             # Get metrics from the model's stored metrics attribute
@@ -343,7 +467,7 @@ class PTLTrainer:
             
             # If metrics are not available from model attributes, calculate them manually
             if not all(metrics.values()):
-                print("Metrics not found in model attributes, calculating manually...")
+                print("Calculating inference metrics manually...")
             
             # Collect all predictions and ground truth
             all_preds = []
@@ -359,49 +483,31 @@ class PTLTrainer:
             all_targets = torch.cat(all_targets)
             
             # Calculate metrics
-            # from torchmetrics.functional.classification import (
-            #     multiclass_accuracy,
-            #     multiclass_precision,
-            #     multiclass_recall,
-            #     multiclass_f1_score
-            # )
+            from torchmetrics.functional.classification import (
+                multiclass_accuracy,
+                multiclass_precision,
+                multiclass_recall,
+                multiclass_f1_score
+            )
             
-            from torchmetrics.functional import accuracy, precision, recall, f1_score
-            
-            # Calculate metrics
-            accuracy_value = accuracy(
-                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
-            ).item()
-            
-            precision_value = precision(
-                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
-            ).item()
-            
-            recall_value = recall(
-                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
-            ).item()
-            
-            f1_value = f1_score(
-                all_preds, all_targets, task="multiclass", num_classes=num_classes, average="weighted"
-            ).item()
             num_classes = self.data_module.num_classes
             
-            # # Calculate metrics
-            # accuracy = multiclass_accuracy(
-            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
-            # ).item()
+            # Calculate metrics
+            accuracy = multiclass_accuracy(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
             
-            # precision = multiclass_precision(
-            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
-            # ).item()
+            precision = multiclass_precision(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
             
-            # recall = multiclass_recall(
-            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
-            # ).item()
+            recall = multiclass_recall(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
             
-            # f1 = multiclass_f1_score(
-            #     all_preds, all_targets, num_classes=num_classes, average="weighted"
-            # ).item()
+            f1 = multiclass_f1_score(
+                all_preds, all_targets, num_classes=num_classes, average="weighted"
+            ).item()
             
             # Update metrics
             metrics = {
@@ -409,6 +515,17 @@ class PTLTrainer:
                 "inference_precision": precision,
                 "inference_recall": recall,
                 "inference_f1": f1
+            }
+            
+            # Store metrics in model for future reference
+            if not hasattr(model, 'predict_metrics'):
+                model.predict_metrics = {}
+            
+            model.predict_metrics = {
+                "predict_acc": accuracy,
+                "predict_precision": precision,
+                "predict_recall": recall,
+                "predict_f1": f1
             }
             
             # Log manually calculated metrics to wandb if wandb logger is enabled
@@ -420,62 +537,79 @@ class PTLTrainer:
                     "inference_recall": metrics["inference_recall"],
                     "inference_f1": metrics["inference_f1"]
                 })
-        
+    
         except Exception as e:
             print(f"Error during inference: {str(e)}")
             return {}
         
         # Create confusion matrix
-        # We still need to collect predictions to create the confusion matrix
-        all_preds = []
-        all_targets = []
-        
-        for batch_preds in predictions:
-            batch_pred_classes, batch_targets = batch_preds
-            all_preds.append(batch_pred_classes)
-            all_targets.append(batch_targets)
-        
-        # Concatenate all batches
-        all_preds = torch.cat(all_preds)
-        all_targets = torch.cat(all_targets)
-        
-        # Create confusion matrix
-        from torchmetrics.functional.classification import confusion_matrix
-        conf_mat = confusion_matrix(
-            all_preds, all_targets, num_classes=self.data_module.num_classes, task="multiclass"
-        ).cpu().numpy()
-        
-        # Log confusion matrix if wandb is enabled
-        if self.wandb_logger:
-            import wandb
-            import matplotlib.pyplot as plt
-            import seaborn as sns
+        try:
+            # We still need to collect predictions to create the confusion matrix
+            all_preds = []
+            all_targets = []
             
-            # Get class names if available
-            class_names = None
-            try:
-                _, _, idx_to_class = self.data_module.get_class_info()
-                class_names = [idx_to_class[i] for i in range(self.data_module.num_classes)]
-            except (AttributeError, KeyError):
-                class_names = [str(i) for i in range(self.data_module.num_classes)]
+            for batch_preds in predictions:
+                batch_pred_classes, batch_targets = batch_preds
+                all_preds.append(batch_pred_classes)
+                all_targets.append(batch_targets)
             
-            # Create confusion matrix plot
-            plt.figure(figsize=(10, 8))
-            sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',
-                        xticklabels=class_names, yticklabels=class_names)
-            plt.xlabel('Predicted')
-            plt.ylabel('True')
-            plt.title('Inference Confusion Matrix')
+            # Concatenate all batches
+            all_preds = torch.cat(all_preds)
+            all_targets = torch.cat(all_targets)
             
-            # Log to wandb
-            self.wandb_logger.experiment.log({
-                "inference_confusion_matrix": wandb.Image(plt),
-                "final_inference_accuracy": metrics["inference_acc"],
-                "final_inference_precision": metrics["inference_precision"],
-                "final_inference_recall": metrics["inference_recall"],
-                "final_inference_f1": metrics["inference_f1"]
-            })
-            plt.close()
+            # Create confusion matrix
+            from torchmetrics.functional.classification import confusion_matrix
+            conf_mat = confusion_matrix(
+                all_preds, all_targets, num_classes=self.data_module.num_classes, task="multiclass"
+            ).cpu().numpy()
+            
+            # Log confusion matrix if wandb is enabled
+            if self.wandb_logger:
+                import wandb
+                import matplotlib.pyplot as plt
+                import seaborn as sns
+                
+                # Get class names if available
+                class_names = None
+                try:
+                    _, _, idx_to_class = self.data_module.get_class_info()
+                    class_names = [idx_to_class[i] for i in range(self.data_module.num_classes)]
+                except (AttributeError, KeyError):
+                    class_names = [str(i) for i in range(self.data_module.num_classes)]
+                
+                # Create confusion matrix plot
+                plt.figure(figsize=(10, 8))
+                sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',
+                            xticklabels=class_names, yticklabels=class_names)
+                plt.xlabel('Predicted')
+                plt.ylabel('True')
+                plt.title('Inference Confusion Matrix')
+                
+                # Log to wandb
+                self.wandb_logger.experiment.log({
+                    "inference_confusion_matrix": wandb.Image(plt),
+                    "final_inference_accuracy": metrics["inference_acc"],
+                    "final_inference_precision": metrics["inference_precision"],
+                    "final_inference_recall": metrics["inference_recall"],
+                    "final_inference_f1": metrics["inference_f1"]
+                })
+                plt.close()
+        except Exception as e:
+            print(f"Error creating confusion matrix: {str(e)}")
+        
+        # Save inference predictions for later analysis
+        try:
+            # Save predictions to file
+            predictions_dir = Path("predictions")
+            predictions_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Save as numpy arrays
+            np.save(str(predictions_dir / "inference_predictions.npy"), all_preds.cpu().numpy())
+            np.save(str(predictions_dir / "inference_targets.npy"), all_targets.cpu().numpy())
+            
+            print(f"Saved inference predictions to {predictions_dir}")
+        except Exception as e:
+            print(f"Error saving predictions: {str(e)}")
         
         return metrics
     
@@ -513,9 +647,17 @@ class PTLTrainer:
                 reinit=True  # Force reinitialize a new wandb run
             )
         
+        # Print k-fold start message with clear formatting
+        print("\n" + "="*80)
+        print(f"STARTING {self.general_config.k_folds}-FOLD CROSS-VALIDATION: {self.general_config.model_type.upper()} MODEL")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print("="*80 + "\n")
+        
         # Train on each fold
         for fold in range(self.general_config.k_folds):
-            ic(f"Training fold {fold+1}/{self.general_config.k_folds}")
+            print("\n" + "="*80)
+            print(f"TRAINING FOLD {fold+1}/{self.general_config.k_folds}")
+            print("="*80)
             
             # Get fold dataloaders
             fold_train_loader, fold_val_loader = self.data_module.get_fold_dataloaders(fold)
@@ -535,6 +677,40 @@ class PTLTrainer:
             checkpoint_dir = Path("checkpoints") / f"fold_{fold+1}" / datetime.now().strftime("%Y%m%d_%H%M%S")
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             
+            # Create custom progress bar for this fold
+            class CustomFoldProgressBar(TQDMProgressBar):
+                def get_metrics(self, trainer, model):
+                    # Get metrics from parent class
+                    items = super().get_metrics(trainer, model)
+                    
+                    # Format all metrics to 2 decimal places
+                    for key in list(items.keys()):
+                        if key in ['v_num', 'epoch', 'step']:
+                            continue
+                        if isinstance(items[key], (float, int, torch.Tensor)):
+                            items[key] = f"{float(items[key]):.2f}"
+                    
+                    # Reorder metrics to show in desired order
+                    ordered_items = {}
+                    
+                    # First show epoch and step
+                    if 'epoch' in items:
+                        ordered_items['epoch'] = items['epoch']
+                    if 'step' in items:
+                        ordered_items['step'] = items['step']
+                    
+                    # Then show train metrics
+                    for metric in ['train_loss', 'train_acc']:
+                        if metric in items:
+                            ordered_items[metric] = items[metric]
+                    
+                    # Then show validation metrics
+                    for metric in ['val_loss', 'val_acc']:
+                        if metric in items:
+                            ordered_items[metric] = items[metric]
+                    
+                    return ordered_items
+            
             # Create callbacks for this fold
             fold_callbacks = [
                 ModelCheckpoint(
@@ -551,7 +727,8 @@ class PTLTrainer:
                     mode="min",
                     verbose=True
                 ),
-                LearningRateMonitor(logging_interval="epoch")
+                LearningRateMonitor(logging_interval="epoch"),
+                CustomFoldProgressBar()
             ]
             
             # Create trainer for this fold
@@ -610,6 +787,20 @@ class PTLTrainer:
                 best_val_loss = val_loss
                 best_model = lightning_module
             
+            # Print fold results in a nice table
+            print("\n" + "="*80)
+            print(f"FOLD {fold+1} RESULTS")
+            print("="*80)
+            
+            print(f"{'Metric':<20} {'Value':<10}")
+            print("-"*30)
+            
+            for metric_name, value in fold_results.items():
+                if metric_name != "fold":
+                    print(f"{metric_name:<20} {value:.2f}")
+            
+            print("="*80 + "\n")
+            
             # Log final metrics for this fold to WandB
             if self.general_config.use_wandb:
                 wandb.log({
@@ -632,75 +823,68 @@ class PTLTrainer:
                     has_inference_data = False
                 
                 if has_inference_data:
-                    print(f"Running inference evaluation for fold {fold+1}...")
+                    print("\n" + "="*80)
+                    print(f"RUNNING INFERENCE EVALUATION FOR FOLD {fold+1}")
+                    print("="*80 + "\n")
+                    
                     inference_results = self._run_inference(trainer, lightning_module)
+                    
+                    # Print inference results in a nice table
+                    if inference_results:
+                        print("\n" + "="*80)
+                        print(f"FOLD {fold+1} INFERENCE RESULTS")
+                        print("="*80)
+                        
+                        print(f"{'Metric':<20} {'Value':<10}")
+                        print("-"*30)
+                        
+                        # Print inference metrics in a specific order
+                        inference_metric_order = [
+                            'inference_acc', 'inference_precision', 'inference_recall', 'inference_f1'
+                        ]
+                        
+                        for metric_name in inference_metric_order:
+                            if metric_name in inference_results:
+                                value = inference_results[metric_name]
+                                if isinstance(value, torch.Tensor):
+                                    value = value.item()
+                                print(f"{metric_name:<20} {value:.2f}")
+                        
+                        print("="*80 + "\n")
                     
                     # Add inference results to fold results
                     for key, value in inference_results.items():
                         fold_results[key] = value
                     
-                    # Log inference results for this fold to WandB
+                    # Log inference results to wandb
                     if self.general_config.use_wandb:
-                        fold_inference_metrics = {
-                            f"fold_{fold+1}_inference_acc": inference_results.get("inference_acc", 0.0),
-                            f"fold_{fold+1}_inference_f1": inference_results.get("inference_f1", 0.0),
-                            f"fold_{fold+1}_inference_precision": inference_results.get("inference_precision", 0.0),
-                            f"fold_{fold+1}_inference_recall": inference_results.get("inference_recall", 0.0)
-                        }
-                        wandb.log(fold_inference_metrics)
-                    
-                    # Print inference results
-                    print(f"\nInference Results for Fold {fold+1}:")
-                    print("-" * 40)
-                    for key, value in inference_results.items():
-                        if isinstance(value, (int, float)):
-                            print(f"{key}: {value:.4f}")
-                        else:
-                            print(f"{key}: {value}")
+                        for key, value in inference_results.items():
+                            wandb.log({f"fold_{fold+1}_{key}": value})
                 else:
                     print(f"No inference data available for fold {fold+1}, skipping inference evaluation.")
             except Exception as e:
                 print(f"Error during inference for fold {fold+1}: {str(e)}")
-                print("Continuing with next fold...")
         
-        # Calculate average metrics
+        # Calculate average metrics across all folds
         avg_metrics = self._calculate_average_metrics(all_fold_results)
         
-        # Calculate average inference metrics if available
-        inference_metrics_keys = ["inference_acc", "inference_f1", "inference_precision", "inference_recall"]
-        avg_inference_metrics = {}
+        # Print average metrics in a nice table
+        print("\n" + "="*80)
+        print(f"AVERAGE METRICS ACROSS {self.general_config.k_folds} FOLDS")
+        print("="*80)
         
-        for key in inference_metrics_keys:
-            values = [fold_result.get(key, None) for fold_result in all_fold_results]
-            values = [v for v in values if v is not None]  # Filter out None values
-            
-            if values:
-                avg_value = sum(values) / len(values)
-                std_value = np.std(values) if len(values) > 1 else 0.0
-                avg_inference_metrics[f"average_{key}"] = avg_value
-                avg_inference_metrics[f"std_{key}"] = std_value
+        print(f"{'Metric':<20} {'Value':<10}")
+        print("-"*30)
         
-        # Add average inference metrics to overall average metrics
-        avg_metrics.update(avg_inference_metrics)
+        for metric_name, value in avg_metrics.items():
+            print(f"{metric_name:<20} {value:.2f}")
         
-        # Log average metrics to WandB
+        print("="*80 + "\n")
+        
+        # Log average metrics to wandb
         if self.general_config.use_wandb:
-            # Log average metrics
-            wandb.log(avg_metrics)
-            
-            # Create a table of fold results
-            fold_table = wandb.Table(columns=["Fold", "Val Loss", "Val Acc", "Val F1", "Val Precision", "Val Recall"])
-            for result in all_fold_results:
-                fold_table.add_data(
-                    result["fold"],
-                    result["val_loss"],
-                    result["val_acc"],
-                    result["val_f1"],
-                    result["val_precision"],
-                    result["val_recall"]
-                )
-            
-            wandb.log({"fold_results": fold_table})
+            for key, value in avg_metrics.items():
+                wandb.log({f"avg_{key}": value})
         
         # Save best model if enabled
         if self.general_config.save_model and best_model is not None:
@@ -725,19 +909,33 @@ class PTLTrainer:
         Returns:
             Dictionary of average metrics
         """
+        # Get all metric keys except 'fold'
+        metric_keys = set()
+        for result in fold_results:
+            metric_keys.update(result.keys())
+        
+        if 'fold' in metric_keys:
+            metric_keys.remove('fold')
+        
+        # Calculate average for each metric
         avg_metrics = {}
-        std_metrics = {}
-        
-        # Skip the 'fold' key
-        metric_keys = [key for key in fold_results[0].keys() if key != 'fold']
-        
-        # Calculate average and standard deviation for each metric
         for key in metric_keys:
-            values = [result[key] for result in fold_results]
-            avg_metrics[f"average_{key}"] = np.mean(values)
-            std_metrics[f"std_{key}"] = np.std(values)
+            # Get values for this metric across all folds
+            values = []
+            for result in fold_results:
+                if key in result:
+                    value = result[key]
+                    if isinstance(value, torch.Tensor):
+                        value = value.item()
+                    values.append(value)
+            
+            # Calculate average and standard deviation
+            if values:
+                avg_value = sum(values) / len(values)
+                std_value = np.std(values) if len(values) > 1 else 0.0
+                
+                # Store average and standard deviation
+                avg_metrics[f"avg_{key}"] = avg_value
+                avg_metrics[f"std_{key}"] = std_value
         
-        # Combine average and standard deviation metrics
-        combined_metrics = {**avg_metrics, **std_metrics}
-        
-        return combined_metrics
+        return avg_metrics

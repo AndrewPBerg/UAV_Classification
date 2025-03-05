@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
-from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy
+from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
@@ -153,14 +153,34 @@ class AudioClassifier(pl.LightningModule):
             return outputs
         
     def on_predict_start(self):
-        """Called at the beginning of prediction."""
-        print("Starting prediction...")
-        # Reset prediction metrics storage
+        """Called at the beginning of the prediction stage.
+        Initialize metrics for prediction.
+        """
+        # Initialize metrics for prediction
+        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted")
+        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted")
+        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted")
+        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted")
+        
+        # Initialize storage for predictions and targets
         self.predict_batch_preds = []
         self.predict_batch_targets = []
-    
+        
+        # Initialize metrics dictionary
+        self.predict_metrics = {}
+        
+        print("Prediction metrics initialized")
+
     def predict_step(self, batch, batch_idx):
-        """Prediction step."""
+        """Prediction step.
+        
+        Args:
+            batch: Input batch
+            batch_idx: Batch index
+            
+        Returns:
+            Tuple of (predicted_classes, targets)
+        """
         x, y = batch
         
         # Forward pass
@@ -169,62 +189,53 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Store predictions and targets for later metric calculation
-        self.predict_batch_preds.append(y_pred_class)
-        self.predict_batch_targets.append(y)
-        
-        # Update metrics for this batch
+        # Update metrics
         self.predict_accuracy(y_pred_class, y)
         self.predict_precision(y_pred_class, y)
         self.predict_recall(y_pred_class, y)
         self.predict_f1(y_pred_class, y)
         
-        # Display batch metrics in progress bar (without logging)
-        batch_acc = self.predict_accuracy.compute()
-        batch_f1 = self.predict_f1.compute()
-        if batch_idx % 10 == 0:  # Display every 10 batches to avoid clutter
-            print(f"Batch {batch_idx} - Acc: {batch_acc:.4f}, F1: {batch_f1:.4f}")
+        # Store predictions and targets for later use
+        self.predict_batch_preds.append(y_pred_class)
+        self.predict_batch_targets.append(y)
         
+        # Return predicted classes and targets
         return y_pred_class, y
     
     def on_predict_epoch_end(self):
-        """Called at the end of the prediction epoch."""
-        # Concatenate all predictions and targets
-        if self.predict_batch_preds and self.predict_batch_targets:
-            all_preds = torch.cat(self.predict_batch_preds)
-            all_targets = torch.cat(self.predict_batch_targets)
-            
-            # Calculate final metrics
-            final_accuracy = self.predict_accuracy.compute()
-            final_precision = self.predict_precision.compute()
-            final_recall = self.predict_recall.compute()
-            final_f1 = self.predict_f1.compute()
-            
-            # Store metrics as attributes so they can be accessed later
-            # Convert tensor values to Python scalars
-            self.predict_metrics = {
-                "predict_acc": final_accuracy.item() if isinstance(final_accuracy, torch.Tensor) else final_accuracy,
-                "predict_precision": final_precision.item() if isinstance(final_precision, torch.Tensor) else final_precision,
-                "predict_recall": final_recall.item() if isinstance(final_recall, torch.Tensor) else final_recall,
-                "predict_f1": final_f1.item() if isinstance(final_f1, torch.Tensor) else final_f1
-            }
-            
-            # Print final metrics
-            print("\nPrediction Metrics:")
-            print(f"Accuracy: {self.predict_metrics['predict_acc']:.4f}")
-            print(f"Precision: {self.predict_metrics['predict_precision']:.4f}")
-            print(f"Recall: {self.predict_metrics['predict_recall']:.4f}")
-            print(f"F1 Score: {self.predict_metrics['predict_f1']:.4f}")
-            
-            # Reset metrics
-            self.predict_accuracy.reset()
-            self.predict_precision.reset()
-            self.predict_recall.reset()
-            self.predict_f1.reset()
-            
-            # Clear storage
-            self.predict_batch_preds = []
-            self.predict_batch_targets = []
+        """Called at the end of the prediction epoch.
+        Compute final metrics.
+        """
+        # Compute final metrics
+        predict_acc = self.predict_accuracy.compute()
+        predict_precision = self.predict_precision.compute()
+        predict_recall = self.predict_recall.compute()
+        predict_f1 = self.predict_f1.compute()
+        
+        # Store metrics in a dictionary
+        self.predict_metrics = {
+            "predict_acc": predict_acc.item(),
+            "predict_precision": predict_precision.item(),
+            "predict_recall": predict_recall.item(),
+            "predict_f1": predict_f1.item()
+        }
+        
+        # Print metrics
+        print("\nPrediction Metrics:")
+        print(f"Accuracy: {predict_acc:.4f}")
+        print(f"Precision: {predict_precision:.4f}")
+        print(f"Recall: {predict_recall:.4f}")
+        print(f"F1 Score: {predict_f1:.4f}")
+        
+        # Reset metrics for next prediction
+        self.predict_accuracy.reset()
+        self.predict_precision.reset()
+        self.predict_recall.reset()
+        self.predict_f1.reset()
+        
+        # Clear storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
         """Training step with manual optimization."""
@@ -272,12 +283,12 @@ class AudioClassifier(pl.LightningModule):
         self.train_precision(y_pred_class, y)
         self.train_recall(y_pred_class, y)
         
-        # Log metrics
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True)
-        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True)
-        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True)
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
         
         return loss
     
@@ -305,12 +316,12 @@ class AudioClassifier(pl.LightningModule):
         self.val_recall(y_pred_class, y)
         self.val_f1(y_pred_class, y)
         
-        # Log metrics
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True)
-        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True)
-        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True)
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
         
         return loss
     
@@ -338,12 +349,12 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall(y_pred_class, y)
         self.test_f1(y_pred_class, y)
         
-        # Log metrics
-        self.log('test_loss', loss, on_step=False, on_epoch=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True)
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True)
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True)
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True)
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
+        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
         
         return loss
     
