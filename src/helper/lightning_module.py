@@ -6,9 +6,13 @@ from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, M
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
+import os
+import re
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
-import re
 
 
 class AudioClassifier(pl.LightningModule):
@@ -359,6 +363,14 @@ class AudioClassifier(pl.LightningModule):
             patience=2,
         )
         
+        # Store scheduler as an attribute so we can access it in on_epoch_end
+        self.lr_scheduler = scheduler
+        
+        # For manual optimization, just return the optimizer
+        if not self.automatic_optimization:
+            return optimizer
+        
+        # For automatic optimization, return with scheduler config
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -415,3 +427,14 @@ class AudioClassifier(pl.LightningModule):
         
         # Return the loss value
         return loss
+
+    def on_validation_epoch_end(self):
+        """Called at the end of the validation epoch.
+        If using manual optimization, manually step the learning rate scheduler.
+        """
+        if not self.automatic_optimization and hasattr(self, 'lr_scheduler'):
+            # Get the current validation loss
+            val_loss = self.trainer.callback_metrics.get('val_loss')
+            if val_loss is not None:
+                # Step the scheduler with the validation loss
+                self.lr_scheduler.step(val_loss)

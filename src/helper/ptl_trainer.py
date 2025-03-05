@@ -422,9 +422,9 @@ class PTLTrainer:
         all_targets = torch.cat(all_targets)
         
         # Create confusion matrix
-        from torchmetrics.functional import confusion_matrix
+        from torchmetrics.functional.classification import confusion_matrix
         conf_mat = confusion_matrix(
-            all_preds, all_targets, num_classes=self.data_module.num_classes
+            all_preds, all_targets, num_classes=self.data_module.num_classes, task="multiclass"
         ).cpu().numpy()
         
         # Log confusion matrix if wandb is enabled
