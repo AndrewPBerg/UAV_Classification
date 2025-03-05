@@ -168,7 +168,7 @@ class PTLTrainer:
         # Add custom progress bar
         progress_bar = CustomProgressBar()
         callbacks.append(progress_bar)
-        
+
         return callbacks
     
     def train(self) -> Dict[str, Any]:
@@ -194,7 +194,7 @@ class PTLTrainer:
         # Create model
         model, feature_extractor = self.model_factory(self.device)
         
-        # Create trainer with our custom callbacks
+        # Create trainer with our custom callbacks (removed track_grad_norm)
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
@@ -202,7 +202,12 @@ class PTLTrainer:
             callbacks=self._get_callbacks(),
             logger=self.wandb_logger,
             deterministic=False,
-            precision=32  # Changed to 32-bit precision to avoid AMP issues
+            precision=32,  # Changed to 32-bit precision to avoid AMP issues
+            check_val_every_n_epoch=1,  # Ensure validation happens every epoch
+            enable_checkpointing=True,
+            enable_progress_bar=True,
+            enable_model_summary=True,
+            log_every_n_steps=1,  # Log metrics every step
         )
         ic("trainer created")
         
@@ -238,10 +243,20 @@ class PTLTrainer:
         start_time = time.time()
         
         try:
+            # Remove test_dataloaders from fit() and use configure_dataloaders instead
             trainer.fit(
                 model=lightning_module,
-                datamodule=self.data_module
+                train_dataloaders=self.data_module.train_dataloader(),
+                val_dataloaders=self.data_module.val_dataloader(),
             )
+            
+            # Run test after each epoch by adding a test loop
+            trainer.test(
+                model=lightning_module,
+                dataloaders=self.data_module.test_dataloader(),
+                verbose=True
+            )
+            
         except Exception as e:
             print(f"Error during training: {str(e)}")
             # Check if this is a CUDA assertion error related to class labels

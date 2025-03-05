@@ -356,20 +356,28 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall(y_pred_class, y)
         self.test_f1(y_pred_class, y)
         
-        # Log metrics - ensure they appear in progress bar and are formatted consistently
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, sync_dist=True)
+        # Log metrics every step
+        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_acc', self.test_accuracy, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_f1', self.test_f1, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_precision', self.test_precision, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_recall', self.test_recall, on_step=True, on_epoch=True, sync_dist=True)
         
         return loss
+
+    def on_train_epoch_end(self):
+        """Called at the end of training epoch.
+        Run test evaluation.
+        """
+        # The trainer will automatically handle the test evaluation at the end of each epoch
+        # as long as we have test_step defined and test_dataloader is provided
+        pass
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
         # Choose optimizer based on model type
         if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer = AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
+            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
         else:
             optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
         
