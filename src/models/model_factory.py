@@ -63,7 +63,7 @@ class ModelFactory:
             elif model_type == "mert":
                 model, feature_extractor = transformer_model._create_mert_model(num_classes, CACHE_DIR, general_config, peft_config)
             elif model_type == "vit":
-                model, feature_extractor = transformer_model._create_vit_model(model_type, num_classes, input_shape, general_config, peft_config)
+                model, feature_extractor = transformer_model._create_vit_model(model_type, num_classes, CACHE_DIR, input_shape, general_config, peft_config)
             else:
                 raise ValueError(f"Unsupported transformer model type: {model_type}")
         
