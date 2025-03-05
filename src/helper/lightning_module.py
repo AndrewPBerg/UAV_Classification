@@ -23,15 +23,7 @@ class AudioClassifier(pl.LightningModule):
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
     ):
-        """
-        Initialize the AudioClassifier module.
-        
-        Args:
-            model: The PyTorch model to train
-            general_config: General configuration
-            peft_config: PEFT configuration (optional)
-            num_classes: Number of classes (if not provided, will use general_config.num_classes)
-        """
+        """Initialize the AudioClassifier module."""
         super().__init__()
         self.model = model
         self.general_config = general_config
@@ -49,10 +41,12 @@ class AudioClassifier(pl.LightningModule):
         # Initialize metrics
         self._init_metrics()
         
-        # Enable automatic optimization for compatibility with gradient clipping
-        self.automatic_optimization = True
+        # Manual optimization settings
+        self.automatic_optimization = False
+        self.accumulation_steps = general_config.accumulation_steps
+        self.current_step = 0
 
-        # Initialize prediction metrics dictionary to store results
+        # Initialize prediction metrics dictionary
         self.predict_metrics = {}
         
     def _init_metrics(self):
@@ -229,7 +223,15 @@ class AudioClassifier(pl.LightningModule):
             self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step with automatic optimization."""
+        """Training step with manual optimization."""
+        # Get optimizer
+        opt = self.optimizers()
+        
+        # Only zero gradients when starting a new accumulation cycle
+        if self.current_step % self.accumulation_steps == 0:
+            opt.zero_grad()
+        
+        # Get the input and target
         x, y = batch
         
         # Validate target labels to ensure they are within range
@@ -242,6 +244,20 @@ class AudioClassifier(pl.LightningModule):
         
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
+        
+        # Scale loss by accumulation steps
+        scaled_loss = loss / self.accumulation_steps
+        
+        # Backward pass with scaled loss
+        self.manual_backward(scaled_loss)
+        
+        # Update weights only when accumulation is complete
+        if (self.current_step + 1) % self.accumulation_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+        # Increment step counter
+        self.current_step += 1
         
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
@@ -331,7 +347,7 @@ class AudioClassifier(pl.LightningModule):
         """Configure optimizers and learning rate schedulers."""
         # Choose optimizer based on model type
         if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer = AdamW(self.model.parameters(), lr=self.general_config.learning_rate)
+            optimizer = AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
         else:
             optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
         
@@ -355,14 +371,14 @@ class AudioClassifier(pl.LightningModule):
 
     def optimizer_step(
         self,
-        epoch,
-        batch_idx,
-        optimizer,
-        optimizer_idx,
-        optimizer_closure,
-        on_tpu=False,
-        using_native_amp=False,
-        using_lbfgs=False,
+        epoch: int = None,
+        batch_idx: int = None,
+        optimizer = None,
+        optimizer_idx: int = None,
+        optimizer_closure = None,
+        on_tpu: bool = False,
+        using_native_amp: bool = False,
+        using_lbfgs: bool = False,
     ):
         """
         Custom optimizer step that ensures gradient scaler inf checks are properly recorded.
@@ -372,11 +388,10 @@ class AudioClassifier(pl.LightningModule):
         if optimizer_closure is None:
             raise ValueError("optimizer_closure cannot be None")
             
-        # Make sure the closure computes gradients before we continue
-        optimizer_closure()
+        # Compute loss and gradients
+        loss = optimizer_closure()
         
         # Skip optimizer step if any gradients are invalid (infinity/NaN)
-        # This ensures inf checks are recorded for the optimizer
         valid_gradients = True
         for param in self.model.parameters():
             if param.grad is not None:
@@ -390,3 +405,6 @@ class AudioClassifier(pl.LightningModule):
         
         # Zero gradients after stepping
         optimizer.zero_grad()
+        
+        # Return the loss value
+        return loss

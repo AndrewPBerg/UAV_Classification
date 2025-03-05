@@ -157,13 +157,11 @@ class PTLTrainer:
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,  # Always use a single device
+            devices=1,
             callbacks=self._get_callbacks(),
             logger=self.wandb_logger,
-            gradient_clip_val=1.0,
-            accumulate_grad_batches=self.general_config.accumulation_steps,
-            deterministic=False,  # Set to False to avoid issues with operations that don't have deterministic implementations
-            precision="16-mixed" if self.gpu_available else "32"
+            deterministic=False,
+            precision=32  # Changed to 32-bit precision to avoid AMP issues
         )
         ic("trainer created")
         
@@ -724,4 +722,4 @@ class PTLTrainer:
         # Combine average and standard deviation metrics
         combined_metrics = {**avg_metrics, **std_metrics}
         
-        return combined_metrics 
+        return combined_metrics

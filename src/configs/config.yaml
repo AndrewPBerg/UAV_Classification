@@ -14,14 +14,14 @@ general:
   val_size: 0.1
   sweep_count: 200
   accumulation_steps: 2
-  learning_rate: 0.002
+  learning_rate: 0.02
   patience: 10
-  use_wandb: true
+  use_wandb: false
   use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -102,7 +102,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: mert-none-classifier
+  name: mert-none-full
   reinit: true
   notes: null
   tags: null

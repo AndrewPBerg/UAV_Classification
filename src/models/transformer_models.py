@@ -125,7 +125,7 @@ class TransformerModel:
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
                  'none-full', 'none-classifier', 'ssf', 'bitfit']
     
-    transformer_models = ['ast', 'mert','vit']
+    transformer_models = ['ast', 'mert','vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32', 'vit_h_14']
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
@@ -436,8 +436,8 @@ class TransformerModel:
             'vit_h_14': (vit_h_14, ViT_H_14_Weights.DEFAULT),
         }
         
-        if model_type not in vit_models:
-            raise ValueError(f"Unsupported ViT model type: {model_type}")
+        if model_type.lower() not in vit_models:
+            raise ValueError(f"Unsupported ViT model type: {model_type}. Must be one of: {list(vit_models.keys())}")
             
         model_fn, weights = vit_models[model_type]
         model = model_fn(weights=weights)
