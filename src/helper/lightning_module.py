@@ -227,12 +227,9 @@ class AudioClassifier(pl.LightningModule):
             "predict_f1": predict_f1.item()
         }
         
-        # Print metrics
+        # Print metrics in a concise format
         print("\nPrediction Metrics:")
-        print(f"Accuracy: {predict_acc:.4f}")
-        print(f"Precision: {predict_precision:.4f}")
-        print(f"Recall: {predict_recall:.4f}")
-        print(f"F1 Score: {predict_f1:.4f}")
+        print(f"Accuracy: {predict_acc:.4f} | Precision: {predict_precision:.4f} | Recall: {predict_recall:.4f} | F1: {predict_f1:.4f}")
         
         # Reset metrics for next prediction
         self.predict_accuracy.reset()
@@ -366,12 +363,23 @@ class AudioClassifier(pl.LightningModule):
         return loss
 
     def on_train_epoch_end(self):
-        """Called at the end of training epoch.
-        Run test evaluation.
+        """Called at the end of the training epoch.
+        Track and log epoch-level metrics.
         """
-        # The trainer will automatically handle the test evaluation at the end of each epoch
-        # as long as we have test_step defined and test_dataloader is provided
-        pass
+        # Get current metrics
+        train_acc = self.train_accuracy.compute()
+        val_acc = self.val_accuracy.compute() if hasattr(self, 'val_accuracy') else None
+        
+        # Store best validation accuracy
+        if val_acc is not None:
+            if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
+                self.best_val_accuracy = val_acc.item()
+        
+        # Log epoch-level metrics
+        self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        
+        # Reset metrics for next epoch if needed
+        # Note: PyTorch Lightning automatically resets metrics at the end of validation/test steps
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""

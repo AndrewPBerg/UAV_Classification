@@ -194,20 +194,46 @@ class PTLTrainer:
         # Create model
         model, feature_extractor = self.model_factory(self.device)
         
-        # Create trainer with our custom callbacks (removed track_grad_norm)
+        # Create a custom callback to display metrics after each epoch
+        class MetricsDisplayCallback(pl.Callback):
+            def on_train_epoch_end(self, trainer, pl_module):
+                metrics = trainer.callback_metrics
+                
+                # Extract metrics
+                train_loss = metrics.get('train_loss_epoch', None)
+                train_acc = metrics.get('train_acc_epoch', None)
+                val_loss = metrics.get('val_loss', None)
+                val_acc = metrics.get('val_acc', None)
+                
+                # Convert tensors to floats
+                if isinstance(train_loss, torch.Tensor):
+                    train_loss = train_loss.item()
+                if isinstance(train_acc, torch.Tensor):
+                    train_acc = train_acc.item()
+                if isinstance(val_loss, torch.Tensor):
+                    val_loss = val_loss.item()
+                if isinstance(val_acc, torch.Tensor):
+                    val_acc = val_acc.item()
+                
+                # Print metrics in a nice format
+                print("\n" + "-"*50)
+                print(f"Epoch {trainer.current_epoch} Metrics:")
+                print(f"Train Loss: {train_loss:.4f} | Train Acc: {train_acc:.4f}")
+                print(f"Val Loss: {val_loss:.4f} | Val Acc: {val_acc:.4f}")
+                print("-"*50 + "\n")
+        
+        # Create trainer with our custom callbacks
+        callbacks = self._get_callbacks()
+        callbacks.append(MetricsDisplayCallback())
+        
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
             devices=1,
-            callbacks=self._get_callbacks(),
+            callbacks=callbacks,
             logger=self.wandb_logger,
             deterministic=False,
-            precision=32,  # Changed to 32-bit precision to avoid AMP issues
-            check_val_every_n_epoch=1,  # Ensure validation happens every epoch
-            enable_checkpointing=True,
-            enable_progress_bar=True,
-            enable_model_summary=True,
-            log_every_n_steps=1,  # Log metrics every step
+            precision=32  # Changed to 32-bit precision to avoid AMP issues
         )
         ic("trainer created")
         
@@ -243,20 +269,10 @@ class PTLTrainer:
         start_time = time.time()
         
         try:
-            # Remove test_dataloaders from fit() and use configure_dataloaders instead
             trainer.fit(
                 model=lightning_module,
-                train_dataloaders=self.data_module.train_dataloader(),
-                val_dataloaders=self.data_module.val_dataloader(),
+                datamodule=self.data_module
             )
-            
-            # Run test after each epoch by adding a test loop
-            trainer.test(
-                model=lightning_module,
-                dataloaders=self.data_module.test_dataloader(),
-                verbose=True
-            )
-            
         except Exception as e:
             print(f"Error during training: {str(e)}")
             # Check if this is a CUDA assertion error related to class labels
@@ -285,52 +301,15 @@ class PTLTrainer:
                 "total_train_time": formatted_end_time
             })
         
-        # Print final training metrics in a nice table
-        print("\n" + "="*80)
-        print("FINAL TRAINING METRICS")
-        print("="*80)
-        
-        # Get the metrics from the trainer
-        metrics = trainer.callback_metrics
-        
-        # Format and print metrics in a table
-        print(f"{'Metric':<20} {'Value':<10}")
-        print("-"*30)
-        
-        # Print metrics in a specific order
-        metric_order = [
-            'train_loss', 'train_acc', 'train_f1', 'train_precision', 'train_recall',
-            'val_loss', 'val_acc', 'val_f1', 'val_precision', 'val_recall'
-        ]
-        
-        for metric_name in metric_order:
-            if metric_name in metrics:
-                value = metrics[metric_name]
-                if isinstance(value, torch.Tensor):
-                    value = value.item()
-                print(f"{metric_name:<20} {value:.2f}")
-        
-        print("="*80 + "\n")
-        
-        # Test model
+        # Run test evaluation after training
         print("\n" + "="*80)
         print("RUNNING TEST EVALUATION")
         print("="*80 + "\n")
         
-        try:
-            test_results = trainer.test(
-                model=lightning_module,
-                datamodule=self.data_module
-            )
-        except Exception as e:
-            print(f"Error during testing: {str(e)}")
-            # Check if this is a CUDA assertion error related to class labels
-            if "nll_loss_forward" in str(e) and "Assertion `t >= 0 && t < n_classes`" in str(e):
-                print("\nERROR: Invalid class labels detected in your test dataset.")
-                print(f"The model expects labels in range [0, {self.data_module.num_classes-1}], but found labels outside this range.")
-                print("Please check your dataset preprocessing and ensure all labels are correctly mapped.")
-                return {"error": "Invalid class labels in test dataset"}
-            raise  # Re-raise the exception if it's not the specific error we're handling
+        test_results = trainer.test(
+            model=lightning_module,
+            datamodule=self.data_module
+        )
         
         # Print test results in a nice table
         if test_results:
@@ -343,7 +322,7 @@ class PTLTrainer:
             
             # Print test metrics in a specific order
             test_metric_order = [
-                'test_loss', 'test_acc', 'test_f1', 'test_precision', 'test_recall'
+                'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
             ]
             
             for metric_name in test_metric_order:
@@ -434,14 +413,14 @@ class PTLTrainer:
         print(f"Model: {self.general_config.model_type}")
         print(f"Total training time: {formatted_end_time}")
         
-        if 'val_acc' in metrics:
-            val_acc = metrics['val_acc']
+        if 'val_acc' in trainer.callback_metrics:
+            val_acc = trainer.callback_metrics['val_acc']
             if isinstance(val_acc, torch.Tensor):
                 val_acc = val_acc.item()
-            print(f"Best validation accuracy: {val_acc:.2f}")
+            print(f"Final validation accuracy: {val_acc:.2f}")
         
-        if 'test_acc' in results_dict:
-            test_acc = results_dict['test_acc']
+        if 'test_acc_epoch' in results_dict:
+            test_acc = results_dict['test_acc_epoch']
             if isinstance(test_acc, torch.Tensor):
                 test_acc = test_acc.item()
             print(f"Test accuracy: {test_acc:.2f}")
@@ -646,20 +625,6 @@ class PTLTrainer:
                 plt.close()
         except Exception as e:
             print(f"Error creating confusion matrix: {str(e)}")
-        
-        # Save inference predictions for later analysis
-        try:
-            # Save predictions to file
-            predictions_dir = Path("predictions")
-            predictions_dir.mkdir(parents=True, exist_ok=True)
-            
-            # Save as numpy arrays
-            np.save(str(predictions_dir / "inference_predictions.npy"), all_preds.cpu().numpy())
-            np.save(str(predictions_dir / "inference_targets.npy"), all_targets.cpu().numpy())
-            
-            print(f"Saved inference predictions to {predictions_dir}")
-        except Exception as e:
-            print(f"Error saving predictions: {str(e)}")
         
         return metrics
     
