@@ -467,7 +467,7 @@ class TransformerModel:
     
     
     @staticmethod
-    def _create_vit_model(model_type: str, num_classes: int, CACHE_DIR: str, input_shape: Tuple[int, int, int], general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
+    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
         """
         Create a ViT model using Hugging Face's implementation.
         """
