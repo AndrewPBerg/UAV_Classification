@@ -502,68 +502,6 @@ class TransformerModel:
                 cache_dir=CACHE_DIR
             )
         
-        # Add resize layer to match ViT's expected input size
-        resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
-        
-        # Save original forward method
-        original_forward = model.forward
-        
-        # Define a new forward method to handle input shape issues
-        def new_forward(self, x=None, input_ids=None, attention_mask=None, pixel_values=None, inputs_embeds=None, **kwargs):
-            # Handle different input types - PEFT might pass input_ids instead of x
-            original_forward = self.__class__.forward.__get__(self, self.__class__)
-            
-            # Use pixel_values if provided
-            if pixel_values is not None:
-                x = pixel_values
-            
-            # If x is still None, check if we have input_ids
-            if x is None and input_ids is not None:
-                # Convert input_ids to the expected format for ViT
-                # This is a placeholder - you might need to adjust based on your specific needs
-                x = input_ids.float().unsqueeze(1)  # Add channel dimension
-            
-            # If inputs_embeds is provided, we need to handle it differently
-            if inputs_embeds is not None:
-                # For ViT, we can't directly use inputs_embeds, so we'll ignore it
-                # and rely on x or pixel_values instead
-                pass
-            
-            # If we still don't have input, raise an error
-            if x is None:
-                raise ValueError("No valid input provided to ViT model")
-            
-            # Print shape for debugging
-            # print(f"Input shape before processing: {x.shape}")
-            
-            # Ensure x has the right shape [batch_size, channels, height, width]
-            if len(x.shape) == 2:  # [batch_size, features]
-                # Reshape to a square image with 1 channel
-                size = int(math.sqrt(x.shape[1]))
-                x = x.reshape(x.shape[0], 1, size, size)
-            elif len(x.shape) == 3:  # [batch_size, height, width] or [batch_size, seq_len, features]
-                x = x.unsqueeze(1)  # Add channel dimension -> [batch_size, 1, height, width]
-            
-            # Ensure we have 3 channels (RGB) as expected by ViT
-            if x.shape[1] == 1:
-                # If we have a single channel, duplicate it to make 3 channels
-                x = x.expand(-1, 3, -1, -1)  # This is safer than repeat or cat
-            
-            # Normalize the input as expected by the ViT model
-            # The ViT model expects normalized images with mean=[0.5, 0.5, 0.5] and std=[0.5, 0.5, 0.5]
-            mean = torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1).to(x.device)
-            std = torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1).to(x.device)
-            x = (x - mean) / std
-            
-            # Pass through the model - filter out inputs_embeds as ViT doesn't accept it
-            filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'inputs_embeds'}
-            outputs = original_forward(pixel_values=x, **filtered_kwargs)
-            
-            return outputs
-        
-        # Replace the forward method
-        model.forward = types.MethodType(new_forward, model)
-        
         # Apply PEFT configuration
         model = apply_peft(model, peft_config, general_config)
         
