@@ -38,7 +38,11 @@ runs:
         model_type: ast
         adapter_type: lora
       lora:
-        r: 8
+        target_modules:
+        - key
+        - value
+        - query
+        - dense
 
   - id: 3
     type: script
@@ -50,6 +54,17 @@ runs:
         batch_size: 8
         model_type: ast
         adapter_type: ia3
+      ia3:
+        target_modules:
+        - key
+        - value
+        - query
+        - dense
+        feedforward_modules:
+        - key 
+        - value
+        - query
+        - dense
   
   - id: 4
     type: script
@@ -60,6 +75,13 @@ runs:
       general:
         model_type: ast
         adapter_type: adalora
+
+      adalora:
+        target_modules:
+        - key
+        - value
+        - query
+        - dense
   
   - id: 5
     type: script
@@ -70,6 +92,13 @@ runs:
       general:
         model_type: ast
         adapter_type: oft
+      oft:
+        target_modules:
+        - key
+        - value
+        - query
+        - dense
+
   - id: 6
     type: script
     changes:
@@ -89,6 +118,12 @@ runs:
       general:
         model_type: ast
         adapter_type: hra
+      hra:
+        target_modules:
+        - key
+        - value
+        - query
+        - dense
         
   - id: 8
     type: script

@@ -3,7 +3,7 @@ general:
   num_classes: 9
   save_dataloader: false
   model_type: mert
-  batch_size: 8
+  batch_size: 4
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: lora
+  adapter_type: ssf
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -56,45 +56,46 @@ lora:
   lora_dropout: 0
   bias: lora_only
 ia3:
-  target_modules:
-  - query
-  - key
-  - value
-  - dense
   feedforward_modules:
-  - dense
-  - query
-  - key
-  - value
+  - output_dense
+  target_modules:
+  - q_proj
+  - k_proj
+  - v_proj
+  - out_proj
+  - output_dense
 adalora:
   init_r: 32
   target_r: 16
   target_modules:
-  - query
-  - key
-  - value
-  - dense
+  - q_proj
+  - k_proj
+  - v_proj
+  - out_proj
+  - output_dense
   lora_alpha: 8
 oft:
   r: 768
   target_modules:
-  - query
-  - key
-  - value
-  - dense
+  - q_proj
+  - k_proj
+  - v_proj
+  - out_proj
+  - output_dense
   module_dropout: 0.0
   init_weights: true
 layernorm:
   target_modules:
-  - layernorm
+  - layer_norm
   task_type: AUDIO_CLASSIFICATION
 hra:
-  r: 8
+  r: 4
   target_modules:
-  - query
-  - key
-  - value
-  - dense
+  - q_proj
+  - k_proj
+  - v_proj
+  - out_proj
+  - output_dense
 ssf:
   init_scale: 1.0
   init_shift: 0.0
@@ -103,7 +104,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: mert-lora
+  name: mert-ssf
   reinit: true
   notes: null
   tags: null

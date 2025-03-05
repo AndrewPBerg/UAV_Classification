@@ -28,89 +28,97 @@ runs:
   #       model_type: mert
   #       adapter_type: none-full
 
-  - id: 2
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-lora
-      general:
-        model_type: mert
-        adapter_type: lora       
-      lora:
-        target_modules:
-        - q_proj
-        - k_proj
-        - v_proj
-        - out_proj
-        - output_dense
+  # - id: 2
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-lora
+  #     general:
+  #       model_type: mert
+  #       adapter_type: lora       
+  #     lora:
+  #       target_modules:
+  #       - q_proj
+  #       - k_proj
+  #       - v_proj
+  #       - out_proj
+  #       - output_dense
 
 
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-ia3
-      general:
-        model_type: mert
-        adapter_type: ia3
+  # - id: 3
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-ia3
+  #     general:
+  #       model_type: mert
+  #       adapter_type: ia3
       
-      ia3:
-        target_modules:
-        - q_proj
-        - k_proj
-        - v_proj
-        - out_proj
-        - output_dense
-      
-  
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-adalora
-      general:
-        model_type: mert
-        adapter_type: adalora
-      
+  #     ia3:
+  #       target_modules:
+  #       - q_proj
+  #       - k_proj
+  #       - v_proj
+  #       - out_proj
+  #       - output_dense
+  #       feedforward_modules:
+  #       - output_dense
 
-      adalora:
-        target_modules:
-        - q_proj
-        - k_proj
-        - v_proj
-        - out_proj
-        - output_dense
       
   
-  - id: 5
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-oft
-      general:
-        model_type: mert
-        adapter_type: oft
-      oft: 
-        target_modules:
-        - q_proj
-        - k_proj
-        - v_proj
-        - out_proj
-        - output_dense
+  # - id: 4
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-adalora
+  #     general:
+  #       model_type: mert
+  #       adapter_type: adalora
+      
 
-  - id: 6
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-layernorm
-      general:
-        model_type: mert
-        adapter_type: layernorm
+  #     adalora:
+  #       target_modules:
+  #       - q_proj
+  #       - k_proj
+  #       - v_proj
+  #       - out_proj
+  #       - output_dense
+      
+  
+  # - id: 5
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-oft
+  #     general:
+  #       model_type: mert
+  #       adapter_type: oft
+  #     oft: 
+  #       target_modules:
+  #       - q_proj
+  #       - k_proj
+  #       - v_proj
+  #       - out_proj
+  #       - output_dense
+
+  # - id: 6
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-layernorm
+  #     general:
+  #       model_type: mert
+  #       adapter_type: layernorm
+      
+  #     layernorm:
+  #       target_modules:
+  #       - layer_norm
+  #       - final_layer_norm
         
   - id: 7
     type: script
@@ -119,9 +127,11 @@ runs:
         project: model-peft-test
         name: mert-hra
       general:
+        batch_size: 4
         model_type: mert
         adapter_type: hra
-      hra:
+      hra:  
+        r: 4
         target_modules:
         - q_proj
         - k_proj
