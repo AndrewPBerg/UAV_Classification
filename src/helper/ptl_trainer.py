@@ -359,7 +359,7 @@ class PTLTrainer:
             all_targets = torch.cat(all_targets)
             
             # Calculate metrics
-            from torchmetrics.functional import (
+            from torchmetrics.functional.classification import (
                 multiclass_accuracy,
                 multiclass_precision,
                 multiclass_recall,

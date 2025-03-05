@@ -383,6 +383,7 @@ class AudioClassifier(pl.LightningModule):
         """
         Custom optimizer step that ensures gradient scaler inf checks are properly recorded.
         This fixes the "No inf checks were recorded for this optimizer" error.
+        Also implements gradient clipping to stabilize training.
         """
         # First, ensure we have a closure for the optimizer
         if optimizer_closure is None:
@@ -390,6 +391,12 @@ class AudioClassifier(pl.LightningModule):
             
         # Compute loss and gradients
         loss = optimizer_closure()
+        
+        # Apply gradient clipping if configured
+        if hasattr(self.general_config, 'gradient_clip_val') and self.general_config.gradient_clip_val > 0:
+            clip_val = self.general_config.gradient_clip_val
+            # Clip gradients by value
+            torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
         
         # Skip optimizer step if any gradients are invalid (infinity/NaN)
         valid_gradients = True
