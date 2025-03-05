@@ -27,14 +27,21 @@ class AudioClassifier(pl.LightningModule):
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
     ):
-        """Initialize the AudioClassifier module."""
+        """Initialize the classifier.
+        
+        Args:
+            model: PyTorch model
+            general_config: General configuration
+            peft_config: PEFT configuration (optional)
+            num_classes: Number of classes (optional)
+        """
         super().__init__()
         self.model = model
         self.general_config = general_config
         self.peft_config = peft_config
         
         # Set number of classes
-        self.num_classes = num_classes or general_config.num_classes
+        self.num_classes = num_classes if num_classes is not None else general_config.num_classes
         
         # Set up loss function
         self.loss_fn = nn.CrossEntropyLoss()
@@ -53,6 +60,10 @@ class AudioClassifier(pl.LightningModule):
         # Initialize prediction metrics dictionary
         self.predict_metrics = {}
         
+        # Initialize tracking variables
+        self.current_train_loss = None
+        self.best_val_accuracy = 0.0
+
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
         # Get the current device
@@ -264,6 +275,9 @@ class AudioClassifier(pl.LightningModule):
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
+        # Store current loss for epoch-level logging
+        self.current_train_loss = loss.detach().clone()
+        
         # Scale loss by accumulation steps
         scaled_loss = loss / self.accumulation_steps
         
@@ -367,19 +381,26 @@ class AudioClassifier(pl.LightningModule):
         Track and log epoch-level metrics.
         """
         # Get current metrics
-        train_acc = self.train_accuracy.compute()
-        val_acc = self.val_accuracy.compute() if hasattr(self, 'val_accuracy') else None
-        
-        # Store best validation accuracy
-        if val_acc is not None:
-            if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
-                self.best_val_accuracy = val_acc.item()
-        
-        # Log epoch-level metrics
-        self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        
-        # Reset metrics for next epoch if needed
-        # Note: PyTorch Lightning automatically resets metrics at the end of validation/test steps
+        try:
+            train_acc = self.train_accuracy.compute()
+            # Log epoch-level metrics
+            self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            
+            # Also log train loss at epoch level if available
+            if hasattr(self, 'current_train_loss'):
+                self.log('train_loss_epoch', self.current_train_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            
+            # Track validation accuracy if available
+            if hasattr(self, 'val_accuracy'):
+                val_acc = self.val_accuracy.compute()
+                if val_acc is not None:
+                    # Store best validation accuracy
+                    if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
+                        self.best_val_accuracy = val_acc.item()
+        except Exception as e:
+            print(f"Warning: Error in on_train_epoch_end: {str(e)}")
+            # Don't let this error stop training
+            pass
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""

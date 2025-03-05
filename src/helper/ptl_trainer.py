@@ -420,23 +420,35 @@ class PTLTrainer:
         print(f"Model: {self.general_config.model_type}")
         print(f"Total training time: {formatted_end_time}")
         
+        # Get validation accuracy
+        val_acc = None
         if 'val_acc' in trainer.callback_metrics:
             val_acc = trainer.callback_metrics['val_acc']
             if isinstance(val_acc, torch.Tensor):
                 val_acc = val_acc.item()
-            print(f"Final validation accuracy: {val_acc:.2f}")
         
+        # Get test accuracy
+        test_acc = None
         if 'test_acc_epoch' in results_dict:
             test_acc = results_dict['test_acc_epoch']
             if isinstance(test_acc, torch.Tensor):
                 test_acc = test_acc.item()
-            print(f"Test accuracy: {test_acc:.2f}")
         
+        # Get inference accuracy
+        inf_acc = None
         if 'inference_acc' in results_dict:
             inf_acc = results_dict['inference_acc']
             if isinstance(inf_acc, torch.Tensor):
                 inf_acc = inf_acc.item()
-            print(f"Inference accuracy: {inf_acc:.2f}")
+        
+        # Format metrics safely, handling None values
+        val_acc_str = f"{val_acc:.2f}" if val_acc is not None else "N/A"
+        test_acc_str = f"{test_acc:.2f}" if test_acc is not None else "N/A"
+        inf_acc_str = f"{inf_acc:.2f}" if inf_acc is not None else "N/A"
+        
+        print(f"Final validation accuracy: {val_acc_str}")
+        print(f"Test accuracy: {test_acc_str}")
+        print(f"Inference accuracy: {inf_acc_str}")
         
         print("="*80 + "\n")
         

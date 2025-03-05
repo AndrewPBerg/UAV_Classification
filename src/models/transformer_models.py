@@ -243,7 +243,14 @@ class TransformerModel:
         original_forward = model.forward
         
         # Define a new forward method to handle input shape issues
-        def new_forward(self, x):
+        def new_forward(self, x=None, input_ids=None, attention_mask=None, **kwargs):
+            # Handle different input types - PEFT might pass input_ids instead of x
+            if x is None and input_ids is not None:
+                x = input_ids
+            
+            if x is None:
+                raise ValueError("Either x or input_ids must be provided to the forward method")
+                
             # Debug logging
             logger.debug(f"AST model input shape before processing: {x.shape}")
             
@@ -381,7 +388,14 @@ class TransformerModel:
         logger.info(f"Added classifier head with {hidden_size} -> {num_classes}")
         
         # Define new forward method to handle shape issues and device consistency
-        def new_forward(self, x):
+        def new_forward(self, x=None, input_ids=None, attention_mask=None, **kwargs):
+            # Handle different input types - PEFT might pass input_ids instead of x
+            if x is None and input_ids is not None:
+                x = input_ids
+            
+            if x is None:
+                raise ValueError("Either x or input_ids must be provided to the forward method")
+                
             logger.debug(f"Input shape: {x.shape}, device: {x.device}")
             
             # Ensure input is float32
@@ -475,7 +489,14 @@ class TransformerModel:
         model.image_size = 224  # Set fixed size expected by ViT
         resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
         
-        def new_forward(self, x):
+        def new_forward(self, x=None, input_ids=None, attention_mask=None, **kwargs):
+            # Handle different input types - PEFT might pass input_ids instead of x
+            if x is None and input_ids is not None:
+                x = input_ids
+            
+            if x is None:
+                raise ValueError("Either x or input_ids must be provided to the forward method")
+                
             # Handle input
             x = x.float()
             if x.dim() == 3:
