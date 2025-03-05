@@ -509,26 +509,37 @@ class TransformerModel:
         original_forward = model.forward
         
         # Define a new forward method to handle input shape issues
-        def new_forward(self, x=None, input_ids=None, attention_mask=None, pixel_values=None, **kwargs):
+        def new_forward(self, x=None, input_ids=None, attention_mask=None, pixel_values=None, inputs_embeds=None, **kwargs):
             # Handle different input types - PEFT might pass input_ids instead of x
-            if x is None and input_ids is not None:
-                x = input_ids
-            elif x is None and pixel_values is not None:
+            original_forward = self.__class__.forward.__get__(self, self.__class__)
+            
+            # Use pixel_values if provided
+            if pixel_values is not None:
                 x = pixel_values
             
+            # If x is still None, check if we have input_ids
+            if x is None and input_ids is not None:
+                # Convert input_ids to the expected format for ViT
+                # This is a placeholder - you might need to adjust based on your specific needs
+                x = input_ids.float().unsqueeze(1)  # Add channel dimension
+            
+            # If inputs_embeds is provided, we need to handle it differently
+            if inputs_embeds is not None:
+                # For ViT, we can't directly use inputs_embeds, so we'll ignore it
+                # and rely on x or pixel_values instead
+                pass
+            
+            # If we still don't have input, raise an error
             if x is None:
-                raise ValueError("Either x, input_ids, or pixel_values must be provided to the forward method")
-                
-            # Handle input
-            x = x.float()
-            if x.dim() == 3:
-                x = x.unsqueeze(1)
+                raise ValueError("No valid input provided to ViT model")
             
-            # Resize input to match ViT's expected size
-            x = resize_layer(x)
+            # Ensure x has the right shape [batch_size, channels, height, width]
+            if len(x.shape) == 3:
+                x = x.unsqueeze(1)  # Add channel dimension
             
-            # Convert to RGB if input is grayscale (1 channel)
+            # Ensure we have 3 channels (RGB) as expected by ViT
             if x.shape[1] == 1:
+                # If we have a single channel, repeat it to make 3 channels
                 x = x.repeat(1, 3, 1, 1)
             
             # Normalize the input as expected by the ViT model
@@ -537,8 +548,9 @@ class TransformerModel:
             std = torch.tensor([0.5, 0.5, 0.5]).view(1, 3, 1, 1).to(x.device)
             x = (x - mean) / std
             
-            # Pass through the model
-            outputs = original_forward(pixel_values=x, **kwargs)
+            # Pass through the model - filter out inputs_embeds as ViT doesn't accept it
+            filtered_kwargs = {k: v for k, v in kwargs.items() if k != 'inputs_embeds'}
+            outputs = original_forward(pixel_values=x, **filtered_kwargs)
             
             return outputs
         
