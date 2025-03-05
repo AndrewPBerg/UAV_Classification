@@ -284,11 +284,11 @@ class AudioClassifier(pl.LightningModule):
         self.train_recall(y_pred_class, y)
         
         # Log metrics - ensure they appear in progress bar and are formatted consistently
-        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
         
         return loss
     
@@ -317,11 +317,11 @@ class AudioClassifier(pl.LightningModule):
         self.val_f1(y_pred_class, y)
         
         # Log metrics - ensure they appear in progress bar and are formatted consistently
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True)
         
         return loss
     
@@ -350,11 +350,11 @@ class AudioClassifier(pl.LightningModule):
         self.test_f1(y_pred_class, y)
         
         # Log metrics - ensure they appear in progress bar and are formatted consistently
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True, fmt='.2f')
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, sync_dist=True, fmt='.2f')
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, sync_dist=True)
         
         return loss
     

@@ -126,7 +126,13 @@ class PTLTrainer:
                     if key in ['v_num', 'epoch', 'step']:
                         continue
                     if isinstance(items[key], (float, int, torch.Tensor)):
-                        items[key] = f"{float(items[key]):.2f}"
+                        try:
+                            # Convert to float first to handle tensor values
+                            value = float(items[key])
+                            items[key] = f"{value:.2f}"
+                        except (ValueError, TypeError):
+                            # If conversion fails, keep the original value
+                            pass
                 
                 # Reorder metrics to show in desired order
                 ordered_items = {}
@@ -147,6 +153,16 @@ class PTLTrainer:
                     if metric in items:
                         ordered_items[metric] = items[metric]
                 
+                # Then show test metrics
+                for metric in ['test_loss', 'test_acc']:
+                    if metric in items:
+                        ordered_items[metric] = items[metric]
+                
+                # Add any remaining metrics
+                for key, val in items.items():
+                    if key not in ordered_items:
+                        ordered_items[key] = val
+                
                 return ordered_items
         
         # Add custom progress bar
@@ -163,6 +179,11 @@ class PTLTrainer:
             Dict[str, Any]: Test results
         """
         import torch
+        
+        # Set float32 matmul precision to 'high' to properly utilize Tensor Cores on CUDA devices
+        if torch.cuda.is_available():
+            torch.set_float32_matmul_precision('high')
+            print("Set float32 matmul precision to 'high' for better performance on Tensor Core GPUs")
         
         # Check if deterministic algorithms are enabled and disable them if needed
         # This is necessary for operations like interpolation that don't have deterministic implementations
@@ -432,6 +453,9 @@ class PTLTrainer:
             Dictionary of inference results
         """
         try:
+            # Get number of classes from data module
+            num_classes = self.data_module.num_classes
+            
             # Run prediction
             print("Starting inference with predict...")
             predictions = trainer.predict(
@@ -490,9 +514,7 @@ class PTLTrainer:
                 multiclass_f1_score
             )
             
-            num_classes = self.data_module.num_classes
-            
-            # Calculate metrics
+            # Calculate metrics using num_classes from data_module
             accuracy = multiclass_accuracy(
                 all_preds, all_targets, num_classes=num_classes, average="weighted"
             ).item()
@@ -560,7 +582,7 @@ class PTLTrainer:
             # Create confusion matrix
             from torchmetrics.functional.classification import confusion_matrix
             conf_mat = confusion_matrix(
-                all_preds, all_targets, num_classes=self.data_module.num_classes, task="multiclass"
+                all_preds, all_targets, num_classes=num_classes, task="multiclass"
             ).cpu().numpy()
             
             # Log confusion matrix if wandb is enabled
@@ -573,9 +595,9 @@ class PTLTrainer:
                 class_names = None
                 try:
                     _, _, idx_to_class = self.data_module.get_class_info()
-                    class_names = [idx_to_class[i] for i in range(self.data_module.num_classes)]
+                    class_names = [idx_to_class[i] for i in range(num_classes)]
                 except (AttributeError, KeyError):
-                    class_names = [str(i) for i in range(self.data_module.num_classes)]
+                    class_names = [str(i) for i in range(num_classes)]
                 
                 # Create confusion matrix plot
                 plt.figure(figsize=(10, 8))
@@ -620,6 +642,13 @@ class PTLTrainer:
         Returns:
             Dictionary of aggregated results across all folds
         """
+        import torch
+        
+        # Set float32 matmul precision to 'high' to properly utilize Tensor Cores on CUDA devices
+        if torch.cuda.is_available():
+            torch.set_float32_matmul_precision('high')
+            print("Set float32 matmul precision to 'high' for better performance on Tensor Core GPUs")
+        
         if not self.general_config.use_kfold:
             raise ValueError("K-fold cross-validation is not enabled in the configuration.")
         
@@ -688,7 +717,13 @@ class PTLTrainer:
                         if key in ['v_num', 'epoch', 'step']:
                             continue
                         if isinstance(items[key], (float, int, torch.Tensor)):
-                            items[key] = f"{float(items[key]):.2f}"
+                            try:
+                                # Convert to float first to handle tensor values
+                                value = float(items[key])
+                                items[key] = f"{value:.2f}"
+                            except (ValueError, TypeError):
+                                # If conversion fails, keep the original value
+                                pass
                     
                     # Reorder metrics to show in desired order
                     ordered_items = {}
@@ -708,6 +743,11 @@ class PTLTrainer:
                     for metric in ['val_loss', 'val_acc']:
                         if metric in items:
                             ordered_items[metric] = items[metric]
+                    
+                    # Add any remaining metrics
+                    for key, val in items.items():
+                        if key not in ordered_items:
+                            ordered_items[key] = val
                     
                     return ordered_items
             
