@@ -480,7 +480,8 @@ class TransformerModel:
                 model_name,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
-                local_files_only=True
+                local_files_only=True,
+                ignore_mismatched_sizes=True
             )
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
@@ -493,7 +494,8 @@ class TransformerModel:
             model = ViTForImageClassification.from_pretrained(
                 model_name,
                 num_labels=num_classes,
-                cache_dir=CACHE_DIR
+                cache_dir=CACHE_DIR,
+                ignore_mismatched_sizes=True
             )
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
