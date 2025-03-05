@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: lora
+  adapter_type: none-classifier
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -103,7 +103,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: vit_b_16-lora
+  name: vit-none-classifier
   reinit: true
   notes: null
   tags: null
