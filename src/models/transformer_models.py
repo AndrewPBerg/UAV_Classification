@@ -534,13 +534,23 @@ class TransformerModel:
                 raise ValueError("No valid input provided to ViT model")
             
             # Ensure x has the right shape [batch_size, channels, height, width]
-            if len(x.shape) == 3:
-                x = x.unsqueeze(1)  # Add channel dimension
+            # Check the number of dimensions and reshape accordingly
+            if len(x.shape) == 2:  # [batch_size, features]
+                # Reshape to a square image with 1 channel
+                size = int(math.sqrt(x.shape[1]))
+                x = x.view(x.shape[0], 1, size, size)
+            elif len(x.shape) == 3:  # [batch_size, height, width] or [batch_size, seq_len, features]
+                if x.shape[1] <= 224 and x.shape[2] <= 224:  # Likely [batch_size, height, width]
+                    x = x.unsqueeze(1)  # Add channel dimension -> [batch_size, 1, height, width]
+                else:  # Likely [batch_size, seq_len, features]
+                    # Reshape to a square image with 1 channel
+                    size = int(math.sqrt(x.shape[1] * x.shape[2]))
+                    x = x.view(x.shape[0], 1, size, size)
             
             # Ensure we have 3 channels (RGB) as expected by ViT
             if x.shape[1] == 1:
                 # If we have a single channel, repeat it to make 3 channels
-                x = x.repeat(1, 3, 1, 1)
+                x = torch.cat([x, x, x], dim=1)  # Use cat instead of repeat
             
             # Normalize the input as expected by the ViT model
             # The ViT model expects normalized images with mean=[0.5, 0.5, 0.5] and std=[0.5, 0.5, 0.5]
