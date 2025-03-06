@@ -5,10 +5,12 @@ from icecream import ic
 import sys
 try:
     from .peft_config import * # noqa: F403
+    from .peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
+    from peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from augmentation_config import create_augmentation_configs, AugmentationConfig
 
@@ -24,7 +26,7 @@ class _ModelNames(BaseModel):
     """
 
     model_list: List[str] = [
-                             "vit_b_16", "vit_b_32", "vit_l_16", "vit_l_32", "vit_h_14",
+                             "vit",
                              "ast", 
                              "mert",
                              "resnet18", "resnet34", "resnet50", "resnet101", "resnet152",
@@ -114,7 +116,7 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, FourierConfig, LayernormConfig, NoneClassifierConfig, NoneFullConfig]], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
 
     
 
@@ -174,7 +176,7 @@ def wandb_config_dict(general_config, feature_extraction_config, peft_config, wa
     res = {}
     res['wandb_config'] = dict(wandb_config)
     res['general_config'] = dict(general_config)
-    res['peft_config'] = dict(peft_config)
+    res['peft_config'] = dict(peft_config.to_dict())
     res['feature_extraction_config'] = dict(feature_extraction_config)
     
     return res

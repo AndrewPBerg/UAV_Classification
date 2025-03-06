@@ -1,19 +1,23 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
 
-SEND_MESSAGE: true
+SEND_MESSAGE: false
 
 runs:
   - id: 0
     type: script
     changes:
-      wandb:
-        name: demo-CNN-start
+        
       general:
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
-        model_type: resnet18
+        model_type: ast
         use_wandb: false
-        adapter_type: none-classifier
+        data_path: /app/src/datasets/UAV_Dataset_9
+        num_classes: 9
+
+
+
+
+ 
 
 
   

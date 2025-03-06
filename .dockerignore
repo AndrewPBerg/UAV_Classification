@@ -14,10 +14,18 @@
 *.pyo
 *.pyd
 
+checkpoints/
+./checkpoints/
+src/checkpoints
+copy_paste_config
+*/copy_paste_config
+
+
 # Ignore virtual environment
 .venv
 env/
 venv/
+
 
 # Ignore IDE-specific files
 .vscode

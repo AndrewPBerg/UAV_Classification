@@ -21,13 +21,25 @@ from .augmentation_config import (
 
 # Import PEFT configurations
 from .peft_config import (
+    get_peft_config,
+    NoneClassifierConfig,
+    NoneFullConfig,
+    VALID_PEFT_TYPES,
+    PEFTConfig,
+    BatchNormConfig,
+    SSFConfig,
+    BitFitConfig
+)
+
+# Import native PEFT configs directly from peft library
+from peft import (
     LoraConfig,
     IA3Config,
     AdaLoraConfig,
     OFTConfig,
-    FourierConfig,
-    LayernormConfig,
-    get_peft_config
+    HRAConfig,
+    LNTuningConfig,
+    TaskType
 )
 
 # Import Wandb configurations
@@ -54,9 +66,17 @@ __all__ = [
     'IA3Config',
     'AdaLoraConfig',
     'OFTConfig',
-    'FourierConfig',
-    'LayernormConfig',
+    'HRAConfig',
+    'LNTuningConfig',
+    'TaskType',
+    'NoneClassifierConfig',
+    'NoneFullConfig',
+    'VALID_PEFT_TYPES',
     'get_peft_config',
+    'PEFTConfig',
+    'BatchNormConfig',
+    'SSFConfig',
+    'BitFitConfig',
     
     # wandb_config exports
     'WandbConfig',

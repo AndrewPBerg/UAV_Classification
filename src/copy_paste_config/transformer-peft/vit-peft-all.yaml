@@ -1,0 +1,144 @@
+SEND_MESSAGE: true
+
+runs:
+
+  - id: 0
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-none-classifier
+      general:
+        model_type: vit
+        use_wandb: true
+        data_path: /app/src/datasets/UAV_Dataset_9
+        num_classes: 9
+        adapter_type: none-classifier
+  
+  - id: 1
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-none-full
+      general:
+        model_type: vit
+        adapter_type: none-full
+
+  - id: 2
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-lora
+      general:
+        model_type: vit
+        adapter_type: lora
+      lora:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
+
+  - id: 3
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-ia3
+      general:
+        model_type: vit
+        adapter_type: ia3
+      ia3:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
+        feedforward_modules:
+        - key
+        - value
+        - query
+        - linear
+  
+  - id: 4
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-adalora
+      general:
+        model_type: vit
+        adapter_type: adalora
+      adalora:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
+  
+  - id: 5
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-oft
+      general:
+        model_type: vit
+        adapter_type: oft
+      oft:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
+
+  - id: 6
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-layernorm
+      general:
+        model_type: vit
+        adapter_type: layernorm
+      layernorm:
+        target_modules:
+        - layernorm
+        
+  - id: 7
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-hra
+      general:
+        model_type: vit
+        adapter_type: hra
+      hra:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
+
+  - id: 8
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-ssf
+      general:
+        model_type: vit
+        adapter_type: ssf
+
+  - id: 9
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: vit-bitfit
+      general:
+        model_type: vit
+        adapter_type: bitfit

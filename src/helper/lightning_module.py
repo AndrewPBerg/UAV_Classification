@@ -2,13 +2,17 @@ import torch
 import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
-from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy
+from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
 from torch.optim.lr_scheduler import ReduceLROnPlateau
 from torch.optim import AdamW, Adam
 from icecream import ic
+import os
+import re
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
-import re
 
 
 class AudioClassifier(pl.LightningModule):
@@ -23,14 +27,13 @@ class AudioClassifier(pl.LightningModule):
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
     ):
-        """
-        Initialize the AudioClassifier module.
+        """Initialize the classifier.
         
         Args:
-            model: The PyTorch model to train
+            model: PyTorch model
             general_config: General configuration
             peft_config: PEFT configuration (optional)
-            num_classes: Number of classes (if not provided, will use general_config.num_classes)
+            num_classes: Number of classes (optional)
         """
         super().__init__()
         self.model = model
@@ -38,7 +41,7 @@ class AudioClassifier(pl.LightningModule):
         self.peft_config = peft_config
         
         # Set number of classes
-        self.num_classes = num_classes or general_config.num_classes
+        self.num_classes = num_classes if num_classes is not None else general_config.num_classes
         
         # Set up loss function
         self.loss_fn = nn.CrossEntropyLoss()
@@ -49,37 +52,47 @@ class AudioClassifier(pl.LightningModule):
         # Initialize metrics
         self._init_metrics()
         
-        # Enable automatic optimization
-        self.automatic_optimization = True
+        # Manual optimization settings
+        self.automatic_optimization = False
+        self.accumulation_steps = general_config.accumulation_steps
+        self.current_step = 0
 
-        # Initialize prediction metrics dictionary to store results
+        # Initialize prediction metrics dictionary
         self.predict_metrics = {}
         
+        # Initialize tracking variables
+        self.current_train_loss = None
+        self.best_val_accuracy = 0.0
+
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
+        # Get the current device
+        device = self.device
+        
         # Training metrics
-        self.train_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.train_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.train_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.train_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Test metrics
-        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Prediction metrics
-        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted")
-        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted")
-        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted")
-        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted")
+        # Prediction metrics - these will be re-initialized in on_predict_start
+        # but we initialize them here as well for completeness
+        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize prediction metrics storage
         self.predict_batch_preds = []
@@ -88,12 +101,27 @@ class AudioClassifier(pl.LightningModule):
     def forward(self, x):
         """Forward pass through the model."""
         
-        
         # Ensure input is float32
         x = x.float()
         
         # Debug input shape
-        
+        try:
+            import logging
+            logger = logging.getLogger("LIGHTNING")
+            logger.debug(f"Input shape in lightning module forward: {x.shape}")
+            
+            # Check model type for debugging
+            model_type = "unknown"
+            if hasattr(self.model, 'vit'):
+                model_type = "vit"
+            elif hasattr(self.model, 'audio_spectrogram_transformer'):
+                model_type = "ast"
+            elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type'):
+                model_type = self.model.config.model_type
+                
+            logger.debug(f"Model type: {model_type}")
+        except Exception as e:
+            print(f"Debug logging error (non-critical): {e}")
         
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
@@ -105,13 +133,9 @@ class AudioClassifier(pl.LightningModule):
             
         elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
             is_ast_model = True
-
             
-        
         # Handle 5D input for AST models
         if is_ast_model and len(x.shape) == 5:
-          
-
             # If we have a 5D tensor [batch, channels, height, extra_dim, width]
             batch_size, channels, height, extra_dim, width = x.shape
             
@@ -123,16 +147,41 @@ class AudioClassifier(pl.LightningModule):
             else:
                 # Otherwise reshape to combine dimensions
                 x = x.reshape(batch_size, channels, height * extra_dim, width)
-                
         
-        
-        # Forward pass
-        
-
-        outputs = self.model(x)
-
+        # Forward pass - simply pass the input to the model
+        # The model itself now handles the correct input parameter names
+        try:
+            # Resize for ViT models if needed
+            is_vit_model = hasattr(self.model, "config") and getattr(self.model.config, "model_type", "") == "vit"
             
-            # If we're using an AST model and get an error, try one more approach
+            if is_vit_model and len(x.shape) == 4:
+                # Check if the input dimensions match what ViT expects (224x224)
+                if x.shape[2] != 224 or x.shape[3] != 224:
+                    # print(f"Resizing input from {x.shape[2]}x{x.shape[3]} to 224x224 for ViT model")
+                    x = torch.nn.functional.interpolate(
+                        x, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                
+                # Ensure channel count is correct (3 channels for ViT)
+                if x.shape[1] == 1:
+                    # print(f"Converting 1-channel input to 3-channel for ViT model")
+                    x = x.repeat(1, 3, 1, 1)
+            
+            # Print shape info for debugging
+            # print(f"Final input shape passed to model: {x.shape}")
+            
+            outputs = self.model(x)
+        except Exception as e:
+            print(f"Forward pass error: {e}")
+            print(f"Input shape: {x.shape}, Input type: {type(x)}")
+            if hasattr(self.model, 'config'):
+                print(f"Model config: {self.model.config}")
+            raise e
+            
+        # If we're using an AST model and get an error, try one more approach
         if is_ast_model:                    
             # Try to reshape the input to match expected dimensions
             if len(x.shape) == 4:  # [batch, channels, height, width]
@@ -142,7 +191,11 @@ class AudioClassifier(pl.LightningModule):
                 # The exact reshape depends on the model's expectations
                 x = x.view(batch_size, channels, height, width)
                 
-                outputs = self.model(x)
+                try:
+                    outputs = self.model(x)
+                except Exception as e:
+                    print(f"Alternate AST approach failed: {e}")
+                    raise e
                     
             else:
                 raise Exception("Model is not in correct AST model format")
@@ -155,81 +208,103 @@ class AudioClassifier(pl.LightningModule):
             return outputs
         
     def on_predict_start(self):
-        """Called at the beginning of prediction."""
-        print("Starting prediction...")
-        # Reset prediction metrics storage
+        """Called at the beginning of the prediction stage.
+        Initialize metrics for prediction.
+        """
+        # Get the current device
+        device = self.device
+        
+        # Initialize metrics for prediction and move them to the correct device
+        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        
+        # Initialize storage for predictions and targets
         self.predict_batch_preds = []
         self.predict_batch_targets = []
-    
+        
+        # Initialize metrics dictionary
+        self.predict_metrics = {}
+        
+        print("Prediction metrics initialized")
+
     def predict_step(self, batch, batch_idx):
-        """Prediction step."""
+        """Prediction step.
+        
+        Args:
+            batch: Input batch
+            batch_idx: Batch index
+            
+        Returns:
+            Tuple of (predicted_classes, targets)
+        """
         x, y = batch
         
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Store predictions and targets for later metric calculation
-        self.predict_batch_preds.append(y_pred_class)
-        self.predict_batch_targets.append(y)
-        
-        # Update metrics for this batch
+        # Update metrics
         self.predict_accuracy(y_pred_class, y)
         self.predict_precision(y_pred_class, y)
         self.predict_recall(y_pred_class, y)
-        self.predict_f1(y_pred_class, y)
         
-        # Display batch metrics in progress bar (without logging)
-        batch_acc = self.predict_accuracy.compute()
-        batch_f1 = self.predict_f1.compute()
-        if batch_idx % 10 == 0:  # Display every 10 batches to avoid clutter
-            print(f"Batch {batch_idx} - Acc: {batch_acc:.4f}, F1: {batch_f1:.4f}")
+        # Store predictions and targets for later use
+        self.predict_batch_preds.append(y_pred_class)
+        self.predict_batch_targets.append(y)
         
+        # Return predicted classes and targets
         return y_pred_class, y
     
     def on_predict_epoch_end(self):
-        """Called at the end of the prediction epoch."""
-        # Concatenate all predictions and targets
-        if self.predict_batch_preds and self.predict_batch_targets:
-            all_preds = torch.cat(self.predict_batch_preds)
-            all_targets = torch.cat(self.predict_batch_targets)
-            
-            # Calculate final metrics
-            final_accuracy = self.predict_accuracy.compute()
-            final_precision = self.predict_precision.compute()
-            final_recall = self.predict_recall.compute()
-            final_f1 = self.predict_f1.compute()
-            
-            # Store metrics as attributes so they can be accessed later
-            # Convert tensor values to Python scalars
-            self.predict_metrics = {
-                "predict_acc": final_accuracy.item() if isinstance(final_accuracy, torch.Tensor) else final_accuracy,
-                "predict_precision": final_precision.item() if isinstance(final_precision, torch.Tensor) else final_precision,
-                "predict_recall": final_recall.item() if isinstance(final_recall, torch.Tensor) else final_recall,
-                "predict_f1": final_f1.item() if isinstance(final_f1, torch.Tensor) else final_f1
-            }
-            
-            # Print final metrics
-            print("\nPrediction Metrics:")
-            print(f"Accuracy: {self.predict_metrics['predict_acc']:.4f}")
-            print(f"Precision: {self.predict_metrics['predict_precision']:.4f}")
-            print(f"Recall: {self.predict_metrics['predict_recall']:.4f}")
-            print(f"F1 Score: {self.predict_metrics['predict_f1']:.4f}")
-            
-            # Reset metrics
-            self.predict_accuracy.reset()
-            self.predict_precision.reset()
-            self.predict_recall.reset()
-            self.predict_f1.reset()
-            
-            # Clear storage
-            self.predict_batch_preds = []
-            self.predict_batch_targets = []
+        """Called at the end of the prediction epoch.
+        Compute final metrics.
+        """
+        # Compute final metrics
+        predict_acc = self.predict_accuracy.compute()
+        predict_precision = self.predict_precision.compute()
+        predict_recall = self.predict_recall.compute()
+        predict_f1 = self.predict_f1.compute()
+        
+        # Store metrics in a dictionary
+        self.predict_metrics = {
+            "predict_acc": predict_acc.item(),
+            "predict_precision": predict_precision.item(),
+            "predict_recall": predict_recall.item(),
+            "predict_f1": predict_f1.item()
+        }
+        
+        # Print metrics in a concise format
+        print("\nPrediction Metrics:")
+        print(f"Accuracy: {predict_acc:.4f} | Precision: {predict_precision:.4f} | Recall: {predict_recall:.4f} | F1: {predict_f1:.4f}")
+        
+        # Reset metrics for next prediction
+        self.predict_accuracy.reset()
+        self.predict_precision.reset()
+        self.predict_recall.reset()
+        self.predict_f1.reset()
+        
+        # Clear storage
+        self.predict_batch_preds = []
+        self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step."""
+        """Training step with manual optimization."""
+        # Get optimizer
+        opt = self.optimizers()
+        
+        # Only zero gradients when starting a new accumulation cycle
+        if self.current_step % self.accumulation_steps == 0:
+            opt.zero_grad()
+        
+        # Get the input and target
         x, y = batch
         
         # Validate target labels to ensure they are within range
@@ -240,24 +315,45 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
+        
+        # Store current loss for epoch-level logging
+        self.current_train_loss = loss.detach().clone()
+        
+        # Scale loss by accumulation steps
+        scaled_loss = loss / self.accumulation_steps
+        
+        # Backward pass with scaled loss
+        self.manual_backward(scaled_loss)
+        
+        # Update weights only when accumulation is complete
+        if (self.current_step + 1) % self.accumulation_steps == 0:
+            opt.step()
+            opt.zero_grad()
+        
+        # Increment step counter
+        self.current_step += 1
         
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
         # Update metrics
         self.train_accuracy(y_pred_class, y)
+        self.train_f1(y_pred_class, y)
         self.train_precision(y_pred_class, y)
         self.train_recall(y_pred_class, y)
-        self.train_f1(y_pred_class, y)
         
-        # Log metrics
-        self.log('train_loss', loss, on_step=True, on_epoch=True, prog_bar=True)
-        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True)
-        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True)
-        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True)
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
         
         return loss
     
@@ -273,6 +369,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -285,12 +385,12 @@ class AudioClassifier(pl.LightningModule):
         self.val_recall(y_pred_class, y)
         self.val_f1(y_pred_class, y)
         
-        # Log metrics
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True)
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True)
-        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True)
-        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True)
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True)
         
         return loss
     
@@ -306,6 +406,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -318,20 +422,46 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall(y_pred_class, y)
         self.test_f1(y_pred_class, y)
         
-        # Log metrics
-        self.log('test_loss', loss, on_step=False, on_epoch=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True)
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True)
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True)
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True)
+        # Log metrics every step
+        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_acc', self.test_accuracy, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_f1', self.test_f1, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_precision', self.test_precision, on_step=True, on_epoch=True, sync_dist=True)
+        self.log('test_recall', self.test_recall, on_step=True, on_epoch=True, sync_dist=True)
         
         return loss
+
+    def on_train_epoch_end(self):
+        """Called at the end of the training epoch.
+        Track and log epoch-level metrics.
+        """
+        # Get current metrics
+        try:
+            train_acc = self.train_accuracy.compute()
+            # Log epoch-level metrics
+            self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            
+            # Also log train loss at epoch level if available
+            if hasattr(self, 'current_train_loss'):
+                self.log('train_loss_epoch', self.current_train_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            
+            # Track validation accuracy if available
+            if hasattr(self, 'val_accuracy'):
+                val_acc = self.val_accuracy.compute()
+                if val_acc is not None:
+                    # Store best validation accuracy
+                    if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
+                        self.best_val_accuracy = val_acc.item()
+        except Exception as e:
+            print(f"Warning: Error in on_train_epoch_end: {str(e)}")
+            # Don't let this error stop training
+            pass
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
         # Choose optimizer based on model type
         if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer = AdamW(self.model.parameters(), lr=self.general_config.learning_rate)
+            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
         else:
             optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
         
@@ -343,6 +473,14 @@ class AudioClassifier(pl.LightningModule):
             patience=2,
         )
         
+        # Store scheduler as an attribute so we can access it in on_epoch_end
+        self.lr_scheduler = scheduler
+        
+        # For manual optimization, just return the optimizer
+        if not self.automatic_optimization:
+            return optimizer
+        
+        # For automatic optimization, return with scheduler config
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -352,3 +490,61 @@ class AudioClassifier(pl.LightningModule):
                 "frequency": 1
             }
         }
+
+    def optimizer_step(
+        self,
+        epoch: int = None,
+        batch_idx: int = None,
+        optimizer = None,
+        optimizer_idx: int = None,
+        optimizer_closure = None,
+        on_tpu: bool = False,
+        using_native_amp: bool = False,
+        using_lbfgs: bool = False,
+    ):
+        """
+        Custom optimizer step that ensures gradient scaler inf checks are properly recorded.
+        This fixes the "No inf checks were recorded for this optimizer" error.
+        Also implements gradient clipping to stabilize training.
+        """
+        # First, ensure we have a closure for the optimizer
+        if optimizer_closure is None:
+            raise ValueError("optimizer_closure cannot be None")
+            
+        # Compute loss and gradients
+        loss = optimizer_closure()
+        
+        # Apply gradient clipping if configured
+        if hasattr(self.general_config, 'gradient_clip_val') and self.general_config.gradient_clip_val > 0:
+            clip_val = self.general_config.gradient_clip_val
+            # Clip gradients by value
+            torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
+        
+        # Skip optimizer step if any gradients are invalid (infinity/NaN)
+        valid_gradients = True
+        for param in self.model.parameters():
+            if param.grad is not None:
+                if not torch.isfinite(param.grad).all():
+                    valid_gradients = False
+                    break
+        
+        # Only perform the optimizer step if all gradients are valid
+        if valid_gradients:
+            optimizer.step()
+        
+        # Zero gradients after stepping
+        optimizer.zero_grad()
+        
+        # Return the loss value
+        return loss
+
+    def on_validation_epoch_end(self):
+        """Called at the end of the validation epoch.
+        If using manual optimization, manually step the learning rate scheduler.
+        """
+        if not self.automatic_optimization and hasattr(self, 'lr_scheduler'):
+            # Get the current validation loss
+            val_loss = self.trainer.callback_metrics.get('val_loss')
+            if val_loss is not None:
+                # Step the scheduler with the validation loss
+                self.lr_scheduler.step(val_loss)

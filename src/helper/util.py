@@ -7,7 +7,7 @@ import random
 import matplotlib.pyplot as plt
 import librosa
 from typing import Optional, Union
-from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor, ViTImageProcessor
 import warnings
 from torchviz import make_dot
 
@@ -95,7 +95,7 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor, ViTImageProcessor],
                  standardize_audio_boolean: bool=True, 
                  target_sr: int=16000,
                  target_duration: int=5, 
@@ -298,6 +298,71 @@ class AudioDataset(Dataset):
                     return_tensors="pt"
                 )
                 return features.input_values.squeeze(0)
+            elif isinstance(self.feature_extractor, ViTImageProcessor):
+                # Convert audio to mel spectrogram with fixed dimensions
+                n_mels = 128  # Number of mel bands
+                hop_length = 512  # Frame shift
+                win_length = 1024  # Frame length
+                n_fft = 1024  # FFT window size
+                
+                # Calculate the number of frames needed for a fixed width
+                target_width = 224
+                audio_length = len(audio_np)
+                num_frames = 1 + (audio_length - n_fft) // hop_length
+                
+                # If audio is too short, pad it
+                if num_frames < target_width:
+                    padding_needed = (target_width - 1) * hop_length + n_fft - audio_length
+                    audio_np = np.pad(audio_np, (0, padding_needed), mode='constant')
+                
+                # Generate mel spectrogram with controlled parameters
+                mel_spec = librosa.feature.melspectrogram(
+                    y=audio_np, 
+                    sr=self.target_sr,
+                    n_fft=n_fft,
+                    hop_length=hop_length,
+                    win_length=win_length,
+                    n_mels=n_mels
+                )
+                
+                # Convert to dB scale
+                mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+                
+                # Normalize to 0-1 range
+                mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
+
+                # Convert normalized mel spectrogram to 8-bit image array
+                image_array = (mel_spec_normalized * 255).astype(np.uint8)
+                
+                # Create PIL image from grayscale array
+                from PIL import Image
+                pil_img = Image.fromarray(image_array, mode="L")
+                
+                # Resize to 224x224 to match ViT model's expected input size
+                pil_img = pil_img.resize((224, 224), Image.LANCZOS)
+                
+                # Convert grayscale PIL image to RGB for ViT processor
+                pil_img_rgb = pil_img.convert('RGB')
+                
+                # Use the ViTImageProcessor's preprocessing pipeline with RGB image
+                features = self.feature_extractor(pil_img_rgb, return_tensors="pt")
+                tensor_3ch = features.pixel_values[0]  # remove batch dimension
+                
+                # Ensure we have 3 channels
+                if tensor_3ch.shape[0] != 3:
+                    if tensor_3ch.shape[0] == 1:
+                        tensor_3ch = tensor_3ch.repeat(3, 1, 1)
+                
+                # Ensure correct dimensions
+                if tensor_3ch.shape[1] != 224 or tensor_3ch.shape[2] != 224:
+                    tensor_3ch = torch.nn.functional.interpolate(
+                        tensor_3ch.unsqueeze(0),
+                        size=(224, 224),
+                        mode='bilinear',
+                        align_corners=False
+                    ).squeeze(0)
+                
+                return tensor_3ch
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr
