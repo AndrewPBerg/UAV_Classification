@@ -84,45 +84,109 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
-            # Print detailed model structure for debugging
-            print("\n[DEBUG] Detailed model structure:")
-            for name, module in model.named_modules():
-                print(f"[DEBUG] Module: {name}, Type: {type(module).__name__}")
-                # Check for any module that's a ModulesToSaveWrapper
-                if "ModulesToSaveWrapper" in str(type(module)):
-                    print(f"[DEBUG] Found ModulesToSaveWrapper at {name}. Available attributes:")
-                    for attr_name in dir(module):
-                        if not attr_name.startswith("_"):
-                            try:
-                                attr = getattr(module, attr_name)
-                                if isinstance(attr, torch.nn.Module):
-                                    print(f"[DEBUG]   - {attr_name}: {type(attr).__name__}")
-                            except:
-                                pass
+            # Completely different approach - ignore target_modules from config and build from scratch
+            # This approach won't rely on generic module type names like 'dense'
             
-            # CRITICAL FIX: Remove dense from target_modules if it exists
-            if hasattr(peft_config, 'target_modules') and 'dense' in peft_config.target_modules:
-                print("[DEBUG] Removing 'dense' from target_modules to avoid ModulesToSaveWrapper error")
-                peft_config.target_modules = [m for m in peft_config.target_modules if m != 'dense']
+            # Print model structure for debugging
+            print("\n[DEBUG] Model structure scan for Linear layers:")
+            
+            # Build new target_modules list from scratch
+            new_target_modules = []
+            found_classifier = False
+            
+            # Collect all Linear layers with their full paths
+            for name, module in model.named_modules():
+                if isinstance(module, nn.Linear):
+                    print(f"[DEBUG] Found Linear layer: {name}")
+                    
+                    # Only add modules with valid names (no ModulesToSaveWrapper in path)
+                    if 'ModulesToSaveWrapper' not in name:
+                        new_target_modules.append(name)
+                        print(f"[DEBUG] Added '{name}' to target_modules")
+                        
+                        # Track if we found the classifier.dense
+                        if name == 'classifier.dense':
+                            found_classifier = True
+            
+            # If classifier.dense wasn't found but we need it
+            if not found_classifier and hasattr(model, 'classifier'):
+                print("[DEBUG] Classifier dense path not found directly, looking through classifier structure")
                 
-                # Look for actual linear layers that can be used with LoRA
-                print("[DEBUG] Finding actual Linear layers in the model that can be used with LoRA")
+                # Handle the case where classifier is a ModulesToSaveWrapper
+                if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
+                    if isinstance(model.classifier.original_module.dense, nn.Linear):
+                        new_target_modules.append('classifier.original_module.dense')
+                        print("[DEBUG] Added 'classifier.original_module.dense' to target_modules")
+                
+                # Also try modules_to_save path
+                if hasattr(model.classifier, 'modules_to_save'):
+                    for key, module in model.classifier.modules_to_save.items():
+                        if hasattr(module, 'dense') and isinstance(module.dense, nn.Linear):
+                            path = f'classifier.modules_to_save.{key}.dense'
+                            new_target_modules.append(path)
+                            print(f"[DEBUG] Added '{path}' to target_modules")
+            
+            # Override peft_config's target_modules with our new list
+            print(f"[DEBUG] Final target_modules: {new_target_modules}")
+            peft_config.target_modules = new_target_modules
+            
+            # If we want to apply to query/key/value based on patterns:
+            # De-duplicate target modules to avoid applying LoRA to the same layer twice
+            seen = set()
+            unique_modules = []
+            for module in peft_config.target_modules:
+                if module not in seen:
+                    seen.add(module)
+                    unique_modules.append(module)
+            peft_config.target_modules = unique_modules
+            
+            # Create a mapping of model attribute paths
+            def set_attribute_path_mapping(model):
+                """Create an attribute map to help PEFT find modules directly"""
+                module_map = {}
                 for name, module in model.named_modules():
                     if isinstance(module, nn.Linear):
-                        print(f"[DEBUG] Found Linear layer: {name}")
-                        # Only add safe paths (no ModulesToSaveWrapper in the path)
-                        if "ModulesToSaveWrapper" not in name:
-                            peft_config.target_modules.append(name)
-                            print(f"[DEBUG] Added '{name}' to target_modules")
+                        # Store the direct reference to this module
+                        module_map[name] = module
                 
-                print(f"[DEBUG] Final target_modules: {peft_config.target_modules}")
+                # Attach this map to the model for PEFT to use
+                if not hasattr(model, '_peft_path_map'):
+                    model._peft_path_map = module_map
+                    print(f"[DEBUG] Created module path map with {len(module_map)} entries")
+            
+            # Apply the path mapping to help PEFT
+            set_attribute_path_mapping(model)
+            
+            # Monkey patch get_submodule to use our map if it exists
+            original_get_submodule = nn.Module.get_submodule
+            
+            def patched_get_submodule(self, target):
+                """Patched get_submodule that checks our path map first"""
+                if hasattr(self, '_peft_path_map') and target in self._peft_path_map:
+                    return self._peft_path_map[target]
+                return original_get_submodule(self, target)
+            
+            # Apply the monkey patch
+            nn.Module.get_submodule = patched_get_submodule
+            print("[DEBUG] Applied get_submodule patch to help PEFT find modules")
             
             # Get PEFT model with the updated configuration
             model = get_peft_model(model, peft_config)
+            
+            # Restore original method after we're done
+            nn.Module.get_submodule = original_get_submodule
+            print("[DEBUG] Restored original get_submodule method")
+            
         except Exception as e:
             print(f"[ERROR] Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
             traceback_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
             print(f"[ERROR] Full traceback:\n{traceback_str}")
+            
+            # In case of error, restore original get_submodule if we patched it
+            if 'original_get_submodule' in locals():
+                nn.Module.get_submodule = original_get_submodule
+                print("[DEBUG] Restored original get_submodule method after error")
+                
             raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
