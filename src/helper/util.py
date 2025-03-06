@@ -300,8 +300,8 @@ class AudioDataset(Dataset):
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, ViTImageProcessor):
                 # Convert audio to spectrogram for ViT
-                # ViT expects image-like inputs with 3 channels
-                logger.debug("Using ViTImageProcessor")
+                # We've modified the ViT model to accept grayscale input (1 channel)
+                logger.debug("Using ViTImageProcessor with grayscale input")
                 
                 # Convert audio to mel spectrogram
                 mel_spec = librosa.feature.melspectrogram(
@@ -315,30 +315,26 @@ class AudioDataset(Dataset):
                 # Normalize to [0, 1] range
                 mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
                 
-                # Create a 3-channel image directly as a PyTorch tensor
-                # Shape: [3, H, W] - exactly what ViT expects
+                # Create a single-channel image as a PyTorch tensor
+                # Shape: [1, H, W] - for grayscale input to our modified ViT
                 h, w = mel_spec_normalized.shape
-                tensor_3ch = torch.zeros(3, h, w, dtype=torch.float32)
-                
-                # Fill all 3 channels with the same spectrogram data
-                for i in range(3):
-                    tensor_3ch[i] = torch.from_numpy(mel_spec_normalized)
+                tensor_1ch = torch.from_numpy(mel_spec_normalized).unsqueeze(0).float()  # Add channel dimension
                 
                 # Resize if needed to match ViT's expected input size (typically 224x224)
                 if h != 224 or w != 224:
-                    tensor_3ch = torch.nn.functional.interpolate(
-                        tensor_3ch.unsqueeze(0),  # Add batch dimension
+                    tensor_1ch = torch.nn.functional.interpolate(
+                        tensor_1ch.unsqueeze(0),  # Add batch dimension
                         size=(224, 224),
                         mode='bilinear',
                         align_corners=False
                     ).squeeze(0)  # Remove batch dimension
                 
-                logger.debug(f"Final tensor shape for ViT: {tensor_3ch.shape}")
+                logger.debug(f"Final tensor shape for ViT (grayscale): {tensor_1ch.shape}")
                 
-                # Verify we have 3 channels
-                assert tensor_3ch.shape[0] == 3, f"Expected 3 channels, got {tensor_3ch.shape[0]}"
+                # Verify we have 1 channel
+                assert tensor_1ch.shape[0] == 1, f"Expected 1 channel, got {tensor_1ch.shape[0]}"
                 
-                return tensor_3ch
+                return tensor_1ch
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr

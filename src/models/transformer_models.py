@@ -502,6 +502,27 @@ class TransformerModel:
                 cache_dir=CACHE_DIR
             )
         
+        # Modify the first layer to accept grayscale input (1 channel instead of 3)
+        print("Modifying ViT model to accept grayscale input (1 channel)")
+        original_projection = model.vit.embeddings.patch_embeddings.projection
+        model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
+            in_channels=1,  # Change from 3 to 1 for grayscale
+            out_channels=original_projection.out_channels,
+            kernel_size=original_projection.kernel_size,
+            stride=original_projection.stride,
+            padding=original_projection.padding
+        )
+        
+        # Initialize the weights of the new projection layer
+        # We'll use the average of the original weights across the RGB channels
+        with torch.no_grad():
+            # Get the original weights [out_channels, 3, kernel_size, kernel_size]
+            original_weights = original_projection.weight.data
+            # Average across the 3 input channels to get [out_channels, 1, kernel_size, kernel_size]
+            new_weights = original_weights.mean(dim=1, keepdim=True)
+            # Set the weights of the new projection layer
+            model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
+        
         # Apply PEFT configuration
         model = apply_peft(model, peft_config, general_config)
         
