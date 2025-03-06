@@ -327,6 +327,17 @@ class AudioDataset(Dataset):
                 tensor_3ch = features.pixel_values[0]  # remove batch dimension
                 logger.debug(f"Final tensor shape for ViT: {tensor_3ch.shape}")
                 
+                # Add extra verification to ensure we have 3 channels
+                if tensor_3ch.shape[0] != 3:
+                    print(f"WARNING: ViT tensor has {tensor_3ch.shape[0]} channels instead of 3!")
+                    print(f"Converting to 3-channel tensor manually")
+                    if tensor_3ch.shape[0] == 1:
+                        # If we have a 1-channel tensor, repeat it to make a 3-channel tensor
+                        tensor_3ch = tensor_3ch.repeat(3, 1, 1)
+                        print(f"New tensor shape after conversion: {tensor_3ch.shape}")
+                else:
+                    print(f"ViT tensor has correct channel count: {tensor_3ch.shape[0]}")
+                
                 return tensor_3ch
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs

@@ -529,6 +529,8 @@ class TransformerModel:
             - input_ids: Used by some PEFT models
             - inputs_embeds: Used by some transformer models
             - x: Generic input used in many custom implementations
+            
+            It also automatically converts 1-channel inputs to 3-channel to match model expectations.
             """
             # Add debug information
             print(f"ViT model forward called with: pixel_values={pixel_values is not None}, "
@@ -546,6 +548,20 @@ class TransformerModel:
                 actual_input = inputs_embeds
             else:
                 raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
+            
+            # Check if actual_input is a tensor and has 1 channel instead of 3
+            if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:
+                # Get shape info
+                batch_size, channels, height, width = actual_input.shape
+                print(f"Input tensor shape: {actual_input.shape}")
+                
+                # If it's a 1-channel input, convert to 3-channel
+                if channels == 1:
+                    print("Converting 1-channel input to 3-channel by repeating the channel")
+                    # Repeat the single channel three times to create a 3-channel tensor
+                    # Method 1: Repeat the tensor along the channel dimension
+                    actual_input = actual_input.repeat(1, 3, 1, 1)
+                    print(f"Converted input shape: {actual_input.shape}")
             
             # Strip out all kwargs except those definitely supported by the ViT model
             # This avoids errors from PEFT or other wrappers adding unexpected arguments
