@@ -15,7 +15,9 @@ import torch
 import torch.nn as nn
 from typing import Tuple, Optional, Any
 from configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoRACConfig
-from models.ssf_adapter import apply_ssf_to_model
+from .ssf_adapter import apply_ssf_to_model
+from .lorac_adapter import apply_lorac_to_model
+
 from configs import BatchNormConfig
 
 
@@ -86,14 +88,16 @@ class CNNModel:
             raise ValueError(f"Unsupported MobileNet model type: {model_type}")
         
         # Modify first convolutional layer to accept grayscale input
-        if input_shape[0] == 1:
-            model.features[0][0] = nn.Conv2d(
-                1, 16, kernel_size=3, stride=2, padding=1, bias=False
-            )
+
+        model.features[0][0] = nn.Conv2d(
+            1, 16, kernel_size=3, stride=2, padding=1, bias=False
+        )
         
         # Replace classification head
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
+        
+        model = apply_peft(model, peft_config)
         
         return model
     
@@ -121,18 +125,20 @@ class CNNModel:
             raise ValueError(f"Unsupported EfficientNet model type: {model_type}")
         
         # Modify first convolutional layer to accept grayscale input
-        if input_shape[0] == 1:
-            model.features[0][0] = nn.Conv2d(
-                1, model.features[0][0].out_channels,
-                kernel_size=model.features[0][0].kernel_size,
-                stride=model.features[0][0].stride,
-                padding=model.features[0][0].padding,
-                bias=False
-            )
-        
+
+        model.features[0][0] = nn.Conv2d(
+            1, model.features[0][0].out_channels,
+            kernel_size=model.features[0][0].kernel_size,
+            stride=model.features[0][0].stride,
+            padding=model.features[0][0].padding,
+            bias=False
+        )
+    
         # Replace classification head
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
+        
+        model = apply_peft(model, peft_config)
         
         return model
 
@@ -189,7 +195,6 @@ def apply_peft(model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module
     
     elif isinstance(peft_config, SSFConfig):
         # Apply SSF adapter to the model
-        from src.models.ssf_adapter import apply_ssf_to_model
         
         model = apply_ssf_to_model(
             model=model,
@@ -202,8 +207,7 @@ def apply_peft(model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module
     
     elif isinstance(peft_config, LoRACConfig):
         # Apply LoRA-C to the model
-        from src.models.lorac_adapter import apply_lorac_to_model
-        
+
         # First, freeze all parameters
         for param in model.parameters():
             param.requires_grad = False
