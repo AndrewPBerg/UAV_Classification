@@ -974,7 +974,11 @@ class PTLTrainer:
         # Log average metrics to wandb
         if self.general_config.use_wandb:
             for key, value in avg_metrics.items():
-                wandb.log({f"avg_{key}": value})
+                # Use correct format that matches the keys in avg_metrics
+                if key.startswith("average_"):
+                    wandb.log({key: value})
+                elif key.startswith("std_"):
+                    wandb.log({key: value})
         
         # Save best model if enabled
         if self.general_config.save_model and best_model is not None:
@@ -1080,8 +1084,8 @@ class PTLTrainer:
                 avg_value = sum(values) / len(values)
                 std_value = np.std(values) if len(values) > 1 else 0.0
                 
-                # Store average and standard deviation
-                avg_metrics[f"avg_{key}"] = avg_value
+                # Store average and standard deviation - use 'average_' prefix instead of 'avg_'
+                avg_metrics[f"average_{key}"] = avg_value
                 avg_metrics[f"std_{key}"] = std_value
         
         return avg_metrics
