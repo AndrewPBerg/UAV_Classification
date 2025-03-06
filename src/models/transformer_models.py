@@ -84,26 +84,39 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
             # Fix for AST model with ModulesToSaveWrapper
+            # Check if we're dealing with an AST model with ModulesToSaveWrapper
             if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
-                # Check if we're dealing with an AST model with ModulesToSaveWrapper
-                if 'dense' in peft_config.target_modules:
-                    # Create a new list of target modules with the correct path for dense in the classifier
+                print("Detected AST model with ModulesToSaveWrapper")
+                
+                # Create a direct reference to the dense layer in the classifier
+                # This is crucial for PEFT to find the dense layer
+                if hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
+                    # Create a direct reference to the dense layer
+                    model.classifier.dense = model.classifier.modules_to_save.default.dense
+                    print("Created direct reference to classifier.dense for PEFT compatibility")
+                
+                # Also create a reference in the original_module if it exists
+                if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
+                    model.dense = model.classifier.original_module.dense
+                    print("Created direct reference to classifier.original_module.dense for PEFT compatibility")
+                
+                # For AST models, we need to modify the target_modules to include the correct paths
+                if hasattr(peft_config, 'target_modules') and 'dense' in peft_config.target_modules:
+                    # Create a new list with the correct paths for dense
                     new_target_modules = []
                     for module_name in peft_config.target_modules:
                         if module_name == 'dense':
-                            # For the classifier's dense layer, we need to use the modules_to_save path
-                            # Keep the original 'dense' for other dense layers in the model
+                            # Keep the original 'dense' for layers in the model body
                             new_target_modules.append(module_name)
-                            new_target_modules.append('modules_to_save.default.dense')
+                            # Add the specific path for the classifier's dense layer
+                            new_target_modules.append('classifier.modules_to_save.default.dense')
+                            new_target_modules.append('classifier.original_module.dense')
+                            new_target_modules.append('classifier.dense')
                         else:
                             new_target_modules.append(module_name)
                     
                     # Update the target_modules in the config
-                    if isinstance(peft_config, LoraConfig):
-                        peft_config.target_modules = new_target_modules
-                    elif hasattr(peft_config, 'target_modules'):
-                        peft_config.target_modules = new_target_modules
-                    
+                    peft_config.target_modules = new_target_modules
                     print(f"Updated target_modules for AST model: {new_target_modules}")
             
             # Generic approach to handle ModulesToSaveWrapper issue
@@ -237,13 +250,23 @@ class TransformerModel:
         # Update the classifier to match our number of classes
         update_classifier(model, num_classes)
         
-        # Ensure the classifier's dense layer is directly accessible for PEFT
+        # Special handling for AST model with ModulesToSaveWrapper
         if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
-            # Make the dense layer directly accessible
-            if hasattr(model.classifier.modules_to_save.default, 'dense'):
-                # Create a reference to the dense layer directly on the classifier
+            # For AST models with ModulesToSaveWrapper, we need to ensure the classifier
+            # is properly set up for PEFT
+            print("Setting up AST model classifier for PEFT compatibility")
+            
+            # Create direct references to the dense layer in the classifier
+            # This is crucial for PEFT to find the dense layer
+            if hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
+                # Create a direct reference to the dense layer
                 model.classifier.dense = model.classifier.modules_to_save.default.dense
-                print("Made classifier's dense layer directly accessible for PEFT")
+                print("Created direct reference to classifier.dense for PEFT compatibility")
+            
+            # Also create a reference in the original_module if it exists
+            if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
+                model.dense = model.classifier.original_module.dense
+                print("Created direct reference to classifier.original_module.dense for PEFT compatibility")
         
         # Define a new forward method for the embeddings to handle our input format
         def new_embeddings_forward(self, input_values):
