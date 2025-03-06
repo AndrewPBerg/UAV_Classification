@@ -101,12 +101,27 @@ class AudioClassifier(pl.LightningModule):
     def forward(self, x):
         """Forward pass through the model."""
         
-        
         # Ensure input is float32
         x = x.float()
         
         # Debug input shape
-        
+        try:
+            import logging
+            logger = logging.getLogger("LIGHTNING")
+            logger.debug(f"Input shape in lightning module forward: {x.shape}")
+            
+            # Check model type for debugging
+            model_type = "unknown"
+            if hasattr(self.model, 'vit'):
+                model_type = "vit"
+            elif hasattr(self.model, 'audio_spectrogram_transformer'):
+                model_type = "ast"
+            elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type'):
+                model_type = self.model.config.model_type
+                
+            logger.debug(f"Model type: {model_type}")
+        except Exception as e:
+            print(f"Debug logging error (non-critical): {e}")
         
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
@@ -118,13 +133,9 @@ class AudioClassifier(pl.LightningModule):
             
         elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
             is_ast_model = True
-
             
-        
         # Handle 5D input for AST models
         if is_ast_model and len(x.shape) == 5:
-          
-
             # If we have a 5D tensor [batch, channels, height, extra_dim, width]
             batch_size, channels, height, extra_dim, width = x.shape
             
@@ -136,16 +147,41 @@ class AudioClassifier(pl.LightningModule):
             else:
                 # Otherwise reshape to combine dimensions
                 x = x.reshape(batch_size, channels, height * extra_dim, width)
-                
         
-        
-        # Forward pass
-        
-
-        outputs = self.model(x)
-
+        # Forward pass - simply pass the input to the model
+        # The model itself now handles the correct input parameter names
+        try:
+            # Resize for ViT models if needed
+            is_vit_model = hasattr(self.model, "config") and getattr(self.model.config, "model_type", "") == "vit"
             
-            # If we're using an AST model and get an error, try one more approach
+            if is_vit_model and len(x.shape) == 4:
+                # Check if the input dimensions match what ViT expects (224x224)
+                if x.shape[2] != 224 or x.shape[3] != 224:
+                    print(f"Resizing input from {x.shape[2]}x{x.shape[3]} to 224x224 for ViT model")
+                    x = torch.nn.functional.interpolate(
+                        x, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                
+                # Ensure channel count is correct (3 channels for ViT)
+                if x.shape[1] == 1:
+                    print(f"Converting 1-channel input to 3-channel for ViT model")
+                    x = x.repeat(1, 3, 1, 1)
+            
+            # Print shape info for debugging
+            print(f"Final input shape passed to model: {x.shape}")
+            
+            outputs = self.model(x)
+        except Exception as e:
+            print(f"Forward pass error: {e}")
+            print(f"Input shape: {x.shape}, Input type: {type(x)}")
+            if hasattr(self.model, 'config'):
+                print(f"Model config: {self.model.config}")
+            raise e
+            
+        # If we're using an AST model and get an error, try one more approach
         if is_ast_model:                    
             # Try to reshape the input to match expected dimensions
             if len(x.shape) == 4:  # [batch, channels, height, width]
@@ -155,7 +191,11 @@ class AudioClassifier(pl.LightningModule):
                 # The exact reshape depends on the model's expectations
                 x = x.view(batch_size, channels, height, width)
                 
-                outputs = self.model(x)
+                try:
+                    outputs = self.model(x)
+                except Exception as e:
+                    print(f"Alternate AST approach failed: {e}")
+                    raise e
                     
             else:
                 raise Exception("Model is not in correct AST model format")
@@ -204,6 +244,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
@@ -211,7 +255,6 @@ class AudioClassifier(pl.LightningModule):
         self.predict_accuracy(y_pred_class, y)
         self.predict_precision(y_pred_class, y)
         self.predict_recall(y_pred_class, y)
-        self.predict_f1(y_pred_class, y)
         
         # Store predictions and targets for later use
         self.predict_batch_preds.append(y_pred_class)
@@ -272,6 +315,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -322,6 +369,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -337,7 +388,7 @@ class AudioClassifier(pl.LightningModule):
         # Log metrics - ensure they appear in progress bar and are formatted consistently
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True)
         
@@ -354,6 +405,10 @@ class AudioClassifier(pl.LightningModule):
         
         # Forward pass
         y_pred = self(x)
+        
+        # For transformer models that return a sequence classification output
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
         
         # Calculate loss
         loss = self.loss_fn(y_pred, y)

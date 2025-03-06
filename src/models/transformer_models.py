@@ -1,15 +1,9 @@
-from torchvision.models import (
-
-    # ViT variants
-    vit_b_16, ViT_B_16_Weights,
-    vit_b_32, ViT_B_32_Weights,
-    vit_l_16, ViT_L_16_Weights,
-    vit_l_32, ViT_L_32_Weights,
-    vit_h_14, ViT_H_14_Weights,
-)
+# Removed torchvision.models import as we're using Hugging Face models
 
 from transformers import (
-    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor
+    ASTFeatureExtractor, ASTForAudioClassification, AutoModel, PreTrainedModel, AutoFeatureExtractor, Wav2Vec2FeatureExtractor,
+    # Add ViT imports from Hugging Face
+    ViTForImageClassification, ViTImageProcessor
 )
 import math
 import logging
@@ -138,7 +132,7 @@ class TransformerModel:
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
                  'none-full', 'none-classifier', 'ssf', 'bitfit']
     
-    transformer_models = ['ast', 'mert','vit_b_16', 'vit_b_32', 'vit_l_16', 'vit_l_32', 'vit_h_14']
+    transformer_models = ['ast', 'mert', 'vit']  # Changed to just 'vit' instead of multiple variants
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
@@ -473,101 +467,223 @@ class TransformerModel:
     
     
     @staticmethod
-    def _create_vit_model(model_type: str, num_classes: int, input_shape: Tuple[int, int, int], general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
         """
-        Create a ViT model.
-        """
-        # Map config model type to actual model function
-        vit_models = {
-            'vit_b_16': (vit_b_16, ViT_B_16_Weights.DEFAULT),
-            'vit_b_32': (vit_b_32, ViT_B_32_Weights.DEFAULT),
-            'vit_l_16': (vit_l_16, ViT_L_16_Weights.DEFAULT),
-            'vit_l_32': (vit_l_32, ViT_L_32_Weights.DEFAULT),
-            'vit_h_14': (vit_h_14, ViT_H_14_Weights.DEFAULT),
-        }
+        Create a ViT model using Hugging Face's implementation.
         
-        if model_type.lower() not in vit_models:
-            raise ValueError(f"Unsupported ViT model type: {model_type}. Must be one of: {list(vit_models.keys())}")
-            
-        model_fn, weights = vit_models[model_type.lower()]
+        This implementation uses the standard 3-channel approach, where grayscale
+        spectrograms are converted to RGB format before processing. This is handled
+        in the feature_extraction method in util.py.
+        
+        The model automatically handles resizing of input tensors to the required 224x224 size.
+        """
+        model_name = "google/vit-large-patch16-224"
+        print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
+
         try:
-            # Try to create model with specified weights
-            model = model_fn(weights=weights)
+            print("Loading model with local_files_only=True...")
+            model = ViTForImageClassification.from_pretrained(
+                model_name,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR,
+                local_files_only=True,
+                ignore_mismatched_sizes=True
+            )
+            print("Model loaded successfully with local_files_only=True.")
+            
+            # Load the processor with explicit resize configuration to 224x224
+            processor = ViTImageProcessor.from_pretrained(
+                model_name,
+                cache_dir=CACHE_DIR,
+                local_files_only=True,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
+            )
+            print("Processor loaded successfully with local_files_only=True and configured for 224x224 images.")
+            
         except Exception as e:
-            print(f"Failed to load model with weights, trying without: {e}")
-            model = model_fn()
-        # Add resize layer to match ViT's expected input size
-        model.image_size = 224  # Set fixed size expected by ViT
-        resize_layer = nn.Upsample(size=(224, 224), mode='bilinear', align_corners=False)
+            print(f"Failed to load model with local_files_only=True, trying to download: {e}")
+            model = ViTForImageClassification.from_pretrained(
+                model_name,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR,
+                ignore_mismatched_sizes=True
+            )
+            print("Model downloaded successfully.")
+            
+            # Load the processor with explicit resize configuration to 224x224
+            processor = ViTImageProcessor.from_pretrained(
+                model_name,
+                cache_dir=CACHE_DIR,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
+            )
+            print("Processor downloaded successfully and configured for 224x224 images.")
+
+        # Debugging model architecture
+        print("Model architecture:")
+        print(model)
         
-        def new_forward(self, x=None, input_ids=None, attention_mask=None, **kwargs):
-            # Handle different input types - PEFT might pass input_ids instead of x
-            if x is None and input_ids is not None:
-                x = input_ids
+        # Update model configuration to accept inputs of any size
+        print("Updating model configuration to handle dynamic input sizes...")
+        if hasattr(model, 'config'):
+            # Save the original image_size
+            original_image_size = model.config.image_size if hasattr(model.config, 'image_size') else 224
+            print(f"Original image_size in config: {original_image_size}")
             
-            if x is None:
-                raise ValueError("Either x or input_ids must be provided to the forward method")
-                
-            # Handle input
-            x = x.float()
-            if x.dim() == 3:
-                x = x.unsqueeze(1)
+            # Explicitly set model to handle 224x224 images
+            model.config.image_size = 224
+            print(f"Updated image_size in config: {model.config.image_size}")
+        
+        # Create a custom forward method to handle different input parameter names
+        original_forward = model.forward
+        
+        def new_forward(self, pixel_values=None, input_ids=None, inputs_embeds=None, x=None, **kwargs):
+            """
+            Custom forward method that handles different input parameter names and is compatible with PEFT.
             
-            # Resize input to match ViT's expected size
-            x = resize_layer(x)
+            This method accepts all common input parameter names and routes them correctly:
+            - pixel_values: Standard ViT input name
+            - input_ids: Used by some PEFT models
+            - inputs_embeds: Used by some transformer models
+            - x: Generic input used in many custom implementations
             
-            # Process through convolutional projection
-            x = self.conv_proj(x)
+            It also automatically converts 1-channel inputs to 3-channel to match model expectations.
+            """
+            # Add debug information
+            print(f"ViT model forward called with: pixel_values={pixel_values is not None}, "
+                  f"input_ids={input_ids is not None}, x={x is not None}, "
+                  f"inputs_embeds={inputs_embeds is not None}, kwargs={list(kwargs.keys())}")
             
-            # Reshape to sequence
-            batch_size = x.shape[0]
-            x = x.flatten(2).transpose(1, 2)
-            
-            # Add class token
-            class_token = self.class_token.expand(batch_size, -1, -1)
-            x = torch.cat([class_token, x], dim=1)
-            
-            # Get position embeddings and adjust if necessary
-            pos_embedding = self.encoder.pos_embedding
-            if x.size(1) != pos_embedding.size(1):
-                # Remove class token from position embeddings
-                pos_tokens = pos_embedding[:, 1:]
-                # Reshape position embeddings to square grid
-                grid_size = int(math.sqrt(pos_tokens.size(1)))
-                pos_tokens = pos_tokens.reshape(-1, grid_size, grid_size, pos_embedding.size(-1))
-                
-                # Interpolate position embeddings to match sequence length
-                new_grid_size = int(math.sqrt(x.size(1) - 1))  # -1 for class token
-                pos_tokens = torch.nn.functional.interpolate(
-                    pos_tokens.permute(0, 3, 1, 2),
-                    size=(new_grid_size, new_grid_size),
-                    mode='bilinear',
-                    align_corners=False
-                )
-                pos_tokens = pos_tokens.permute(0, 2, 3, 1).flatten(1, 2)
-                
-                # Add class token position embedding back
-                new_pos_embedding = torch.cat([pos_embedding[:, :1], pos_tokens], dim=1)
-                x = x + new_pos_embedding
+            # Determine which input to use
+            if pixel_values is not None:
+                actual_input = pixel_values
+                if hasattr(actual_input, 'shape'):
+                    print(f"pixel_values input shape: {actual_input.shape}")
+            elif input_ids is not None:
+                actual_input = input_ids
+                if hasattr(actual_input, 'shape'):
+                    print(f"input_ids input shape: {actual_input.shape}")
+            elif x is not None:
+                actual_input = x
+                if hasattr(actual_input, 'shape'):
+                    print(f"x input shape: {actual_input.shape}")
+            elif inputs_embeds is not None:
+                actual_input = inputs_embeds
+                if hasattr(actual_input, 'shape'):
+                    print(f"inputs_embeds input shape: {actual_input.shape}")
             else:
-                x = x + pos_embedding
+                raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
             
-            # Forward through encoder and classification head
-            for block in self.encoder.layers:
-                x = block(x)
-            x = self.encoder.ln(x)
-            x = x[:, 0]
-            x = self.heads(x)
+            # Print the overall input shape for debugging
+            if hasattr(actual_input, 'shape'):
+                print(f"Selected input shape: {actual_input.shape}")
+                if len(actual_input.shape) >= 4:
+                    # For typical image input (B, C, H, W)
+                    print(f"Image dimensions (Height × Width): {actual_input.shape[-2]}×{actual_input.shape[-1]}")
             
-            return x
-    
-        # Update model components
-        model.forward = types.MethodType(new_forward, model)
-        model.heads.head = nn.Linear(model.heads.head.in_features, num_classes)
-        hidden_dim = model.conv_proj.out_channels
-        model.conv_proj = nn.Conv2d(1, hidden_dim, kernel_size=16, stride=16)
+            # Check if actual_input is a tensor and has 1 channel instead of 3
+            if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:
+                print(f"Input tensor shape: {actual_input.shape}")
+                
+                # Handle channel count - convert from 1 to 3 channels if needed
+                if actual_input.shape[1] == 1:
+                    print("Converting 1-channel input to 3-channel by repeating the channel")
+                    actual_input = actual_input.repeat(1, 3, 1, 1)
+                    print(f"Converted input shape: {actual_input.shape}")
+                
+                # Handle input size - resize all inputs to 224x224 using interpolation
+                if actual_input.shape[2] != 224 or actual_input.shape[3] != 224:
+                    print(f"Resizing input from {actual_input.shape[2]}x{actual_input.shape[3]} to 224x224")
+                    # Use interpolate to resize the tensor to 224x224
+                    actual_input = torch.nn.functional.interpolate(
+                        actual_input, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                    print(f"Resized input shape: {actual_input.shape}")
+            
+            # Remove attention_mask from kwargs if it exists - ViT doesn't use it
+            vit_kwargs = {k: v for k, v in kwargs.items() if k not in ['attention_mask']}
+            
+            # Add debug info to see what's being passed to the original forward
+            print(f"Passing to ViT: pixel_values={actual_input.shape if hasattr(actual_input, 'shape') else None}, kwargs={list(vit_kwargs.keys())}")
+            
+            try:
+                return original_forward(pixel_values=actual_input, **vit_kwargs)
+            except Exception as e:
+                print(f"Forward pass error: {str(e)}")
+                print(f"Input shape: {actual_input.shape if hasattr(actual_input, 'shape') else None}, Input type: {type(actual_input)}")
+                
+                # Get model configuration to help debug
+                if hasattr(self, 'config'):
+                    print(f"Model config: {self.config}")
+                
+                # Re-raise the exception for proper error handling
+                raise
         
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
+        print("Custom forward method added to handle different input parameter names and filter unsupported parameters")
+
+        # Note: We're using the standard 3-channel approach where grayscale spectrograms
+        # are converted to RGB in the feature_extraction method in util.py.
+        # This is simpler and doesn't require modifying the model architecture.
+        
+        # If you want to use the 1-channel approach instead, uncomment the following code:
+        """
+        # 1-CHANNEL APPROACH (ALTERNATIVE)
+        # This modifies the model to accept 1-channel input directly.
+        
+        # First, modify the configuration to expect 1 channel
+        from transformers import ViTConfig
+        config = ViTConfig.from_pretrained(
+            model_name,
+            num_labels=num_classes,
+            cache_dir=CACHE_DIR
+        )
+        config.num_channels = 1  # Set number of channels to 1
+        print(f"Modified config to use {config.num_channels} channels")
+        
+        # Create model with modified config
+        model = ViTForImageClassification.from_pretrained(
+            model_name,
+            config=config,
+            ignore_mismatched_sizes=True
+        )
+        
+        # Get the original projection layer
+        original_projection = model.vit.embeddings.patch_embeddings.projection
+        print(f"Original projection layer: {original_projection}")
+        
+        # Modify the projection layer to accept 1-channel input
+        model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
+            in_channels=1,  # Change from 3 to 1 for grayscale
+            out_channels=original_projection.out_channels,
+            kernel_size=original_projection.kernel_size,
+            stride=original_projection.stride,
+            padding=original_projection.padding
+        )
+        
+        # Initialize the weights of the new projection layer
+        with torch.no_grad():
+            original_weights = original_projection.weight.data
+            new_weights = original_weights.mean(dim=1, keepdim=True)
+            model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
+        
+        # Double-check the configuration
+        print(f"Model config num_channels: {model.config.num_channels}")
+        print(f"Modified projection layer: {model.vit.embeddings.patch_embeddings.projection}")
+        print("Model modified to accept 1-channel input")
+        """
+
+        # Apply PEFT configuration
+        print("Applying PEFT configuration...")
         model = apply_peft(model, peft_config, general_config)
-    
-        return model
+        print("PEFT configuration applied successfully.")
+
+        return model, processor
     
