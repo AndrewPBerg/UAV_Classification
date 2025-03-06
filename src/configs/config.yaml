@@ -3,7 +3,7 @@ general:
   num_classes: 9
   save_dataloader: false
   model_type: ast
-  batch_size: 4
+  batch_size: 8
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: lora
+  adapter_type: adalora
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -59,10 +59,12 @@ ia3:
   - key
   - value
   - query
+  - dense
   target_modules:
   - key
   - value
   - query
+  - dense
 adalora:
   init_r: 32
   target_r: 16
@@ -70,6 +72,7 @@ adalora:
   - key
   - value
   - query
+  - dense
   lora_alpha: 8
 oft:
   r: 768
@@ -113,7 +116,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: mert-none-classifier
+  name: ast-adalora
   reinit: true
   notes: null
   tags: null
