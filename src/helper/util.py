@@ -300,7 +300,7 @@ class AudioDataset(Dataset):
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, ViTImageProcessor):
                 # Convert audio to spectrogram for ViT
-                # ViT expects image-like inputs
+                # ViT expects image-like inputs with 3 channels
                 logger.debug("Using ViTImageProcessor")
                 
                 # Convert audio to mel spectrogram
@@ -315,30 +315,30 @@ class AudioDataset(Dataset):
                 # Normalize to [0, 1] range
                 mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
                 
-                # Convert to RGB by repeating the channel 3 times
-                # Important: ViT expects images in [B, C, H, W] format where C=3 for RGB
-                rgb_image = np.stack([mel_spec_normalized] * 3, axis=-1)  # [H, W, 3]
+                # Create a 3-channel image directly as a PyTorch tensor
+                # Shape: [3, H, W] - exactly what ViT expects
+                h, w = mel_spec_normalized.shape
+                tensor_3ch = torch.zeros(3, h, w, dtype=torch.float32)
                 
-                # Process with ViT processor - it will handle resizing and other preprocessing
-                features = self.feature_extractor(
-                    images=rgb_image,
-                    return_tensors="pt"
-                )
+                # Fill all 3 channels with the same spectrogram data
+                for i in range(3):
+                    tensor_3ch[i] = torch.from_numpy(mel_spec_normalized)
                 
-                # Ensure the output has the correct shape with 3 channels
-                # The error suggests we're getting [1, H, W] but need [3, H, W]
-                pixel_values = features.pixel_values.squeeze(0)  # Remove batch dimension
+                # Resize if needed to match ViT's expected input size (typically 224x224)
+                if h != 224 or w != 224:
+                    tensor_3ch = torch.nn.functional.interpolate(
+                        tensor_3ch.unsqueeze(0),  # Add batch dimension
+                        size=(224, 224),
+                        mode='bilinear',
+                        align_corners=False
+                    ).squeeze(0)  # Remove batch dimension
                 
-                # Debug the shape
-                logger.debug(f"ViT pixel_values shape: {pixel_values.shape}")
+                logger.debug(f"Final tensor shape for ViT: {tensor_3ch.shape}")
                 
-                # If the channel dimension is not 3, reshape it
-                if pixel_values.shape[0] != 3 and len(pixel_values.shape) == 3:
-                    # Assuming the shape is [1, H, W], we need to make it [3, H, W]
-                    pixel_values = pixel_values.repeat(3, 1, 1)
-                    logger.debug(f"Reshaped to: {pixel_values.shape}")
+                # Verify we have 3 channels
+                assert tensor_3ch.shape[0] == 3, f"Expected 3 channels, got {tensor_3ch.shape[0]}"
                 
-                return pixel_values
+                return tensor_3ch
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr
