@@ -905,13 +905,25 @@ class PTLTrainer:
         print("="*80 + "\n")
         
         # Log average metrics to wandb
-        if self.general_config.use_wandb:
+        if self.wandb_logger:
+            # Log average metrics, but only to the summary
             for key, value in avg_metrics.items():
-                # Use correct format that matches the keys in avg_metrics
-                if key.startswith("average_"):
-                    wandb.log({key: value})
-                elif key.startswith("std_"):
-                    wandb.log({key: value})
+                if key.startswith("average_") or key.startswith("std_"):
+                    self.wandb_logger.experiment.summary[f"final_{key}"] = value
+        
+        # Log best validation metrics from the best fold
+        if best_model is not None and hasattr(best_model, 'best_val_accuracy') and self.wandb_logger:
+            self.wandb_logger.experiment.summary['final_best_fold_val_acc'] = best_model.best_val_accuracy
+            
+            # Log other best validation metrics if available
+            if hasattr(best_model, 'best_val_f1'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_f1'] = best_model.best_val_f1
+            
+            if hasattr(best_model, 'best_val_precision'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_precision'] = best_model.best_val_precision
+                
+            if hasattr(best_model, 'best_val_recall'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_recall'] = best_model.best_val_recall
         
         # Save best model if enabled
         if self.general_config.save_model and best_model is not None:
