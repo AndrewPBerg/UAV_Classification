@@ -370,44 +370,46 @@ class TransformerModel:
         original_patch_embeddings_forward = model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward
         
         def new_patch_embeddings_forward(self, input_values):
-            logger.debug(f"Patch embeddings input shape: {input_values.shape}")
+            # logger.debug(f"Patch embeddings input shape: {input_values.shape}")
             
             # Handle 5D input directly at the patch embeddings level
             if len(input_values.shape) == 5:
-                logger.debug("Fixing 5D input at patch embeddings level")
+                # logger.debug("Fixing 5D input at patch embeddings level")
                 batch_size, channels, height, extra_dim, width = input_values.shape
                 
                 # Try different approaches
                 if extra_dim == 1:
                     # If extra dimension is 1, just squeeze it out
                     input_values = input_values.squeeze(3)
-                    logger.debug(f"Squeezed to shape: {input_values.shape}")
+                    # logger.debug(f"Squeezed to shape: {input_values.shape}")
                 else:
                     # Otherwise reshape
                     try:
                         input_values = input_values.reshape(batch_size, channels, height * extra_dim, width)
-                        logger.debug(f"Reshaped to: {input_values.shape}")
+                        # logger.debug(f"Reshaped to: {input_values.shape}")
                     except Exception as e:
-                        logger.error(f"Error reshaping in patch embeddings: {e}")
+                        pass
+                        # logger.error(f"Error reshaping in patch embeddings: {e}")
             
             # Call original method with fixed input
             try:
                 result = original_patch_embeddings_forward(input_values)
-                logger.debug(f"Patch embeddings output shape: {result.shape}")
+                # logger.debug(f"Patch embeddings output shape: {result.shape}")
                 return result
             except Exception as e:
-                logger.error(f"Error in original patch embeddings forward: {e}")
-                logger.error(f"Input shape: {input_values.shape}")
+                # logger.error(f"Error in original patch embeddings forward: {e}")
+                # logger.error(f"Input shape: {input_values.shape}")
                 # Try one more approach if it fails
                 if len(input_values.shape) == 4:
-                    logger.debug("Attempting alternative approach for 4D input")
+                    # logger.debug("Attempting alternative approach for 4D input")
                     # Try to use the projection directly
                     try:
                         result = self.projection(input_values).flatten(2).transpose(1, 2)
-                        logger.debug(f"Direct projection successful, shape: {result.shape}")
+                        # logger.debug(f"Direct projection successful, shape: {result.shape}")
                         return result
                     except Exception as e2:
-                        logger.error(f"Direct projection failed: {e2}")
+                        pass
+                        # logger.error(f"Direct projection failed: {e2}")
                 raise
         
         # Replace the patch embeddings forward method

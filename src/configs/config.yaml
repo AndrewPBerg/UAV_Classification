@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: adalora
+  adapter_type: lora
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -116,7 +116,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: ast-adalora
+  name: ast-lora
   reinit: true
   notes: null
   tags: null
