@@ -84,25 +84,16 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
-            # Completely different approach - ignore target_modules from config and build from scratch
-            # This approach won't rely on generic module type names like 'dense'
-            
-            # Print model structure for debugging
-            print("\n[DEBUG] Model structure scan for Linear layers:")
-            
-            # Build new target_modules list from scratch
+            # Build target_modules list from reliable full module paths
             new_target_modules = []
             found_classifier = False
             
             # Collect all Linear layers with their full paths
             for name, module in model.named_modules():
                 if isinstance(module, nn.Linear):
-                    print(f"[DEBUG] Found Linear layer: {name}")
-                    
                     # Only add modules with valid names (no ModulesToSaveWrapper in path)
                     if 'ModulesToSaveWrapper' not in name:
                         new_target_modules.append(name)
-                        print(f"[DEBUG] Added '{name}' to target_modules")
                         
                         # Track if we found the classifier.dense
                         if name == 'classifier.dense':
@@ -110,13 +101,10 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             
             # If classifier.dense wasn't found but we need it
             if not found_classifier and hasattr(model, 'classifier'):
-                print("[DEBUG] Classifier dense path not found directly, looking through classifier structure")
-                
                 # Handle the case where classifier is a ModulesToSaveWrapper
                 if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
                     if isinstance(model.classifier.original_module.dense, nn.Linear):
                         new_target_modules.append('classifier.original_module.dense')
-                        print("[DEBUG] Added 'classifier.original_module.dense' to target_modules")
                 
                 # Also try modules_to_save path
                 if hasattr(model.classifier, 'modules_to_save'):
@@ -124,14 +112,11 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
                         if hasattr(module, 'dense') and isinstance(module.dense, nn.Linear):
                             path = f'classifier.modules_to_save.{key}.dense'
                             new_target_modules.append(path)
-                            print(f"[DEBUG] Added '{path}' to target_modules")
             
             # Override peft_config's target_modules with our new list
-            print(f"[DEBUG] Final target_modules: {new_target_modules}")
             peft_config.target_modules = new_target_modules
             
-            # If we want to apply to query/key/value based on patterns:
-            # De-duplicate target modules to avoid applying LoRA to the same layer twice
+            # De-duplicate target modules
             seen = set()
             unique_modules = []
             for module in peft_config.target_modules:
@@ -152,7 +137,6 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
                 # Attach this map to the model for PEFT to use
                 if not hasattr(model, '_peft_path_map'):
                     model._peft_path_map = module_map
-                    print(f"[DEBUG] Created module path map with {len(module_map)} entries")
             
             # Apply the path mapping to help PEFT
             set_attribute_path_mapping(model)
@@ -168,25 +152,17 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             
             # Apply the monkey patch
             nn.Module.get_submodule = patched_get_submodule
-            print("[DEBUG] Applied get_submodule patch to help PEFT find modules")
             
             # Get PEFT model with the updated configuration
             model = get_peft_model(model, peft_config)
             
             # Restore original method after we're done
             nn.Module.get_submodule = original_get_submodule
-            print("[DEBUG] Restored original get_submodule method")
             
         except Exception as e:
-            print(f"[ERROR] Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
-            traceback_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
-            print(f"[ERROR] Full traceback:\n{traceback_str}")
-            
             # In case of error, restore original get_submodule if we patched it
             if 'original_get_submodule' in locals():
                 nn.Module.get_submodule = original_get_submodule
-                print("[DEBUG] Restored original get_submodule method after error")
-                
             raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
@@ -312,22 +288,17 @@ class TransformerModel:
             
             # When we have a 3D input (batch_size, channels, sequence), we need to add the height dimension
             if input_values.dim() == 3:
-                logger.debug(f"Reshaping 3D input with shape {input_values.shape}")
                 # Reshape to (batch_size, channels, height=1, width=sequence)
                 input_values = input_values.unsqueeze(2)
-                logger.debug(f"Reshaped to {input_values.shape}")
             
             # Get patch embeddings
             embeddings = self.patch_embeddings(input_values)
-            logger.debug(f"Patch embeddings shape: {embeddings.shape}")
             
             # Check if sequence length matches expected length for position embeddings
             expected_seq_length = self.position_embeddings.shape[1]
             current_seq_length = embeddings.shape[1]
             
             if current_seq_length != expected_seq_length:
-                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
-                
                 # Use interpolation to adapt embeddings to the expected sequence length
                 # First transpose to [batch_size, hidden_dim, seq_len]
                 embeddings = embeddings.transpose(1, 2)
@@ -342,8 +313,6 @@ class TransformerModel:
                 
                 # Transpose back to [batch_size, seq_len, hidden_dim]
                 embeddings = embeddings.transpose(1, 2)
-                
-                logger.debug(f"Adapted embeddings shape: {embeddings.shape}")
             
             # Add position embeddings
             embeddings = embeddings + self.position_embeddings
@@ -369,47 +338,29 @@ class TransformerModel:
             if x is None:
                 raise ValueError("Either x or input_ids must be provided to the forward method")
                 
-            # Debug logging
-            logger.debug(f"AST model input shape before processing: {x.shape}")
-            
             # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
             if len(x.shape) == 5:
-                logger.debug(f"Detected 5D input tensor with shape: {x.shape}")
-                
                 # Get the dimensions
                 batch_size, channels, height, extra_dim, width = x.shape
                 
                 # Reshape to 4D tensor that conv2d can accept
-                # We need to reshape from [batch, channels, height, extra_dim, width] to [batch, channels, height*extra_dim, width]
                 try:
                     x = x.reshape(batch_size, channels, height * extra_dim, width)
-                    logger.debug(f"Reshaped tensor to: {x.shape}")
-                except Exception as e:
-                    logger.error(f"Error reshaping tensor: {e}")
-                    
+                except Exception:
                     # Alternative approach: try to squeeze out the extra dimension if it's 1
                     if extra_dim == 1:
                         try:
                             x = x.squeeze(3)  # Remove the 4th dimension (index 3)
-                            logger.debug(f"Squeezed tensor to: {x.shape}")
-                        except Exception as e2:
-                            logger.error(f"Error squeezing tensor: {e2}")
-                            
+                        except Exception:
                             # Last resort: try to view the tensor differently
                             try:
                                 x = x.view(batch_size, channels, height, width)
-                                logger.debug(f"Viewed tensor as: {x.shape}")
-                            except Exception as e3:
-                                logger.error(f"Error viewing tensor: {e3}")
-            
-            # Final shape check before passing to original forward
-            logger.debug(f"Final tensor shape before original forward: {x.shape}")
+                            except Exception:
+                                pass
             
             try:
                 return original_forward(x)
             except Exception as e:
-                logger.error(f"Error in original_forward: {e}")
-                logger.error(f"Input tensor shape: {x.shape}")
                 raise
         
         # Replace the forward method
