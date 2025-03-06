@@ -83,6 +83,29 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
+            # Fix for AST model with ModulesToSaveWrapper
+            if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
+                # Check if we're dealing with an AST model with ModulesToSaveWrapper
+                if 'dense' in peft_config.target_modules:
+                    # Create a new list of target modules with the correct path for dense in the classifier
+                    new_target_modules = []
+                    for module_name in peft_config.target_modules:
+                        if module_name == 'dense':
+                            # For the classifier's dense layer, we need to use the modules_to_save path
+                            # Keep the original 'dense' for other dense layers in the model
+                            new_target_modules.append(module_name)
+                            new_target_modules.append('modules_to_save.default.dense')
+                        else:
+                            new_target_modules.append(module_name)
+                    
+                    # Update the target_modules in the config
+                    if isinstance(peft_config, LoraConfig):
+                        peft_config.target_modules = new_target_modules
+                    elif hasattr(peft_config, 'target_modules'):
+                        peft_config.target_modules = new_target_modules
+                    
+                    print(f"Updated target_modules for AST model: {new_target_modules}")
+            
             # Generic approach to handle ModulesToSaveWrapper issue
             # This will work for any model that uses ModulesToSaveWrapper
             # Recursively expose attributes from original_module to parent wrapper
@@ -129,6 +152,56 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     return model
 
 
+def update_classifier(model, num_classes):
+    """
+    Update the classifier of a model to match the specified number of classes.
+    Works with various model architectures by handling different classifier structures.
+    """
+    # Update the model config
+    if hasattr(model, 'config'):
+        model.config.num_labels = num_classes
+    
+    # Handle direct classifier
+    if hasattr(model, 'classifier'):
+        # Case 1: Simple classifier with dense attribute
+        if hasattr(model.classifier, 'dense') and isinstance(model.classifier.dense, nn.Linear):
+            in_features = model.classifier.dense.in_features
+            model.classifier.dense = nn.Linear(in_features, num_classes)
+            print(f"Updated classifier.dense: {in_features} -> {num_classes}")
+        
+        # Case 2: ModulesToSaveWrapper with original_module
+        elif hasattr(model.classifier, 'original_module'):
+            if hasattr(model.classifier.original_module, 'dense') and isinstance(model.classifier.original_module.dense, nn.Linear):
+                in_features = model.classifier.original_module.dense.in_features
+                model.classifier.original_module.dense = nn.Linear(in_features, num_classes)
+                print(f"Updated classifier.original_module.dense: {in_features} -> {num_classes}")
+        
+        # Case 3: ModulesToSaveWrapper with modules_to_save
+        elif hasattr(model.classifier, 'modules_to_save'):
+            for key in model.classifier.modules_to_save:
+                module = model.classifier.modules_to_save[key]
+                if hasattr(module, 'dense') and isinstance(module.dense, nn.Linear):
+                    in_features = module.dense.in_features
+                    module.dense = nn.Linear(in_features, num_classes)
+                    print(f"Updated classifier.modules_to_save.{key}.dense: {in_features} -> {num_classes}")
+    
+    # Handle other classifier structures
+    else:
+        # Look for classifier-like modules
+        for name, module in model.named_modules():
+            if 'classifier' in name.lower() or 'head' in name.lower() or 'output' in name.lower():
+                if isinstance(module, nn.Linear) and module.out_features != num_classes:
+                    in_features = module.in_features
+                    parent_name = '.'.join(name.split('.')[:-1])
+                    module_name = name.split('.')[-1]
+                    parent = model
+                    for part in parent_name.split('.'):
+                        if part:
+                            parent = getattr(parent, part)
+                    setattr(parent, module_name, nn.Linear(in_features, num_classes))
+                    print(f"Updated {name}: {in_features} -> {num_classes}")
+
+
 class TransformerModel:
     
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
@@ -148,49 +221,44 @@ class TransformerModel:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             stream=sys.stdout
         )
-        logger = logging.getLogger("AST_MODEL")
         
-        pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
-
+        # Create a logger for this function
+        logger = logging.getLogger("AST_Model_Creation")
+        logger.setLevel(logging.DEBUG)
+        
+        # Define the pretrained model to use
+        pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
+        
         try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
-        model.config.num_labels = num_classes
+        # Update the classifier to match our number of classes
+        update_classifier(model, num_classes)
         
-        # Update the classifier in a generic way that works with any structure
-        def update_classifier(module, in_features=None):
-            # If this is a Linear layer with the right output dimension, update it
-            if isinstance(module, nn.Linear) and hasattr(module, 'out_features'):
-                if module.out_features != num_classes:
-                    if in_features is None:
-                        in_features = module.in_features
-                    return nn.Linear(in_features, num_classes)
-            return module
+        # Ensure the classifier's dense layer is directly accessible for PEFT
+        if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
+            # Make the dense layer directly accessible
+            if hasattr(model.classifier.modules_to_save.default, 'dense'):
+                # Create a reference to the dense layer directly on the classifier
+                model.classifier.dense = model.classifier.modules_to_save.default.dense
+                print("Made classifier's dense layer directly accessible for PEFT")
         
-        # Find and update the classifier
-        if hasattr(model, 'classifier'):
-            # Handle direct classifier
-            if hasattr(model.classifier, 'dense') and isinstance(model.classifier.dense, nn.Linear):
-                in_features = model.classifier.dense.in_features
-                model.classifier.dense = nn.Linear(in_features, num_classes)
-            # Handle wrapped classifier
-            elif hasattr(model.classifier, 'original_module'):
-                if hasattr(model.classifier.original_module, 'dense') and isinstance(model.classifier.original_module.dense, nn.Linear):
-                    in_features = model.classifier.original_module.dense.in_features
-                    model.classifier.original_module.dense = nn.Linear(in_features, num_classes)
-        
-        # Get the expected sequence length from the position embeddings
-        expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]
-        logger.debug(f"Expected sequence length from position embeddings: {expected_seq_length}")
-        
-        # Save original embeddings forward method
-        original_embeddings_forward = model.audio_spectrogram_transformer.embeddings.forward
-        
-        # Define a new embeddings forward method to handle sequence length mismatch
+        # Define a new forward method for the embeddings to handle our input format
         def new_embeddings_forward(self, input_values):
-            logger.debug(f"Embeddings input shape: {input_values.shape}")
+            # Original code from AST model
+            batch_size = input_values.shape[0]
+            
+            if input_values.dim() > 4:
+                raise ValueError(f"Input has {input_values.dim()} dimensions, expected 4 dimensions")
+            
+            # When we have a 3D input (batch_size, channels, sequence), we need to add the height dimension
+            if input_values.dim() == 3:
+                logger.debug(f"Reshaping 3D input with shape {input_values.shape}")
+                # Reshape to (batch_size, channels, height=1, width=sequence)
+                input_values = input_values.unsqueeze(2)
+                logger.debug(f"Reshaped to {input_values.shape}")
             
             # Get patch embeddings
             embeddings = self.patch_embeddings(input_values)
@@ -199,8 +267,8 @@ class TransformerModel:
             # Check if sequence length matches expected length
             current_seq_length = embeddings.shape[1]
             
-            if current_seq_length != expected_seq_length:
-                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
+            if current_seq_length != batch_size:
+                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {batch_size}")
                 
                 # Use a deterministic approach instead of interpolation
                 # We'll use a learned projection layer to change the sequence length
@@ -209,7 +277,7 @@ class TransformerModel:
                     # This is a simple linear layer that projects from current_seq_length to expected_seq_length
                     self.seq_adapter = torch.nn.Linear(
                         current_seq_length, 
-                        expected_seq_length
+                        batch_size
                     ).to(embeddings.device)
                     logger.debug("Created sequence adapter layer")
                 
