@@ -540,14 +540,29 @@ class TransformerModel:
             # Determine which input to use
             if pixel_values is not None:
                 actual_input = pixel_values
+                if hasattr(actual_input, 'shape'):
+                    print(f"pixel_values input shape: {actual_input.shape}")
             elif input_ids is not None:
                 actual_input = input_ids
+                if hasattr(actual_input, 'shape'):
+                    print(f"input_ids input shape: {actual_input.shape}")
             elif x is not None:
                 actual_input = x
+                if hasattr(actual_input, 'shape'):
+                    print(f"x input shape: {actual_input.shape}")
             elif inputs_embeds is not None:
                 actual_input = inputs_embeds
+                if hasattr(actual_input, 'shape'):
+                    print(f"inputs_embeds input shape: {actual_input.shape}")
             else:
                 raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
+            
+            # Print the overall input shape for debugging
+            if hasattr(actual_input, 'shape'):
+                print(f"Selected input shape: {actual_input.shape}")
+                if len(actual_input.shape) >= 4:
+                    # For typical image input (B, C, H, W)
+                    print(f"Image dimensions (Height × Width): {actual_input.shape[-2]}×{actual_input.shape[-1]}")
             
             # Check if actual_input is a tensor and has 1 channel instead of 3
             if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:

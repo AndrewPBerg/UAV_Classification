@@ -313,7 +313,11 @@ class AudioDataset(Dataset):
                 # Create PIL image from grayscale array
                 from PIL import Image
                 pil_img = Image.fromarray(image_array, mode="L")
-                logger.debug(f"PIL image size: {pil_img.size}")
+                logger.debug(f"Original PIL image size: {pil_img.size}")
+                
+                # Resize to 224x224 to match ViT model's expected input size
+                pil_img = pil_img.resize((224, 224), Image.LANCZOS)
+                logger.debug(f"Resized PIL image size: {pil_img.size}")
                 
                 # Convert grayscale PIL image to RGB for ViT processor
                 pil_img_rgb = pil_img.convert('RGB')
