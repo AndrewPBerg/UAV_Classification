@@ -471,11 +471,11 @@ class TransformerModel:
         """
         Create a ViT model using Hugging Face's implementation.
         """
-        # Use the Hugging Face ViT model
         model_name = "google/vit-large-patch16-224"
-        
+        print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
+
         try:
-            # Try to load the model with local_files_only first
+            print("Loading model with local_files_only=True...")
             model = ViTForImageClassification.from_pretrained(
                 model_name,
                 num_labels=num_classes,
@@ -483,51 +483,64 @@ class TransformerModel:
                 local_files_only=True,
                 ignore_mismatched_sizes=True
             )
+            print("Model loaded successfully with local_files_only=True.")
+            
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
                 cache_dir=CACHE_DIR,
                 local_files_only=True
             )
+            print("Processor loaded successfully with local_files_only=True.")
+            
         except Exception as e:
             print(f"Failed to load model with local_files_only=True, trying to download: {e}")
-            # If local loading fails, download the model
             model = ViTForImageClassification.from_pretrained(
                 model_name,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
                 ignore_mismatched_sizes=True
             )
+            print("Model downloaded successfully.")
+            
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
                 cache_dir=CACHE_DIR
             )
-        
+            print("Processor downloaded successfully.")
+
+        # Debugging model architecture
+        print("Model architecture:")
+        print(model)
+
         # Modify the first layer to accept grayscale input (1 channel instead of 3)
-        print("Modifying ViT model to accept grayscale input (1 channel)")
+        print("Modifying ViT model to accept grayscale input (1 channel)...")
         original_projection = model.vit.embeddings.patch_embeddings.projection
-        model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
-            in_channels=1,  # Change from 3 to 1 for grayscale
-            out_channels=original_projection.out_channels,
-            kernel_size=original_projection.kernel_size,
-            stride=original_projection.stride,
-            padding=original_projection.padding
-        )
+        print(f"Original projection layer: {original_projection}")
+
+        # Uncomment the following lines if you want to modify the projection layer
+        # model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
+        #     in_channels=3,  # Change from 3 to 1 for grayscale
+        #     out_channels=original_projection.out_channels,
+        #     kernel_size=original_projection.kernel_size,
+        #     stride=original_projection.stride,
+        #     padding=original_projection.padding
+        # )
         
         # Initialize the weights of the new projection layer
-        # We'll use the average of the original weights across the RGB channels
-        with torch.no_grad():
-            # Get the original weights [out_channels, 3, kernel_size, kernel_size]
-            original_weights = original_projection.weight.data
-            # Average across the 3 input channels to get [out_channels, 1, kernel_size, kernel_size]
-            new_weights = original_weights.mean(dim=1, keepdim=True)
-            # Set the weights of the new projection layer
-            model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
-        
+        # with torch.no_grad():
+        #     original_weights = original_projection.weight.data
+        #     new_weights = original_weights.mean(dim=1, keepdim=True)
+        #     model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
+        #     print("New weights initialized for the projection layer.")
+
         # Set the model configuration to expect 1 channel for grayscale images
-        model.config.num_channels = 1
-        
+        # model.config.num_channels = 1
+        # print("Model configuration updated to expect 1 channel.")
+
         # Apply PEFT configuration
+        print("Applying PEFT configuration...")
         model = apply_peft(model, peft_config, general_config)
-        
+        print("PEFT configuration applied successfully.")
+
         return model, processor
     

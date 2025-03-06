@@ -299,42 +299,31 @@ class AudioDataset(Dataset):
                 )
                 return features.input_values.squeeze(0)
             elif isinstance(self.feature_extractor, ViTImageProcessor):
-                # Convert audio to spectrogram for ViT
-                # We've modified the ViT model to accept grayscale input (1 channel)
-                logger.debug("Using ViTImageProcessor with grayscale input")
+                logger.debug("Using ViTImageProcessor with grayscale input via PIL conversion")
                 
                 # Convert audio to mel spectrogram
-                mel_spec = librosa.feature.melspectrogram(
-                    y=audio_np, 
-                    sr=self.target_sr
-                )
-                
-                # Convert to decibels
+                mel_spec = librosa.feature.melspectrogram(y=audio_np, sr=self.target_sr)
                 mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
-                
-                # Normalize to [0, 1] range
                 mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
-                
-                # Create a single-channel image as a PyTorch tensor
-                # Shape: [1, H, W] - for grayscale input to our modified ViT
-                h, w = mel_spec_normalized.shape
-                tensor_1ch = torch.from_numpy(mel_spec_normalized).unsqueeze(0).float()  # Add channel dimension
-                
-                # Resize if needed to match ViT's expected input size (typically 224x224)
-                if h != 224 or w != 224:
-                    tensor_1ch = torch.nn.functional.interpolate(
-                        tensor_1ch.unsqueeze(0),  # Add batch dimension
-                        size=(224, 224),
-                        mode='bilinear',
-                        align_corners=False
-                    ).squeeze(0)  # Remove batch dimension
-                
-                logger.debug(f"Final tensor shape for ViT (grayscale): {tensor_1ch.shape}")
-                
-                # Verify we have 1 channel
-                assert tensor_1ch.shape[0] == 1, f"Expected 1 channel, got {tensor_1ch.shape[0]}"
-                
-                return tensor_1ch
+
+                # Convert normalized mel spectrogram to 8-bit image array
+                image_array = (mel_spec_normalized * 255).astype(np.uint8)
+                print(f"Image array shape after normalization: {image_array.shape}")  # Debugging shape
+
+                from PIL import Image
+                pil_img = Image.fromarray(image_array, mode="L")
+                print(f"PIL image size: {pil_img.size}")  # Debugging PIL image size
+
+                # Use the ViTImageProcessor's own preprocessing pipeline
+                features = self.feature_extractor(pil_img, return_tensors="pt")  # Process the PIL image
+                print(f"Features output shape from ViTImageProcessor: {features.pixel_values.shape}")  # Debugging shape
+                tensor_1ch = features.pixel_values[0]  # remove batch dimension
+
+                # Duplicate the tensor across the channel dimension to simulate RGB input
+                tensor_rgb = tensor_1ch.unsqueeze(0).repeat(3, 1, 1)  # Shape: [3, H, W]
+                print(f"Final tensor shape for ViT (simulated RGB): {tensor_rgb.shape}")  # Debugging shape
+
+                return tensor_rgb
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr
