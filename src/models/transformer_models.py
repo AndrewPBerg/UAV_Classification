@@ -515,6 +515,44 @@ class TransformerModel:
         # Debugging model architecture
         print("Model architecture:")
         print(model)
+        
+        # Create a custom forward method to handle different input parameter names
+        # This makes the model compatible with both direct input and PEFT
+        original_forward = model.forward
+        
+        def new_forward(self, pixel_values=None, input_ids=None, inputs_embeds=None, x=None, **kwargs):
+            """
+            Custom forward method that handles different input parameter names.
+            
+            This method accepts all common input parameter names and routes them correctly:
+            - pixel_values: Standard ViT input name
+            - input_ids: Used by some PEFT models
+            - inputs_embeds: Used by some transformer models
+            - x: Generic input used in many custom implementations
+            """
+            # Print debug information about the inputs
+            # print(f"ViT received inputs: pixel_values={pixel_values is not None}, "
+            #       f"input_ids={input_ids is not None}, inputs_embeds={inputs_embeds is not None}, "
+            #       f"x={x is not None}")
+            
+            # Determine which input to use
+            if pixel_values is not None:
+                actual_input = pixel_values
+            elif input_ids is not None:
+                actual_input = input_ids
+            elif x is not None:
+                actual_input = x
+            elif inputs_embeds is not None:
+                actual_input = inputs_embeds
+            else:
+                raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
+            
+            # Call the original forward method with the correct input
+            return original_forward(pixel_values=actual_input, **kwargs)
+        
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
+        print("Custom forward method added to handle different input parameter names")
 
         # Note: We're using the standard 3-channel approach where grayscale spectrograms
         # are converted to RGB in the feature_extraction method in util.py.

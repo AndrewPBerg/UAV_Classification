@@ -101,17 +101,12 @@ class AudioClassifier(pl.LightningModule):
     def forward(self, x):
         """Forward pass through the model."""
         
-        
         # Ensure input is float32
         x = x.float()
-        
-        # Debug input shape
-        
         
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
         is_ast_model = False
-        is_vit_model = False
 
         # Check if this is an AST model by looking for specific attributes
         if hasattr(self.model, 'audio_spectrogram_transformer'):
@@ -119,16 +114,9 @@ class AudioClassifier(pl.LightningModule):
             
         elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
             is_ast_model = True
-
-        # Check if this is a ViT model
-        if hasattr(self.model, 'vit') or (hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'vit'):
-            is_vit_model = True
             
-        
         # Handle 5D input for AST models
         if is_ast_model and len(x.shape) == 5:
-          
-
             # If we have a 5D tensor [batch, channels, height, extra_dim, width]
             batch_size, channels, height, extra_dim, width = x.shape
             
@@ -140,17 +128,10 @@ class AudioClassifier(pl.LightningModule):
             else:
                 # Otherwise reshape to combine dimensions
                 x = x.reshape(batch_size, channels, height * extra_dim, width)
-                
         
-        
-        # Forward pass
-        # For ViT models, we need to pass the input as pixel_values
-        if is_vit_model:
-            outputs = self.model(pixel_values=x)
-        else:
-            # For other models, pass the input directly
-            outputs = self.model(x)
-
+        # Forward pass - simply pass the input to the model
+        # The model itself now handles the correct input parameter names
+        outputs = self.model(x)
             
         # If we're using an AST model and get an error, try one more approach
         if is_ast_model:                    
@@ -211,7 +192,7 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
-        # For ViT models, the output is a sequence classification output with logits
+        # For transformer models that return a sequence classification output
         if hasattr(y_pred, 'logits'):
             y_pred = y_pred.logits
         
@@ -282,7 +263,7 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
-        # For ViT models, the output is a sequence classification output with logits
+        # For transformer models that return a sequence classification output
         if hasattr(y_pred, 'logits'):
             y_pred = y_pred.logits
         
@@ -336,7 +317,7 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
-        # For ViT models, the output is a sequence classification output with logits
+        # For transformer models that return a sequence classification output
         if hasattr(y_pred, 'logits'):
             y_pred = y_pred.logits
         
@@ -355,7 +336,7 @@ class AudioClassifier(pl.LightningModule):
         # Log metrics - ensure they appear in progress bar and are formatted consistently
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True)
         
@@ -373,7 +354,7 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
-        # For ViT models, the output is a sequence classification output with logits
+        # For transformer models that return a sequence classification output
         if hasattr(y_pred, 'logits'):
             y_pred = y_pred.logits
         
