@@ -83,62 +83,50 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
-            # Fix for AST model with ModulesToSaveWrapper
+            # Simplified fix for AST model with ModulesToSaveWrapper
             if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
-                print("Detected AST model with ModulesToSaveWrapper")
-                
-                if hasattr(model.classifier, 'dense'):
-                    print("classifier already has attribute dense")
-                elif hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
-                    model.classifier.dense = model.classifier.modules_to_save.default.dense
-                    print("Created direct reference to classifier.dense from modules_to_save.default for PEFT compatibility")
-                else:
-                    # Fallback: assign the first linear layer found in classifier as dense
-                    for module in model.classifier.modules():
-                        if isinstance(module, nn.Linear):
-                            model.classifier.dense = module
-                            print("Fallback: Set classifier.dense from first linear layer found in classifier")
-                            break
+                print("[DEBUG] Detected AST model with ModulesToSaveWrapper")
+                if not hasattr(model.classifier, 'dense'):
+                    if hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
+                        model.classifier.dense = model.classifier.modules_to_save.default.dense
+                        print("[DEBUG] Assigned classifier.dense from classifier.modules_to_save.default.dense")
                     else:
-                        print("Warning: Could not find a dense layer to set for classifier")
+                        print("[DEBUG] classifier.modules_to_save.default.dense not found. Cannot assign dense automatically.")
+                else:
+                    print("[DEBUG] classifier already has attribute dense")
                 
                 if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
                     model.dense = model.classifier.original_module.dense
-                    print("Created direct reference to classifier.original_module.dense for PEFT compatibility")
+                    print("[DEBUG] Assigned model.dense from classifier.original_module.dense")
+            else:
+                print("[DEBUG] Model does not have classifier.modules_to_save attribute. Skipping AST-specific dense assignment.")
             
-            # Update target_modules to include the correct path for 'dense'
+            # Simplified update of target_modules for dense
             if hasattr(peft_config, 'target_modules') and 'dense' in peft_config.target_modules:
                 new_target_modules = []
                 for module_name in peft_config.target_modules:
                     if module_name == 'dense':
                         new_target_modules.append(module_name)
                         new_target_modules.append('classifier.dense')
+                        print("[DEBUG] Added 'classifier.dense' to target_modules")
                     else:
                         new_target_modules.append(module_name)
                 peft_config.target_modules = new_target_modules
-                print(f"Updated target_modules for AST model: {new_target_modules}")
+                print(f"[DEBUG] Updated target_modules: {new_target_modules}")
             
-            # Generic approach to handle ModulesToSaveWrapper issue
-            def expose_attributes(module, prefix=""):
+            # Minimal attribute exposure
+            def expose_attributes(module):
                 if hasattr(module, 'original_module'):
                     for name, child in module.original_module.named_children():
                         if not hasattr(module, name):
                             setattr(module, name, child)
-                    for name in dir(module.original_module):
-                        if not name.startswith('_') and not hasattr(module, name):
-                            try:
-                                setattr(module, name, getattr(module.original_module, name))
-                            except (AttributeError, TypeError):
-                                pass
                 for name, child in module.named_children():
-                    new_prefix = f"{prefix}.{name}" if prefix else name
-                    expose_attributes(child, new_prefix)
-
+                    expose_attributes(child)
             expose_attributes(model)
             
             model = get_peft_model(model, peft_config)
         except Exception as e:
-            print(f"Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
+            print(f"[ERROR] Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
             raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
