@@ -24,6 +24,7 @@ from configs.peft_config import (
     OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig, BitFitConfig
 )
 from models.ssf_adapter import apply_ssf_to_model
+import traceback
 
 
 def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: GeneralConfig) -> nn.Module:
@@ -83,40 +84,85 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
-            # Generic approach to handle ModulesToSaveWrapper issue
-            # This will work for any model that uses ModulesToSaveWrapper
-            # Recursively expose attributes from original_module to parent wrapper
-            def expose_attributes(module, prefix=""):
-                if hasattr(module, 'original_module'):
-                    # For each attribute in the original module, expose it to the wrapper
-                    for name, child in module.original_module.named_children():
-                        # Skip if the attribute already exists
-                        if not hasattr(module, name):
-                            setattr(module, name, child)
-                    
-                    # Also expose methods and attributes that aren't modules
-                    for name in dir(module.original_module):
-                        if not name.startswith('_') and not hasattr(module, name):
-                            try:
-                                setattr(module, name, getattr(module.original_module, name))
-                            except (AttributeError, TypeError):
-                                # Skip if we can't set the attribute
-                                pass
+            # Build target_modules list from reliable full module paths
+            new_target_modules = []
+            found_classifier = False
+            
+            # Collect all Linear layers with their full paths
+            for name, module in model.named_modules():
+                if isinstance(module, nn.Linear):
+                    # Only add modules with valid names (no ModulesToSaveWrapper in path)
+                    if 'ModulesToSaveWrapper' not in name:
+                        new_target_modules.append(name)
+                        
+                        # Track if we found the classifier.dense
+                        if name == 'classifier.dense':
+                            found_classifier = True
+            
+            # If classifier.dense wasn't found but we need it
+            if not found_classifier and hasattr(model, 'classifier'):
+                # Handle the case where classifier is a ModulesToSaveWrapper
+                if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
+                    if isinstance(model.classifier.original_module.dense, nn.Linear):
+                        new_target_modules.append('classifier.original_module.dense')
                 
-                # Recursively process child modules
-                for name, child in module.named_children():
-                    new_prefix = f"{prefix}.{name}" if prefix else name
-                    expose_attributes(child, new_prefix)
+                # Also try modules_to_save path
+                if hasattr(model.classifier, 'modules_to_save'):
+                    for key, module in model.classifier.modules_to_save.items():
+                        if hasattr(module, 'dense') and isinstance(module.dense, nn.Linear):
+                            path = f'classifier.modules_to_save.{key}.dense'
+                            new_target_modules.append(path)
             
-            # Apply the attribute exposure to the model
-            expose_attributes(model)
+            # Override peft_config's target_modules with our new list
+            peft_config.target_modules = new_target_modules
             
-            # get peft model given peft config
+            # De-duplicate target modules
+            seen = set()
+            unique_modules = []
+            for module in peft_config.target_modules:
+                if module not in seen:
+                    seen.add(module)
+                    unique_modules.append(module)
+            peft_config.target_modules = unique_modules
+            
+            # Create a mapping of model attribute paths
+            def set_attribute_path_mapping(model):
+                """Create an attribute map to help PEFT find modules directly"""
+                module_map = {}
+                for name, module in model.named_modules():
+                    if isinstance(module, nn.Linear):
+                        # Store the direct reference to this module
+                        module_map[name] = module
+                
+                # Attach this map to the model for PEFT to use
+                if not hasattr(model, '_peft_path_map'):
+                    model._peft_path_map = module_map
+            
+            # Apply the path mapping to help PEFT
+            set_attribute_path_mapping(model)
+            
+            # Monkey patch get_submodule to use our map if it exists
+            original_get_submodule = nn.Module.get_submodule
+            
+            def patched_get_submodule(self, target):
+                """Patched get_submodule that checks our path map first"""
+                if hasattr(self, '_peft_path_map') and target in self._peft_path_map:
+                    return self._peft_path_map[target]
+                return original_get_submodule(self, target)
+            
+            # Apply the monkey patch
+            nn.Module.get_submodule = patched_get_submodule
+            
+            # Get PEFT model with the updated configuration
             model = get_peft_model(model, peft_config)
+            
+            # Restore original method after we're done
+            nn.Module.get_submodule = original_get_submodule
+            
         except Exception as e:
-            # Log the error but continue with the original model
-            print(f"Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
-
+            # In case of error, restore original get_submodule if we patched it
+            if 'original_get_submodule' in locals():
+                nn.Module.get_submodule = original_get_submodule
             raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
@@ -127,6 +173,56 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     print(f"Trainable parameters: {trainable_params:,} ({trainable_params/total_params:.2%} of {total_params:,} total)")
     
     return model
+
+
+def update_classifier(model, num_classes):
+    """
+    Update the classifier of a model to match the specified number of classes.
+    Works with various model architectures by handling different classifier structures.
+    """
+    # Update the model config
+    if hasattr(model, 'config'):
+        model.config.num_labels = num_classes
+    
+    # Handle direct classifier
+    if hasattr(model, 'classifier'):
+        # Case 1: Simple classifier with dense attribute
+        if hasattr(model.classifier, 'dense') and isinstance(model.classifier.dense, nn.Linear):
+            in_features = model.classifier.dense.in_features
+            model.classifier.dense = nn.Linear(in_features, num_classes)
+            print(f"Updated classifier.dense: {in_features} -> {num_classes}")
+        
+        # Case 2: ModulesToSaveWrapper with original_module
+        elif hasattr(model.classifier, 'original_module'):
+            if hasattr(model.classifier.original_module, 'dense') and isinstance(model.classifier.original_module.dense, nn.Linear):
+                in_features = model.classifier.original_module.dense.in_features
+                model.classifier.original_module.dense = nn.Linear(in_features, num_classes)
+                print(f"Updated classifier.original_module.dense: {in_features} -> {num_classes}")
+        
+        # Case 3: ModulesToSaveWrapper with modules_to_save
+        elif hasattr(model.classifier, 'modules_to_save'):
+            for key in model.classifier.modules_to_save:
+                module = model.classifier.modules_to_save[key]
+                if hasattr(module, 'dense') and isinstance(module.dense, nn.Linear):
+                    in_features = module.dense.in_features
+                    module.dense = nn.Linear(in_features, num_classes)
+                    print(f"Updated classifier.modules_to_save.{key}.dense: {in_features} -> {num_classes}")
+    
+    # Handle other classifier structures
+    else:
+        # Look for classifier-like modules
+        for name, module in model.named_modules():
+            if 'classifier' in name.lower() or 'head' in name.lower() or 'output' in name.lower():
+                if isinstance(module, nn.Linear) and module.out_features != num_classes:
+                    in_features = module.in_features
+                    parent_name = '.'.join(name.split('.')[:-1])
+                    module_name = name.split('.')[-1]
+                    parent = model
+                    for part in parent_name.split('.'):
+                        if part:
+                            parent = getattr(parent, part)
+                    setattr(parent, module_name, nn.Linear(in_features, num_classes))
+                    print(f"Updated {name}: {in_features} -> {num_classes}")
 
 
 class TransformerModel:
@@ -148,80 +244,75 @@ class TransformerModel:
             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
             stream=sys.stdout
         )
-        logger = logging.getLogger("AST_MODEL")
         
-        pretrained_AST_model="MIT/ast-finetuned-audioset-10-10-0.4593"
-
+        # Create a logger for this function
+        logger = logging.getLogger("AST_Model_Creation")
+        logger.setLevel(logging.DEBUG)
+        
+        # Define the pretrained model to use
+        pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
+        
         try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, attn_implementation="sdpa", cache_dir=CACHE_DIR, local_files_only=True)
+            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
             model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
         
-        model.config.num_labels = num_classes
+        # Update the classifier to match our number of classes
+        update_classifier(model, num_classes)
         
-        # Update the classifier in a generic way that works with any structure
-        def update_classifier(module, in_features=None):
-            # If this is a Linear layer with the right output dimension, update it
-            if isinstance(module, nn.Linear) and hasattr(module, 'out_features'):
-                if module.out_features != num_classes:
-                    if in_features is None:
-                        in_features = module.in_features
-                    return nn.Linear(in_features, num_classes)
-            return module
+        # Special handling for AST model with ModulesToSaveWrapper
+        if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
+            # For AST models with ModulesToSaveWrapper, we need to ensure the classifier
+            # is properly set up for PEFT
+            print("Setting up AST model classifier for PEFT compatibility")
+            
+            # Create direct references to the dense layer in the classifier
+            # This is crucial for PEFT to find the dense layer
+            if hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
+                # Create a direct reference to the dense layer
+                model.classifier.dense = model.classifier.modules_to_save.default.dense
+                print("Created direct reference to classifier.dense for PEFT compatibility")
+            
+            # Also create a reference in the original_module if it exists
+            if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
+                model.dense = model.classifier.original_module.dense
+                print("Created direct reference to classifier.original_module.dense for PEFT compatibility")
         
-        # Find and update the classifier
-        if hasattr(model, 'classifier'):
-            # Handle direct classifier
-            if hasattr(model.classifier, 'dense') and isinstance(model.classifier.dense, nn.Linear):
-                in_features = model.classifier.dense.in_features
-                model.classifier.dense = nn.Linear(in_features, num_classes)
-            # Handle wrapped classifier
-            elif hasattr(model.classifier, 'original_module'):
-                if hasattr(model.classifier.original_module, 'dense') and isinstance(model.classifier.original_module.dense, nn.Linear):
-                    in_features = model.classifier.original_module.dense.in_features
-                    model.classifier.original_module.dense = nn.Linear(in_features, num_classes)
-        
-        # Get the expected sequence length from the position embeddings
-        expected_seq_length = model.audio_spectrogram_transformer.embeddings.position_embeddings.shape[1]
-        logger.debug(f"Expected sequence length from position embeddings: {expected_seq_length}")
-        
-        # Save original embeddings forward method
-        original_embeddings_forward = model.audio_spectrogram_transformer.embeddings.forward
-        
-        # Define a new embeddings forward method to handle sequence length mismatch
+        # Define a new forward method for the embeddings to handle our input format
         def new_embeddings_forward(self, input_values):
-            logger.debug(f"Embeddings input shape: {input_values.shape}")
+            # Original code from AST model
+            batch_size = input_values.shape[0]
+            
+            if input_values.dim() > 4:
+                raise ValueError(f"Input has {input_values.dim()} dimensions, expected 4 dimensions")
+            
+            # When we have a 3D input (batch_size, channels, sequence), we need to add the height dimension
+            if input_values.dim() == 3:
+                # Reshape to (batch_size, channels, height=1, width=sequence)
+                input_values = input_values.unsqueeze(2)
             
             # Get patch embeddings
             embeddings = self.patch_embeddings(input_values)
-            logger.debug(f"Patch embeddings shape: {embeddings.shape}")
             
-            # Check if sequence length matches expected length
+            # Check if sequence length matches expected length for position embeddings
+            expected_seq_length = self.position_embeddings.shape[1]
             current_seq_length = embeddings.shape[1]
             
             if current_seq_length != expected_seq_length:
-                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
-                
-                # Use a deterministic approach instead of interpolation
-                # We'll use a learned projection layer to change the sequence length
-                if not hasattr(self, 'seq_adapter'):
-                    # Create a sequence adapter if it doesn't exist
-                    # This is a simple linear layer that projects from current_seq_length to expected_seq_length
-                    self.seq_adapter = torch.nn.Linear(
-                        current_seq_length, 
-                        expected_seq_length
-                    ).to(embeddings.device)
-                    logger.debug("Created sequence adapter layer")
-                
-                # Apply the sequence adapter
-                # [batch_size, seq_len, hidden_dim] -> [batch_size, hidden_dim, seq_len]
-                embeddings = embeddings.transpose(1, 2)
-                # Apply linear projection to change sequence length
-                embeddings = self.seq_adapter(embeddings)
-                # [batch_size, hidden_dim, seq_len] -> [batch_size, seq_len, hidden_dim]
+                # Use interpolation to adapt embeddings to the expected sequence length
+                # First transpose to [batch_size, hidden_dim, seq_len]
                 embeddings = embeddings.transpose(1, 2)
                 
-                logger.debug(f"Adapted embeddings shape: {embeddings.shape}")
+                # Use 1D interpolation to get the correct sequence length
+                embeddings = F.interpolate(
+                    embeddings, 
+                    size=expected_seq_length, 
+                    mode='linear', 
+                    align_corners=False
+                )
+                
+                # Transpose back to [batch_size, seq_len, hidden_dim]
+                embeddings = embeddings.transpose(1, 2)
             
             # Add position embeddings
             embeddings = embeddings + self.position_embeddings
@@ -247,47 +338,29 @@ class TransformerModel:
             if x is None:
                 raise ValueError("Either x or input_ids must be provided to the forward method")
                 
-            # Debug logging
-            logger.debug(f"AST model input shape before processing: {x.shape}")
-            
             # Check if input has 5 dimensions [batch, channels, height, extra_dim, width]
             if len(x.shape) == 5:
-                logger.debug(f"Detected 5D input tensor with shape: {x.shape}")
-                
                 # Get the dimensions
                 batch_size, channels, height, extra_dim, width = x.shape
                 
                 # Reshape to 4D tensor that conv2d can accept
-                # We need to reshape from [batch, channels, height, extra_dim, width] to [batch, channels, height*extra_dim, width]
                 try:
                     x = x.reshape(batch_size, channels, height * extra_dim, width)
-                    logger.debug(f"Reshaped tensor to: {x.shape}")
-                except Exception as e:
-                    logger.error(f"Error reshaping tensor: {e}")
-                    
+                except Exception:
                     # Alternative approach: try to squeeze out the extra dimension if it's 1
                     if extra_dim == 1:
                         try:
                             x = x.squeeze(3)  # Remove the 4th dimension (index 3)
-                            logger.debug(f"Squeezed tensor to: {x.shape}")
-                        except Exception as e2:
-                            logger.error(f"Error squeezing tensor: {e2}")
-                            
+                        except Exception:
                             # Last resort: try to view the tensor differently
                             try:
                                 x = x.view(batch_size, channels, height, width)
-                                logger.debug(f"Viewed tensor as: {x.shape}")
-                            except Exception as e3:
-                                logger.error(f"Error viewing tensor: {e3}")
-            
-            # Final shape check before passing to original forward
-            logger.debug(f"Final tensor shape before original forward: {x.shape}")
+                            except Exception:
+                                pass
             
             try:
                 return original_forward(x)
             except Exception as e:
-                logger.error(f"Error in original_forward: {e}")
-                logger.error(f"Input tensor shape: {x.shape}")
                 raise
         
         # Replace the forward method
@@ -297,44 +370,46 @@ class TransformerModel:
         original_patch_embeddings_forward = model.audio_spectrogram_transformer.embeddings.patch_embeddings.forward
         
         def new_patch_embeddings_forward(self, input_values):
-            logger.debug(f"Patch embeddings input shape: {input_values.shape}")
+            # logger.debug(f"Patch embeddings input shape: {input_values.shape}")
             
             # Handle 5D input directly at the patch embeddings level
             if len(input_values.shape) == 5:
-                logger.debug("Fixing 5D input at patch embeddings level")
+                # logger.debug("Fixing 5D input at patch embeddings level")
                 batch_size, channels, height, extra_dim, width = input_values.shape
                 
                 # Try different approaches
                 if extra_dim == 1:
                     # If extra dimension is 1, just squeeze it out
                     input_values = input_values.squeeze(3)
-                    logger.debug(f"Squeezed to shape: {input_values.shape}")
+                    # logger.debug(f"Squeezed to shape: {input_values.shape}")
                 else:
                     # Otherwise reshape
                     try:
                         input_values = input_values.reshape(batch_size, channels, height * extra_dim, width)
-                        logger.debug(f"Reshaped to: {input_values.shape}")
+                        # logger.debug(f"Reshaped to: {input_values.shape}")
                     except Exception as e:
-                        logger.error(f"Error reshaping in patch embeddings: {e}")
+                        pass
+                        # logger.error(f"Error reshaping in patch embeddings: {e}")
             
             # Call original method with fixed input
             try:
                 result = original_patch_embeddings_forward(input_values)
-                logger.debug(f"Patch embeddings output shape: {result.shape}")
+                # logger.debug(f"Patch embeddings output shape: {result.shape}")
                 return result
             except Exception as e:
-                logger.error(f"Error in original patch embeddings forward: {e}")
-                logger.error(f"Input shape: {input_values.shape}")
+                # logger.error(f"Error in original patch embeddings forward: {e}")
+                # logger.error(f"Input shape: {input_values.shape}")
                 # Try one more approach if it fails
                 if len(input_values.shape) == 4:
-                    logger.debug("Attempting alternative approach for 4D input")
+                    # logger.debug("Attempting alternative approach for 4D input")
                     # Try to use the projection directly
                     try:
                         result = self.projection(input_values).flatten(2).transpose(1, 2)
-                        logger.debug(f"Direct projection successful, shape: {result.shape}")
+                        # logger.debug(f"Direct projection successful, shape: {result.shape}")
                         return result
                     except Exception as e2:
-                        logger.error(f"Direct projection failed: {e2}")
+                        pass
+                        # logger.error(f"Direct projection failed: {e2}")
                 raise
         
         # Replace the patch embeddings forward method
