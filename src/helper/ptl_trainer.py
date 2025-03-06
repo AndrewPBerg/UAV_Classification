@@ -339,6 +339,16 @@ class PTLTrainer:
                     print(f"{metric_name:<20} {value:.2f}")
             
             print("="*80 + "\n")
+            
+            # Log final test metrics to wandb summary
+            if self.wandb_logger:
+                for metric_name in test_metric_order:
+                    if metric_name in test_results[0]:
+                        value = test_results[0][metric_name]
+                        if isinstance(value, torch.Tensor):
+                            value = value.item()
+                        # Add to wandb summary
+                        self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
         
         # Run inference on the inference split if available
         inference_results = {}
@@ -382,10 +392,13 @@ class PTLTrainer:
                     
                     print("="*80 + "\n")
                 
-                # Log inference results
+                # Log inference results to wandb summary
                 if self.wandb_logger and inference_results:
                     for key, value in inference_results.items():
+                        # Log to metrics (regular logging)
                         self.wandb_logger.log_metrics({key: value})
+                        # Also add to wandb summary
+                        self.wandb_logger.experiment.summary[f"final_{key}"] = value
             else:
                 print("No inference data available, skipping inference evaluation.")
         except Exception as e:
@@ -411,6 +424,20 @@ class PTLTrainer:
         if inference_results:
             for key, value in inference_results.items():
                 results_dict[key] = value
+        
+        # Log best validation metrics to wandb summary
+        if self.wandb_logger and hasattr(lightning_module, 'best_val_accuracy'):
+            self.wandb_logger.experiment.summary['final_best_val_acc'] = lightning_module.best_val_accuracy
+            
+            # Log other best validation metrics if available
+            if hasattr(lightning_module, 'best_val_f1'):
+                self.wandb_logger.experiment.summary['final_best_val_f1'] = lightning_module.best_val_f1
+            
+            if hasattr(lightning_module, 'best_val_precision'):
+                self.wandb_logger.experiment.summary['final_best_val_precision'] = lightning_module.best_val_precision
+                
+            if hasattr(lightning_module, 'best_val_recall'):
+                self.wandb_logger.experiment.summary['final_best_val_recall'] = lightning_module.best_val_recall
         
         # Print a summary of all metrics at the end
         print("\n" + "="*80)
@@ -585,65 +612,6 @@ class PTLTrainer:
             traceback.print_exc()
             return {}
         
-        # Create confusion matrix
-        try:
-            # We still need to collect predictions to create the confusion matrix
-            all_preds = []
-            all_targets = []
-            
-            for batch_preds in predictions:
-                batch_pred_classes, batch_targets = batch_preds
-                all_preds.append(batch_pred_classes)
-                all_targets.append(batch_targets)
-            
-            # Concatenate all batches
-            all_preds = torch.cat(all_preds)
-            all_targets = torch.cat(all_targets)
-            
-            # Ensure tensors are on the same device
-            all_preds = all_preds.to(device)
-            all_targets = all_targets.to(device)
-            
-            # Create confusion matrix
-            from torchmetrics.functional.classification import confusion_matrix
-            conf_mat = confusion_matrix(
-                all_preds, all_targets, num_classes=num_classes, task="multiclass"
-            ).cpu().numpy()
-            
-            # Log confusion matrix if wandb is enabled
-            if self.wandb_logger:
-                import wandb
-                import matplotlib.pyplot as plt
-                import seaborn as sns
-                
-                # Get class names if available
-                class_names = None
-                try:
-                    _, _, idx_to_class = self.data_module.get_class_info()
-                    class_names = [idx_to_class[i] for i in range(num_classes)]
-                except (AttributeError, KeyError):
-                    class_names = [str(i) for i in range(num_classes)]
-                
-                # Create confusion matrix plot
-                plt.figure(figsize=(10, 8))
-                sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',
-                            xticklabels=class_names, yticklabels=class_names)
-                plt.xlabel('Predicted')
-                plt.ylabel('True')
-                plt.title('Inference Confusion Matrix')
-                
-                # Log to wandb
-                self.wandb_logger.experiment.log({
-                    "inference_confusion_matrix": wandb.Image(plt),
-                    "final_inference_accuracy": metrics["inference_acc"],
-                    "final_inference_precision": metrics["inference_precision"],
-                    "final_inference_recall": metrics["inference_recall"],
-                    "final_inference_f1": metrics["inference_f1"]
-                })
-                plt.close()
-        except Exception as e:
-            print(f"Error creating confusion matrix: {str(e)}")
-        
         return metrics
     
     def k_fold_cross_validation(self) -> Dict[str, Any]:
@@ -782,19 +750,6 @@ class PTLTrainer:
                 CustomFoldProgressBar()
             ]
             
-            # # Create trainer for this fold
-            # trainer = pl.Trainer(
-            #     max_epochs=self.general_config.epochs,
-            #     accelerator="gpu" if self.gpu_available else "cpu",
-            #     devices=1,  # Always use a single device
-            #     callbacks=fold_callbacks,
-            #     logger=self.wandb_logger,
-            #     gradient_clip_val=1.0,
-            #     accumulate_grad_batches=self.general_config.accumulation_steps,
-            #     deterministic=True,
-            #     precision="16-mixed" if self.gpu_available else "32"
-            # )
-            
             trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
@@ -866,14 +821,14 @@ class PTLTrainer:
             
             # Log final metrics for this fold to WandB
             if self.general_config.use_wandb:
-                wandb.log({
-                    f"fold_{fold+1}_final_val_acc": val_acc,
-                    f"fold_{fold+1}_final_val_loss": val_loss,
-                    f"fold_{fold+1}_final_val_f1": val_f1,
-                    f"fold_{fold+1}_final_val_precision": val_precision,
-                    f"fold_{fold+1}_final_val_recall": val_recall
-                })
-            
+                fold_data = {
+                    "val_acc": val_acc,
+                    "val_loss": val_loss,
+                    "val_f1": val_f1,
+                    "val_precision": val_precision,
+                    "val_recall": val_recall
+                }
+
             # Run inference evaluation for this fold if available
             try:
                 # Check if inference dataset exists and has samples
@@ -922,11 +877,16 @@ class PTLTrainer:
                     # Log inference results to wandb
                     if self.general_config.use_wandb:
                         for key, value in inference_results.items():
-                            wandb.log({f"fold_{fold+1}_{key}": value})
+                            fold_data[key] = value # add to fold_data dict
                 else:
                     print(f"No inference data available for fold {fold+1}, skipping inference evaluation.")
             except Exception as e:
                 print(f"Error during inference for fold {fold+1}: {str(e)}")
+
+            if self.general_config.use_wandb:
+                # Create a wandb Table for the fold
+                fold_table = wandb.Table(data=[[key, val] for key, val in fold_data.items()], columns=["Metric", "Value"])
+                wandb.log({f"fold_{fold+1}_metrics": fold_table})
         
         # Calculate average metrics across all folds
         avg_metrics = self._calculate_average_metrics(all_fold_results)
@@ -945,9 +905,25 @@ class PTLTrainer:
         print("="*80 + "\n")
         
         # Log average metrics to wandb
-        if self.general_config.use_wandb:
+        if self.wandb_logger:
+            # Log average metrics, but only to the summary
             for key, value in avg_metrics.items():
-                wandb.log({f"avg_{key}": value})
+                if key.startswith("average_") or key.startswith("std_"):
+                    self.wandb_logger.experiment.summary[f"final_{key}"] = value
+        
+        # Log best validation metrics from the best fold
+        if best_model is not None and hasattr(best_model, 'best_val_accuracy') and self.wandb_logger:
+            self.wandb_logger.experiment.summary['final_best_fold_val_acc'] = best_model.best_val_accuracy
+            
+            # Log other best validation metrics if available
+            if hasattr(best_model, 'best_val_f1'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_f1'] = best_model.best_val_f1
+            
+            if hasattr(best_model, 'best_val_precision'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_precision'] = best_model.best_val_precision
+                
+            if hasattr(best_model, 'best_val_recall'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_recall'] = best_model.best_val_recall
         
         # Save best model if enabled
         if self.general_config.save_model and best_model is not None:
@@ -956,11 +932,67 @@ class PTLTrainer:
             model_name = f"{self.general_config.model_type}_kfold_best.pt"
             torch.save(best_model.model.state_dict(), str(model_path / model_name))
         
-        return {
+        # Create the results dictionary
+        results = {
             "fold_results": all_fold_results,
-            "avg_metrics": avg_metrics,
-            "best_model": best_model
+            "avg_metrics": avg_metrics
         }
+        
+        # After creating the results dictionary
+        # Print and log the average metrics across all folds
+        for key, value in results['avg_metrics'].items():
+            if isinstance(value, torch.Tensor):
+                results['avg_metrics'][key] = value.item()
+            
+        # Print average metrics as a table
+        metric_order = ['average_val_loss', 'average_val_acc', 'average_val_f1', 'average_val_precision', 'average_val_recall']
+        
+        # Add inference metrics to the order if they exist
+        inference_metrics = [k for k in results['avg_metrics'].keys() if k.startswith('average_inference_')]
+        metric_order.extend(sorted(inference_metrics))
+        
+        # Print the table header
+        print("\n" + "="*80)
+        print("AVERAGE METRICS ACROSS ALL FOLDS")
+        print("="*80)
+        print(f"{'Metric':<30} {'Value':<10} {'Std':<10}")
+        print("-"*50)
+        
+        # Print the metrics in order
+        for key in metric_order:
+            if key in results['avg_metrics']:
+                value = results['avg_metrics'][key]
+                std_key = key.replace('average_', 'std_')
+                std = results['avg_metrics'].get(std_key, 0.0)
+                
+                # Format the metric name for better readability
+                pretty_name = key.replace('average_', '').replace('_', ' ').title()
+                print(f"{pretty_name:<30} {value:.4f} {std:.4f}")
+        
+        print("="*80 + "\n")
+        
+        # Log average metrics to WandB
+        if self.wandb_logger:
+            for key, value in results['avg_metrics'].items():
+                # Log all average metrics to the summary
+                self.wandb_logger.experiment.summary[f"final_{key}"] = value
+        
+        # Log best validation metrics from the best fold
+        if best_model is not None and hasattr(best_model, 'best_val_accuracy') and self.wandb_logger:
+            self.wandb_logger.experiment.summary['final_best_fold_val_acc'] = best_model.best_val_accuracy
+            
+            # Log other best validation metrics if available
+            if hasattr(best_model, 'best_val_f1'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_f1'] = best_model.best_val_f1
+            
+            if hasattr(best_model, 'best_val_precision'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_precision'] = best_model.best_val_precision
+                
+            if hasattr(best_model, 'best_val_recall'):
+                self.wandb_logger.experiment.summary['final_best_fold_val_recall'] = best_model.best_val_recall
+        
+        # Return results dict
+        return results
     
     def _calculate_average_metrics(self, fold_results: List[Dict[str, Any]]) -> Dict[str, float]:
         """
@@ -997,8 +1029,8 @@ class PTLTrainer:
                 avg_value = sum(values) / len(values)
                 std_value = np.std(values) if len(values) > 1 else 0.0
                 
-                # Store average and standard deviation
-                avg_metrics[f"avg_{key}"] = avg_value
+                # Store average and standard deviation - use 'average_' prefix instead of 'avg_'
+                avg_metrics[f"average_{key}"] = avg_value
                 avg_metrics[f"std_{key}"] = std_value
         
         return avg_metrics

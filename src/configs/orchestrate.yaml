@@ -9,11 +9,11 @@ runs:
     type: script
     changes:
       wandb:
-        project: big-sweep-test-3-6
-        name: should-be-ignored
+        project: testing-metrics-kfold
+        name: base-case-kfold
       general:
         model_type: resnet18
-        use_wandb: false
+        use_wandb: true
         use_sweep: false
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_9
@@ -21,25 +21,25 @@ runs:
         adapter_type: none-classifier
         sweep_count: 10
         epochs: 2
-      # sweep:
-      #   project: big-sweep-test-3-6
-      #   name: resnet18-classifier-sweep
-      #   method: random
-      #   metric:
-      #     name: test_acc
-      #     goal: maximize
-      #   parameters:
-      #     seed:
-      #       values:
-      #       - 42
-      #       - 43
-      #       - 44
-      #       - 45
-      #       - 46
-      #     learning_rate:
-      #       values:
-      #       - 0.001
-      #       - 0.002
-      #       - 0.003
-      #       - 0.004
+      sweep:
+        project: testing-metrics
+        name: resnet18-sweep-metrics
+        method: random
+        metric:
+          name: test_acc
+          goal: maximize
+        parameters:
+          seed:
+            values:
+            - 42
+            - 43
+            - 44
+            - 45
+            - 46
+          learning_rate:
+            values:
+            - 0.001
+            - 0.002
+            - 0.003
+            - 0.004
   
