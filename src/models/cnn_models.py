@@ -218,8 +218,16 @@ def apply_peft(model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module
             r=peft_config.r,
             alpha=peft_config.alpha,
             dropout=peft_config.dropout,
-            target_modules=peft_config.target_modules if peft_config.target_modules else None
+            target_modules=peft_config.target_modules
         )
+        
+        # Print information about applied LoRAC layers
+        if hasattr(model, 'lorac_layers') and len(model.lorac_layers) > 0:
+            print(f"Applied LoRAC to {len(model.lorac_layers)} layers:")
+            for name in model.lorac_layers.keys():
+                print(f"  - {name}")
+        else:
+            print("Warning: No LoRAC layers were applied to the model.")
     
     else:
         raise ValueError(f"Unsupported PEFT configuration type: {type(peft_config).__name__}")

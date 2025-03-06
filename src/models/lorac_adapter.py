@@ -244,19 +244,29 @@ def apply_lorac_to_model(
     Returns:
         Model with LoRA-C applied
     """
-    # If no target modules specified, apply to all Conv2d layers
-    if target_modules is None:
-        target_modules = []
-        for name, module in model.named_modules():
-            if isinstance(module, nn.Conv2d):
-                target_modules.append(name)
-    
     # Dictionary to store LoRA-C layers
     lorac_layers = {}
     
+    # If no target modules specified, apply to all Conv2d layers
+    if target_modules is None or len(target_modules) == 0:
+        target_modules_list = []
+        for name, module in model.named_modules():
+            if isinstance(module, nn.Conv2d):
+                target_modules_list.append(name)
+    else:
+        # Convert target_modules to lowercase for case-insensitive matching
+        target_modules_lower = [module.lower() for module in target_modules]
+        target_modules_list = []
+        
+        # Find all modules that match the target module types
+        for name, module in model.named_modules():
+            module_type = module.__class__.__name__.lower()
+            if any(target_type.lower() in module_type for target_type in target_modules_lower) and isinstance(module, nn.Conv2d):
+                target_modules_list.append(name)
+    
     # Replace target modules with LoRA-C layers
     for name, module in model.named_modules():
-        if name in target_modules and isinstance(module, nn.Conv2d):
+        if name in target_modules_list:
             parent_name = '.'.join(name.split('.')[:-1])
             child_name = name.split('.')[-1]
             
