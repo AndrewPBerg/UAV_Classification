@@ -13,7 +13,7 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: efficientnet_b0
         use_wandb: false
         epochs: 2
         data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
@@ -27,7 +27,7 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: efficientnet_b0 
         use_wandb: false
         epochs: 2
         data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
@@ -46,7 +46,7 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: efficientnet_b0
         use_wandb: false
         epochs: 2
         data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
@@ -64,7 +64,7 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet50
+        model_type: efficientnet_b0
         use_wandb: false
         epochs: 2
         data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
@@ -87,7 +87,7 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet152
+        model_type: efficientnet_b0
         use_wandb: false
         epochs: 2
         data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
