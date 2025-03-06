@@ -522,7 +522,7 @@ class TransformerModel:
         
         def new_forward(self, pixel_values=None, input_ids=None, inputs_embeds=None, x=None, **kwargs):
             """
-            Custom forward method that handles different input parameter names.
+            Custom forward method that handles different input parameter names and is compatible with PEFT.
             
             This method accepts all common input parameter names and routes them correctly:
             - pixel_values: Standard ViT input name
@@ -530,10 +530,10 @@ class TransformerModel:
             - inputs_embeds: Used by some transformer models
             - x: Generic input used in many custom implementations
             """
-            # Print debug information about the inputs
-            # print(f"ViT received inputs: pixel_values={pixel_values is not None}, "
-            #       f"input_ids={input_ids is not None}, inputs_embeds={inputs_embeds is not None}, "
-            #       f"x={x is not None}")
+            # Add debug information
+            print(f"ViT model forward called with: pixel_values={pixel_values is not None}, "
+                  f"input_ids={input_ids is not None}, x={x is not None}, "
+                  f"inputs_embeds={inputs_embeds is not None}, kwargs={list(kwargs.keys())}")
             
             # Determine which input to use
             if pixel_values is not None:
@@ -547,12 +547,32 @@ class TransformerModel:
             else:
                 raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
             
-            # Call the original forward method with the correct input
-            return original_forward(pixel_values=actual_input, **kwargs)
+            # Strip out all kwargs except those definitely supported by the ViT model
+            # This avoids errors from PEFT or other wrappers adding unexpected arguments
+            vit_kwargs = {}
+            
+            # Only pass these specific kwargs to the original forward method
+            if 'labels' in kwargs:
+                vit_kwargs['labels'] = kwargs['labels']
+            if 'head_mask' in kwargs:
+                vit_kwargs['head_mask'] = kwargs['head_mask']
+            if 'output_attentions' in kwargs:
+                vit_kwargs['output_attentions'] = kwargs['output_attentions']
+            if 'output_hidden_states' in kwargs:
+                vit_kwargs['output_hidden_states'] = kwargs['output_hidden_states']
+            if 'return_dict' in kwargs:
+                vit_kwargs['return_dict'] = kwargs['return_dict']
+            
+            # Log what we're actually passing to the model
+            print(f"Passing to ViT: pixel_values={actual_input.shape if isinstance(actual_input, torch.Tensor) else None}, " 
+                  f"kwargs={list(vit_kwargs.keys())}")
+            
+            # Call the original forward method with carefully controlled arguments
+            return original_forward(pixel_values=actual_input, **vit_kwargs)
         
         # Replace the forward method
         model.forward = types.MethodType(new_forward, model)
-        print("Custom forward method added to handle different input parameter names")
+        print("Custom forward method added to handle different input parameter names and filter unsupported parameters")
 
         # Note: We're using the standard 3-channel approach where grayscale spectrograms
         # are converted to RGB in the feature_extraction method in util.py.

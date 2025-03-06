@@ -104,6 +104,25 @@ class AudioClassifier(pl.LightningModule):
         # Ensure input is float32
         x = x.float()
         
+        # Debug input shape
+        try:
+            import logging
+            logger = logging.getLogger("LIGHTNING")
+            logger.debug(f"Input shape in lightning module forward: {x.shape}")
+            
+            # Check model type for debugging
+            model_type = "unknown"
+            if hasattr(self.model, 'vit'):
+                model_type = "vit"
+            elif hasattr(self.model, 'audio_spectrogram_transformer'):
+                model_type = "ast"
+            elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type'):
+                model_type = self.model.config.model_type
+                
+            logger.debug(f"Model type: {model_type}")
+        except Exception as e:
+            print(f"Debug logging error (non-critical): {e}")
+        
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
         is_ast_model = False
@@ -131,7 +150,14 @@ class AudioClassifier(pl.LightningModule):
         
         # Forward pass - simply pass the input to the model
         # The model itself now handles the correct input parameter names
-        outputs = self.model(x)
+        try:
+            outputs = self.model(x)
+        except Exception as e:
+            print(f"Forward pass error: {e}")
+            print(f"Input shape: {x.shape}, Input type: {type(x)}")
+            if hasattr(self.model, 'config'):
+                print(f"Model config: {self.model.config}")
+            raise e
             
         # If we're using an AST model and get an error, try one more approach
         if is_ast_model:                    
@@ -143,7 +169,11 @@ class AudioClassifier(pl.LightningModule):
                 # The exact reshape depends on the model's expectations
                 x = x.view(batch_size, channels, height, width)
                 
-                outputs = self.model(x)
+                try:
+                    outputs = self.model(x)
+                except Exception as e:
+                    print(f"Alternate AST approach failed: {e}")
+                    raise e
                     
             else:
                 raise Exception("Model is not in correct AST model format")
