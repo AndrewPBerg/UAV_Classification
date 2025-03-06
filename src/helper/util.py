@@ -7,9 +7,10 @@ import random
 import matplotlib.pyplot as plt
 import librosa
 from typing import Optional, Union
-from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
+from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor, ViTImageProcessor
 import warnings
 from torchviz import make_dot
+from skimage.transform import resize
 
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from .augmentations import create_augmentation_pipeline, apply_augmentations
@@ -95,7 +96,7 @@ class AudioDataset(Dataset):
     def __init__(self,
                  data_path: str, 
                  data_paths: list[str],
-                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor],
+                 feature_extractor: Union[ASTFeatureExtractor, SeamlessM4TFeatureExtractor, MelSpectrogramFeatureExtractor, MFCCFeatureExtractor, ViTImageProcessor],
                  standardize_audio_boolean: bool=True, 
                  target_sr: int=16000,
                  target_duration: int=5, 
@@ -298,6 +299,33 @@ class AudioDataset(Dataset):
                     return_tensors="pt"
                 )
                 return features.input_values.squeeze(0)
+            elif isinstance(self.feature_extractor, ViTImageProcessor):
+                # Convert audio to spectrogram for ViT
+                # ViT expects image-like inputs
+                logger.debug("Using ViTImageProcessor")
+                
+                # Convert audio to mel spectrogram
+                mel_spec = librosa.feature.melspectrogram(
+                    y=audio_np, 
+                    sr=self.target_sr
+                )
+                
+                # Convert to decibels
+                mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+                
+                # Normalize to [0, 1] range
+                mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
+                
+                # Convert to RGB by repeating the channel 3 times
+                rgb_image = np.stack([mel_spec_normalized] * 3, axis=-1)
+                
+                # Process with ViT processor - it will handle resizing and other preprocessing
+                features = self.feature_extractor(
+                    images=rgb_image,
+                    return_tensors="pt"
+                )
+                
+                return features.pixel_values.squeeze(0)
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr
