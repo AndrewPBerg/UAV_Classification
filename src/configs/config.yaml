@@ -17,6 +17,7 @@ general:
   learning_rate: 0.02
   patience: 10
   use_wandb: false
+  use_wandb: false
   use_sweep: true
   torch_viz: false
   use_kfold: false
@@ -51,7 +52,6 @@ lora:
   - key
   - value
   - query
-  - linear
   lora_dropout: 0
   bias: lora_only
 ia3:
@@ -59,12 +59,10 @@ ia3:
   - key
   - value
   - query
-  - linear
   target_modules:
   - key
   - value
   - query
-  - linear
 adalora:
   init_r: 32
   target_r: 16
@@ -72,7 +70,6 @@ adalora:
   - key
   - value
   - query
-  - linear
   lora_alpha: 8
 oft:
   r: 768
@@ -80,12 +77,12 @@ oft:
   - key
   - value
   - query
-  - linear
   module_dropout: 0.0
   init_weights: true
 layernorm:
   target_modules:
-  - layernorm
+  - layernorm_before
+  - layernorm_after
   task_type: AUDIO_CLASSIFICATION
 hra:
   r: 4
@@ -93,7 +90,6 @@ hra:
   - key
   - value
   - query
-  - linear
 ssf:
   init_scale: 1.0
   init_shift: 0.0
