@@ -24,6 +24,7 @@ from configs.peft_config import (
     OFTConfig as CustomOFTConfig, HRAConfig as CustomHRAConfig, LNTuningConfig, BitFitConfig
 )
 from models.ssf_adapter import apply_ssf_to_model
+import traceback
 
 
 def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: GeneralConfig) -> nn.Module:
@@ -83,50 +84,45 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
     
     elif isinstance(peft_config, (LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig)):
         try:
-            # Simplified fix for AST model with ModulesToSaveWrapper
-            if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
-                print("[DEBUG] Detected AST model with ModulesToSaveWrapper")
-                if not hasattr(model.classifier, 'dense'):
-                    if hasattr(model.classifier.modules_to_save, 'default') and hasattr(model.classifier.modules_to_save.default, 'dense'):
-                        model.classifier.dense = model.classifier.modules_to_save.default.dense
-                        print("[DEBUG] Assigned classifier.dense from classifier.modules_to_save.default.dense")
-                    else:
-                        print("[DEBUG] classifier.modules_to_save.default.dense not found. Cannot assign dense automatically.")
-                else:
-                    print("[DEBUG] classifier already has attribute dense")
-                
-                if hasattr(model.classifier, 'original_module') and hasattr(model.classifier.original_module, 'dense'):
-                    model.dense = model.classifier.original_module.dense
-                    print("[DEBUG] Assigned model.dense from classifier.original_module.dense")
-            else:
-                print("[DEBUG] Model does not have classifier.modules_to_save attribute. Skipping AST-specific dense assignment.")
+            # Print detailed model structure for debugging
+            print("\n[DEBUG] Detailed model structure:")
+            for name, module in model.named_modules():
+                print(f"[DEBUG] Module: {name}, Type: {type(module).__name__}")
+                # Check for any module that's a ModulesToSaveWrapper
+                if "ModulesToSaveWrapper" in str(type(module)):
+                    print(f"[DEBUG] Found ModulesToSaveWrapper at {name}. Available attributes:")
+                    for attr_name in dir(module):
+                        if not attr_name.startswith("_"):
+                            try:
+                                attr = getattr(module, attr_name)
+                                if isinstance(attr, torch.nn.Module):
+                                    print(f"[DEBUG]   - {attr_name}: {type(attr).__name__}")
+                            except:
+                                pass
             
-            # Simplified update of target_modules for dense
+            # CRITICAL FIX: Remove dense from target_modules if it exists
             if hasattr(peft_config, 'target_modules') and 'dense' in peft_config.target_modules:
-                new_target_modules = []
-                for module_name in peft_config.target_modules:
-                    if module_name == 'dense':
-                        new_target_modules.append(module_name)
-                        new_target_modules.append('classifier.dense')
-                        print("[DEBUG] Added 'classifier.dense' to target_modules")
-                    else:
-                        new_target_modules.append(module_name)
-                peft_config.target_modules = new_target_modules
-                print(f"[DEBUG] Updated target_modules: {new_target_modules}")
+                print("[DEBUG] Removing 'dense' from target_modules to avoid ModulesToSaveWrapper error")
+                peft_config.target_modules = [m for m in peft_config.target_modules if m != 'dense']
+                
+                # Look for actual linear layers that can be used with LoRA
+                print("[DEBUG] Finding actual Linear layers in the model that can be used with LoRA")
+                for name, module in model.named_modules():
+                    if isinstance(module, nn.Linear):
+                        print(f"[DEBUG] Found Linear layer: {name}")
+                        # Only add safe paths (no ModulesToSaveWrapper in the path)
+                        if "ModulesToSaveWrapper" not in name:
+                            peft_config.target_modules.append(name)
+                            print(f"[DEBUG] Added '{name}' to target_modules")
+                
+                print(f"[DEBUG] Final target_modules: {peft_config.target_modules}")
             
-            # Minimal attribute exposure
-            def expose_attributes(module):
-                if hasattr(module, 'original_module'):
-                    for name, child in module.original_module.named_children():
-                        if not hasattr(module, name):
-                            setattr(module, name, child)
-                for name, child in module.named_children():
-                    expose_attributes(child)
-            expose_attributes(model)
-            
+            # Get PEFT model with the updated configuration
             model = get_peft_model(model, peft_config)
         except Exception as e:
             print(f"[ERROR] Error applying PEFT ({type(peft_config).__name__}): {str(e)}")
+            traceback_str = ''.join(traceback.format_exception(type(e), e, e.__traceback__))
+            print(f"[ERROR] Full traceback:\n{traceback_str}")
             raise e
     else:
         raise ValueError(f"Invalid PEFT config type: {type(peft_config)} with a {adapter_type} adapter type")
