@@ -91,8 +91,8 @@ class AudioClassifier(pl.LightningModule):
         # but we initialize them here as well for completeness
         self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
         self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize prediction metrics storage
         self.predict_batch_preds = []
@@ -389,8 +389,8 @@ class AudioClassifier(pl.LightningModule):
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, sync_dist=True)
-        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
     
@@ -422,12 +422,12 @@ class AudioClassifier(pl.LightningModule):
         self.test_recall(y_pred_class, y)
         self.test_f1(y_pred_class, y)
         
-        # Log metrics every step
-        self.log('test_loss', loss, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_acc', self.test_accuracy, on_step=True, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_f1', self.test_f1, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('test_precision', self.test_precision, on_step=True, on_epoch=True, sync_dist=True)
-        self.log('test_recall', self.test_recall, on_step=True, on_epoch=True, sync_dist=True)
+        # Log metrics - changed to only log at epoch level
+        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
 
@@ -438,20 +438,40 @@ class AudioClassifier(pl.LightningModule):
         # Get current metrics
         try:
             train_acc = self.train_accuracy.compute()
+            train_f1 = self.train_f1.compute() 
+            train_precision = self.train_precision.compute()
+            train_recall = self.train_recall.compute()
+            
             # Log epoch-level metrics
             self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
             
             # Also log train loss at epoch level if available
             if hasattr(self, 'current_train_loss'):
                 self.log('train_loss_epoch', self.current_train_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
             
-            # Track validation accuracy if available
+            # Track validation metrics if available
             if hasattr(self, 'val_accuracy'):
                 val_acc = self.val_accuracy.compute()
+                val_f1 = self.val_f1.compute()
+                val_precision = self.val_precision.compute()
+                val_recall = self.val_recall.compute()
+                
                 if val_acc is not None:
-                    # Store best validation accuracy
+                    # Store best validation accuracy and related metrics
                     if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
                         self.best_val_accuracy = val_acc.item()
+                        self.best_val_f1 = val_f1.item()
+                        self.best_val_precision = val_precision.item()
+                        self.best_val_recall = val_recall.item()
+                        
+                        # Log best validation metrics
+                        self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         except Exception as e:
             print(f"Warning: Error in on_train_epoch_end: {str(e)}")
             # Don't let this error stop training
