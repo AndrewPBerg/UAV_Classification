@@ -53,6 +53,7 @@ class NoneFullConfig:
 @dataclass
 class SSFConfig:
     """Scale-Shift Factor configuration"""
+    target_modules: List[str]
     adapter_type: str = "ssf"
     task_type: str = "SEQ_CLS"
     init_scale: float = 1.0
@@ -63,14 +64,37 @@ class SSFConfig:
         yield "task_type", self.task_type
         yield "init_scale", self.init_scale
         yield "init_shift", self.init_shift
+        yield "target_modules", self.target_modules
         
     def to_dict(self):
         return {
             "adapter_type": self.adapter_type,
             "task_type": self.task_type,
             "init_scale": self.init_scale,
-            "init_shift": self.init_shift
+            "init_shift": self.init_shift,
+            "target_modules": self.target_modules
         }
+
+@dataclass
+class BatchNormConfig:
+    """BatchNorm configuration"""
+    target_modules: List[str] = field(default_factory=lambda: ["batchnorm2d"])
+    adapter_type: str = "batchnorm"
+    task_type: str = "SEQ_CLS"
+    
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+        yield "target_modules", self.target_modules
+        
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type,
+            "target_modules": self.target_modules
+        }
+        
+    
 
 @dataclass
 class BitFitConfig:
@@ -91,11 +115,39 @@ class BitFitConfig:
             "trainable_components": self.trainable_components
         }
 
+@dataclass
+class LoRACConfig:
+    """LoRA-C configuration for CNN models"""
+    adapter_type: str = "lorac"
+    task_type: str = "SEQ_CLS"
+    r: int = 4
+    alpha: float = 8.0
+    dropout: float = 0.0
+    target_modules: List[str] = field(default_factory=list)
+    
+    def __iter__(self):
+        yield "adapter_type", self.adapter_type
+        yield "task_type", self.task_type
+        yield "r", self.r
+        yield "alpha", self.alpha
+        yield "dropout", self.dropout
+        yield "target_modules", self.target_modules
+        
+    def to_dict(self):
+        return {
+            "adapter_type": self.adapter_type,
+            "task_type": self.task_type,
+            "r": self.r,
+            "alpha": self.alpha,
+            "dropout": self.dropout,
+            "target_modules": self.target_modules
+        }
+
 # Define valid PEFT types
 VALID_PEFT_TYPES = ["lora", "ia3", "adalora", "oft", "layernorm", "hra", "bitfit"]
 
 # Define PEFTConfig type alias
-PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig, SSFConfig, BitFitConfig]
+PEFTConfig = Union[LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, HRAConfig, LNTuningConfig, Any, NoneClassifierConfig, NoneFullConfig, SSFConfig, BitFitConfig, LoRACConfig]
 
 def get_peft_config(config: dict) -> Optional[PEFTConfig]:
     """
@@ -111,6 +163,14 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
         adapter_type = config["general"]["adapter_type"]
         
         match adapter_type:
+            case "lorac":
+                lorac_config = config["lorac"].copy()
+                lorac_config["task_type"] = "SEQ_CLS"
+                return LoRACConfig(**lorac_config)
+            case "batchnorm":
+                batchnorm_config = config["batchnorm"].copy()
+                batchnorm_config["task_type"] = "SEQ_CLS"
+                return BatchNormConfig(**batchnorm_config)
             case "lora":
                 # Convert task_type string to TaskType enum
                 lora_config = config["lora"].copy()
@@ -175,6 +235,14 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
             adapter_type = config["adapter_type"]
             
             match adapter_type:
+                case "lorac":
+                    lorac_config = config["lorac"].copy()
+                    lorac_config["task_type"] = "SEQ_CLS"
+                    return LoRACConfig(**lorac_config)
+                case "batchnorm":
+                    batchnorm_config = config["batchnorm"].copy()
+                    batchnorm_config["task_type"] = "SEQ_CLS"
+                    return BatchNormConfig(**batchnorm_config)
                 case "lora":
                     # Convert task_type string to TaskType enum
                     sweep_config = config.copy()

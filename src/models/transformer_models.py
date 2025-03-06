@@ -63,7 +63,9 @@ def apply_peft(model: nn.Module, peft_config: PEFTConfig, general_config: Genera
             model=model,
             init_scale=peft_config.init_scale,
             init_shift=peft_config.init_shift,
-            verbose=False
+            target_modules=peft_config.target_modules,
+            expected_input_channels=1,  # Audio data typically has 1 channel
+            verbose=True
         )
         
     elif isinstance(peft_config, BitFitConfig):

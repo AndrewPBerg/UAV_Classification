@@ -28,51 +28,11 @@ runs:
     type: script
     changes:
       wandb:
-        name: efficientnet_b1
-      general:
-        model_type: efficientnet_b1
-
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b2
-      general:
-        model_type: efficientnet_b2
-
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b3
-      general:
-        model_type: efficientnet_b3
-
-  - id: 5
-    type: script
-    changes:
-      wandb:
         name: efficientnet_b4
       general:
         model_type: efficientnet_b4
 
-  - id: 6
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b5
-      general:
-        model_type: efficientnet_b5
-
-  - id: 7
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b6
-      general:
-        model_type: efficientnet_b6
-
-  - id: 8
+  - id: 3
     type: script
     changes:
       wandb:
@@ -80,7 +40,7 @@ runs:
       general:
         model_type: efficientnet_b7
 
-  - id: 9
+  - id: 4
     type: script
     changes:
       wandb:
@@ -88,7 +48,7 @@ runs:
       general:
         model_type: vit_b_16
 
-  - id: 10
+  - id: 5
     type: script
     changes:
       wandb:
@@ -96,7 +56,7 @@ runs:
       general:
         model_type: vit_b_32
 
-  - id: 11
+  - id: 6
     type: script
     changes:
       wandb:
@@ -104,7 +64,7 @@ runs:
       general:
         model_type: vit_l_16
 
-  - id: 12
+  - id: 7
     type: script
     changes:
       wandb:
@@ -112,7 +72,7 @@ runs:
       general:
         model_type: vit_l_32
 
-  - id: 13
+  - id: 8
     type: script
     changes:
       wandb:
@@ -120,7 +80,7 @@ runs:
       general:
         model_type: vit_h_14
 
-  - id: 14
+  - id: 9
     type: script
     changes:
       general:
@@ -128,15 +88,7 @@ runs:
       wandb:
         name: resnet18
 
-  - id: 15
-    type: script
-    changes:
-      general:
-        model_type: resnet34
-      wandb:
-        name: resnet34
-
-  - id: 16
+  - id: 10
     type: script
     changes:
       general:
@@ -144,15 +96,7 @@ runs:
       wandb:
         name: resnet50
 
-  - id: 17
-    type: script
-    changes:
-      general:
-        model_type: resnet101
-      wandb:
-        name: resnet101
-
-  - id: 18
+  - id: 11
     type: script
     changes:
       general:
@@ -160,7 +104,7 @@ runs:
       wandb:
         name: resnet152
 
-  - id: 19
+  - id: 12
     type: script
     changes:
       wandb:
@@ -168,7 +112,7 @@ runs:
       general:
         model_type: mobilenet_v3_small
 
-  - id: 20
+  - id: 13
     type: script
     changes:
       wandb:
@@ -176,7 +120,7 @@ runs:
       general:
         model_type: mobilenet_v3_large
 
-  - id: 21
+  - id: 14
     type: script
     changes:
       wandb:

@@ -25,7 +25,10 @@ from .peft_config import (
     NoneClassifierConfig,
     NoneFullConfig,
     VALID_PEFT_TYPES,
-    PEFTConfig
+    PEFTConfig,
+    BatchNormConfig,
+    SSFConfig,
+    BitFitConfig
 )
 
 # Import native PEFT configs directly from peft library
@@ -71,6 +74,9 @@ __all__ = [
     'VALID_PEFT_TYPES',
     'get_peft_config',
     'PEFTConfig',
+    'BatchNormConfig',
+    'SSFConfig',
+    'BitFitConfig',
     
     # wandb_config exports
     'WandbConfig',

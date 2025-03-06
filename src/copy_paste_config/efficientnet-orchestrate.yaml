@@ -16,58 +16,15 @@ runs:
     type: script
     changes:
       wandb:
-        name: efficientnet_b1
+        name: efficientnet_b4
       general:
-        model_type: efficientnet_b1
+        model_type: efficientnet_b4
+
   - id: 2
     type: script
     changes:
       wandb:
-        name: efficientnet_b2
-        
-      general:
-        model_type: efficientnet_b2
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b3
-        
-      general:
-        model_type: efficientnet_b3
-
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b4
-        
-      general:
-        model_type: efficientnet_b4
-  - id: 5
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b5
-        
-      general:
-        model_type: efficientnet_b5
-
-        
-  - id: 6
-    type: script
-    changes:
-      wandb:
-        name: efficientnet_b6
-        
-      general:
-        model_type: efficientnet_b6
-  - id: 7
-    type: script
-    changes:
-      wandb:
         name: efficientnet_b7
-        
       general:
         model_type: efficientnet_b7
 

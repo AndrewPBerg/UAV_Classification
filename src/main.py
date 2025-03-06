@@ -3,14 +3,6 @@ import torch
 import sys
 from icecream import ic
 
-# Print GPU information
-print("-" * 50)
-print(f"PyTorch version: {torch.__version__}")
-print(f"CUDA available: {torch.cuda.is_available()}")
-if torch.cuda.is_available():
-    print(f"GPU: {torch.cuda.get_device_name(0)}")
-print("-" * 50)
-
 # Import the rest of the modules
 from helper.ptl_trainer import PTLTrainer
 from helper.datamodule import AudioDataModule
@@ -203,4 +195,12 @@ def main():
                 send_message(f'Your Symphony has failed @ run number: {run_count}.\n\n Traceback: {e}')
 
 if __name__ == "__main__":
+    # Print GPU information
+    print("-" * 50)
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"CUDA available: {torch.cuda.is_available()}")
+    if torch.cuda.is_available():
+        print(f"GPU: {torch.cuda.get_device_name(0)}")
+    print("-" * 50)
+    
     main()
