@@ -16,6 +16,8 @@ import torch.nn as nn
 from typing import Tuple, Optional, Any
 from configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoRACConfig
 from .ssf_adapter import apply_ssf_to_model
+from .lorac_adapter import apply_lorac_to_model
+
 from configs import BatchNormConfig
 
 
@@ -205,8 +207,7 @@ def apply_peft(model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module
     
     elif isinstance(peft_config, LoRACConfig):
         # Apply LoRA-C to the model
-        from src.models.lorac_adapter import apply_lorac_to_model
-        
+
         # First, freeze all parameters
         for param in model.parameters():
             param.requires_grad = False
