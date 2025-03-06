@@ -612,65 +612,6 @@ class PTLTrainer:
             traceback.print_exc()
             return {}
         
-        # Create confusion matrix
-        try:
-            # We still need to collect predictions to create the confusion matrix
-            all_preds = []
-            all_targets = []
-            
-            for batch_preds in predictions:
-                batch_pred_classes, batch_targets = batch_preds
-                all_preds.append(batch_pred_classes)
-                all_targets.append(batch_targets)
-            
-            # Concatenate all batches
-            all_preds = torch.cat(all_preds)
-            all_targets = torch.cat(all_targets)
-            
-            # Ensure tensors are on the same device
-            all_preds = all_preds.to(device)
-            all_targets = all_targets.to(device)
-            
-            # Create confusion matrix
-            from torchmetrics.functional.classification import confusion_matrix
-            conf_mat = confusion_matrix(
-                all_preds, all_targets, num_classes=num_classes, task="multiclass"
-            ).cpu().numpy()
-            
-            # Log confusion matrix if wandb is enabled
-            if self.wandb_logger:
-                import wandb
-                import matplotlib.pyplot as plt
-                import seaborn as sns
-                
-                # Get class names if available
-                class_names = None
-                try:
-                    _, _, idx_to_class = self.data_module.get_class_info()
-                    class_names = [idx_to_class[i] for i in range(num_classes)]
-                except (AttributeError, KeyError):
-                    class_names = [str(i) for i in range(num_classes)]
-                
-                # Create confusion matrix plot
-                plt.figure(figsize=(10, 8))
-                sns.heatmap(conf_mat, annot=True, fmt='d', cmap='Blues',
-                            xticklabels=class_names, yticklabels=class_names)
-                plt.xlabel('Predicted')
-                plt.ylabel('True')
-                plt.title('Inference Confusion Matrix')
-                
-                # Log to wandb
-                self.wandb_logger.experiment.log({
-                    "inference_confusion_matrix": wandb.Image(plt),
-                    "final_inference_accuracy": metrics["inference_acc"],
-                    "final_inference_precision": metrics["inference_precision"],
-                    "final_inference_recall": metrics["inference_recall"],
-                    "final_inference_f1": metrics["inference_f1"]
-                })
-                plt.close()
-        except Exception as e:
-            print(f"Error creating confusion matrix: {str(e)}")
-        
         return metrics
     
     def k_fold_cross_validation(self) -> Dict[str, Any]:
@@ -809,19 +750,6 @@ class PTLTrainer:
                 CustomFoldProgressBar()
             ]
             
-            # # Create trainer for this fold
-            # trainer = pl.Trainer(
-            #     max_epochs=self.general_config.epochs,
-            #     accelerator="gpu" if self.gpu_available else "cpu",
-            #     devices=1,  # Always use a single device
-            #     callbacks=fold_callbacks,
-            #     logger=self.wandb_logger,
-            #     gradient_clip_val=1.0,
-            #     accumulate_grad_batches=self.general_config.accumulation_steps,
-            #     deterministic=True,
-            #     precision="16-mixed" if self.gpu_available else "32"
-            # )
-            
             trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
@@ -893,14 +821,14 @@ class PTLTrainer:
             
             # Log final metrics for this fold to WandB
             if self.general_config.use_wandb:
-                wandb.log({
-                    f"fold_{fold+1}_final_val_acc": val_acc,
-                    f"fold_{fold+1}_final_val_loss": val_loss,
-                    f"fold_{fold+1}_final_val_f1": val_f1,
-                    f"fold_{fold+1}_final_val_precision": val_precision,
-                    f"fold_{fold+1}_final_val_recall": val_recall
-                })
-            
+                fold_data = {
+                    "val_acc": val_acc,
+                    "val_loss": val_loss,
+                    "val_f1": val_f1,
+                    "val_precision": val_precision,
+                    "val_recall": val_recall
+                }
+
             # Run inference evaluation for this fold if available
             try:
                 # Check if inference dataset exists and has samples
@@ -949,11 +877,16 @@ class PTLTrainer:
                     # Log inference results to wandb
                     if self.general_config.use_wandb:
                         for key, value in inference_results.items():
-                            wandb.log({f"fold_{fold+1}_{key}": value})
+                            fold_data[key] = value # add to fold_data dict
                 else:
                     print(f"No inference data available for fold {fold+1}, skipping inference evaluation.")
             except Exception as e:
                 print(f"Error during inference for fold {fold+1}: {str(e)}")
+
+            if self.general_config.use_wandb:
+                # Create a wandb Table for the fold
+                fold_table = wandb.Table(data=[[key, val] for key, val in fold_data.items()], columns=["Metric", "Value"])
+                wandb.log({f"fold_{fold+1}_metrics": fold_table})
         
         # Calculate average metrics across all folds
         avg_metrics = self._calculate_average_metrics(all_fold_results)
