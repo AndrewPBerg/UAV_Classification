@@ -782,18 +782,30 @@ class PTLTrainer:
                 CustomFoldProgressBar()
             ]
             
-            # Create trainer for this fold
+            # # Create trainer for this fold
+            # trainer = pl.Trainer(
+            #     max_epochs=self.general_config.epochs,
+            #     accelerator="gpu" if self.gpu_available else "cpu",
+            #     devices=1,  # Always use a single device
+            #     callbacks=fold_callbacks,
+            #     logger=self.wandb_logger,
+            #     gradient_clip_val=1.0,
+            #     accumulate_grad_batches=self.general_config.accumulation_steps,
+            #     deterministic=True,
+            #     precision="16-mixed" if self.gpu_available else "32"
+            # )
+            
             trainer = pl.Trainer(
-                max_epochs=self.general_config.epochs,
-                accelerator="gpu" if self.gpu_available else "cpu",
-                devices=1,  # Always use a single device
-                callbacks=fold_callbacks,
-                logger=self.wandb_logger,
-                gradient_clip_val=1.0,
-                accumulate_grad_batches=self.general_config.accumulation_steps,
-                deterministic=True,
-                precision="16-mixed" if self.gpu_available else "32"
+            max_epochs=self.general_config.epochs,
+            accelerator="gpu" if self.gpu_available else "cpu",
+            devices=1,
+            callbacks=fold_callbacks,
+            logger=self.wandb_logger,
+            deterministic=False,
+            precision=32  # Changed to 32-bit precision to avoid AMP issues
             )
+            
+            
             
             # Train on this fold
             trainer.fit(
