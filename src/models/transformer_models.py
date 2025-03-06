@@ -321,29 +321,26 @@ class TransformerModel:
             embeddings = self.patch_embeddings(input_values)
             logger.debug(f"Patch embeddings shape: {embeddings.shape}")
             
-            # Check if sequence length matches expected length
+            # Check if sequence length matches expected length for position embeddings
+            expected_seq_length = self.position_embeddings.shape[1]
             current_seq_length = embeddings.shape[1]
             
-            if current_seq_length != batch_size:
-                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {batch_size}")
+            if current_seq_length != expected_seq_length:
+                logger.debug(f"Sequence length mismatch: got {current_seq_length}, expected {expected_seq_length}")
                 
-                # Use a deterministic approach instead of interpolation
-                # We'll use a learned projection layer to change the sequence length
-                if not hasattr(self, 'seq_adapter'):
-                    # Create a sequence adapter if it doesn't exist
-                    # This is a simple linear layer that projects from current_seq_length to expected_seq_length
-                    self.seq_adapter = torch.nn.Linear(
-                        current_seq_length, 
-                        batch_size
-                    ).to(embeddings.device)
-                    logger.debug("Created sequence adapter layer")
-                
-                # Apply the sequence adapter
-                # [batch_size, seq_len, hidden_dim] -> [batch_size, hidden_dim, seq_len]
+                # Use interpolation to adapt embeddings to the expected sequence length
+                # First transpose to [batch_size, hidden_dim, seq_len]
                 embeddings = embeddings.transpose(1, 2)
-                # Apply linear projection to change sequence length
-                embeddings = self.seq_adapter(embeddings)
-                # [batch_size, hidden_dim, seq_len] -> [batch_size, seq_len, hidden_dim]
+                
+                # Use 1D interpolation to get the correct sequence length
+                embeddings = F.interpolate(
+                    embeddings, 
+                    size=expected_seq_length, 
+                    mode='linear', 
+                    align_corners=False
+                )
+                
+                # Transpose back to [batch_size, seq_len, hidden_dim]
                 embeddings = embeddings.transpose(1, 2)
                 
                 logger.debug(f"Adapted embeddings shape: {embeddings.shape}")
