@@ -10,7 +10,6 @@ from typing import Optional, Union
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor, ViTImageProcessor
 import warnings
 from torchviz import make_dot
-from skimage.transform import resize
 
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from .augmentations import create_augmentation_pipeline, apply_augmentations
@@ -317,7 +316,8 @@ class AudioDataset(Dataset):
                 mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
                 
                 # Convert to RGB by repeating the channel 3 times
-                rgb_image = np.stack([mel_spec_normalized] * 3, axis=-1)
+                # Important: ViT expects images in [B, C, H, W] format where C=3 for RGB
+                rgb_image = np.stack([mel_spec_normalized] * 3, axis=-1)  # [H, W, 3]
                 
                 # Process with ViT processor - it will handle resizing and other preprocessing
                 features = self.feature_extractor(
@@ -325,7 +325,20 @@ class AudioDataset(Dataset):
                     return_tensors="pt"
                 )
                 
-                return features.pixel_values.squeeze(0)
+                # Ensure the output has the correct shape with 3 channels
+                # The error suggests we're getting [1, H, W] but need [3, H, W]
+                pixel_values = features.pixel_values.squeeze(0)  # Remove batch dimension
+                
+                # Debug the shape
+                logger.debug(f"ViT pixel_values shape: {pixel_values.shape}")
+                
+                # If the channel dimension is not 3, reshape it
+                if pixel_values.shape[0] != 3 and len(pixel_values.shape) == 3:
+                    # Assuming the shape is [1, H, W], we need to make it [3, H, W]
+                    pixel_values = pixel_values.repeat(3, 1, 1)
+                    logger.debug(f"Reshaped to: {pixel_values.shape}")
+                
+                return pixel_values
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr
