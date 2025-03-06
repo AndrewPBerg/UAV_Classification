@@ -523,6 +523,9 @@ class TransformerModel:
             # Set the weights of the new projection layer
             model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
         
+        # Set the model configuration to expect 1 channel for grayscale images
+        model.config.num_channels = 1
+        
         # Apply PEFT configuration
         model = apply_peft(model, peft_config, general_config)
         
