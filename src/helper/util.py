@@ -301,9 +301,36 @@ class AudioDataset(Dataset):
             elif isinstance(self.feature_extractor, ViTImageProcessor):
                 logger.debug("Using ViTImageProcessor with grayscale input via PIL conversion")
                 
-                # Convert audio to mel spectrogram
-                mel_spec = librosa.feature.melspectrogram(y=audio_np, sr=self.target_sr)
+                # Convert audio to mel spectrogram with fixed dimensions
+                n_mels = 128  # Number of mel bands
+                hop_length = 512  # Frame shift
+                win_length = 1024  # Frame length
+                n_fft = 1024  # FFT window size
+                
+                # Calculate the number of frames needed for a fixed width
+                target_width = 224
+                audio_length = len(audio_np)
+                num_frames = 1 + (audio_length - n_fft) // hop_length
+                
+                # If audio is too short, pad it
+                if num_frames < target_width:
+                    padding_needed = (target_width - 1) * hop_length + n_fft - audio_length
+                    audio_np = np.pad(audio_np, (0, padding_needed), mode='constant')
+                
+                # Generate mel spectrogram with controlled parameters
+                mel_spec = librosa.feature.melspectrogram(
+                    y=audio_np, 
+                    sr=self.target_sr,
+                    n_fft=n_fft,
+                    hop_length=hop_length,
+                    win_length=win_length,
+                    n_mels=n_mels
+                )
+                
+                # Convert to dB scale
                 mel_spec_db = librosa.power_to_db(mel_spec, ref=np.max)
+                
+                # Normalize to 0-1 range
                 mel_spec_normalized = (mel_spec_db - mel_spec_db.min()) / (mel_spec_db.max() - mel_spec_db.min())
 
                 # Convert normalized mel spectrogram to 8-bit image array
@@ -324,6 +351,7 @@ class AudioDataset(Dataset):
                 logger.debug(f"PIL RGB image size: {pil_img_rgb.size}")
                 
                 # Use the ViTImageProcessor's own preprocessing pipeline with RGB image
+                # Note: The processor should be configured to handle 224x224 images
                 features = self.feature_extractor(pil_img_rgb, return_tensors="pt")
                 logger.debug(f"Features shape from processor: {features.pixel_values.shape}")
                 
@@ -339,8 +367,19 @@ class AudioDataset(Dataset):
                         # If we have a 1-channel tensor, repeat it to make a 3-channel tensor
                         tensor_3ch = tensor_3ch.repeat(3, 1, 1)
                         print(f"New tensor shape after conversion: {tensor_3ch.shape}")
-                else:
-                    print(f"ViT tensor has correct channel count: {tensor_3ch.shape[0]}")
+                
+                # Final size verification 
+                if tensor_3ch.shape[1] != 224 or tensor_3ch.shape[2] != 224:
+                    print(f"WARNING: Tensor dimensions {tensor_3ch.shape[1]}x{tensor_3ch.shape[2]} don't match expected 224x224!")
+                    print(f"Resizing tensor to 224x224...")
+                    # Use interpolate to resize if dimensions don't match
+                    tensor_3ch = torch.nn.functional.interpolate(
+                        tensor_3ch.unsqueeze(0),  # Add batch dimension
+                        size=(224, 224),
+                        mode='bilinear',
+                        align_corners=False
+                    ).squeeze(0)  # Remove batch dimension
+                    print(f"New tensor shape after resizing: {tensor_3ch.shape}")
                 
                 return tensor_3ch
             elif isinstance(self.feature_extractor, WhisperProcessor):

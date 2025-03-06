@@ -474,6 +474,8 @@ class TransformerModel:
         This implementation uses the standard 3-channel approach, where grayscale
         spectrograms are converted to RGB format before processing. This is handled
         in the feature_extraction method in util.py.
+        
+        The model automatically handles resizing of input tensors to the required 224x224 size.
         """
         model_name = "google/vit-large-patch16-224"
         print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
@@ -489,12 +491,16 @@ class TransformerModel:
             )
             print("Model loaded successfully with local_files_only=True.")
             
+            # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
                 cache_dir=CACHE_DIR,
-                local_files_only=True
+                local_files_only=True,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
             )
-            print("Processor loaded successfully with local_files_only=True.")
+            print("Processor loaded successfully with local_files_only=True and configured for 224x224 images.")
             
         except Exception as e:
             print(f"Failed to load model with local_files_only=True, trying to download: {e}")
@@ -506,18 +512,32 @@ class TransformerModel:
             )
             print("Model downloaded successfully.")
             
+            # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
                 model_name,
-                cache_dir=CACHE_DIR
+                cache_dir=CACHE_DIR,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
             )
-            print("Processor downloaded successfully.")
+            print("Processor downloaded successfully and configured for 224x224 images.")
 
         # Debugging model architecture
         print("Model architecture:")
         print(model)
         
+        # Update model configuration to accept inputs of any size
+        print("Updating model configuration to handle dynamic input sizes...")
+        if hasattr(model, 'config'):
+            # Save the original image_size
+            original_image_size = model.config.image_size if hasattr(model.config, 'image_size') else 224
+            print(f"Original image_size in config: {original_image_size}")
+            
+            # Explicitly set model to handle 224x224 images
+            model.config.image_size = 224
+            print(f"Updated image_size in config: {model.config.image_size}")
+        
         # Create a custom forward method to handle different input parameter names
-        # This makes the model compatible with both direct input and PEFT
         original_forward = model.forward
         
         def new_forward(self, pixel_values=None, input_ids=None, inputs_embeds=None, x=None, **kwargs):
@@ -566,40 +586,44 @@ class TransformerModel:
             
             # Check if actual_input is a tensor and has 1 channel instead of 3
             if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:
-                # Get shape info
-                batch_size, channels, height, width = actual_input.shape
                 print(f"Input tensor shape: {actual_input.shape}")
                 
-                # If it's a 1-channel input, convert to 3-channel
-                if channels == 1:
+                # Handle channel count - convert from 1 to 3 channels if needed
+                if actual_input.shape[1] == 1:
                     print("Converting 1-channel input to 3-channel by repeating the channel")
-                    # Repeat the single channel three times to create a 3-channel tensor
-                    # Method 1: Repeat the tensor along the channel dimension
                     actual_input = actual_input.repeat(1, 3, 1, 1)
                     print(f"Converted input shape: {actual_input.shape}")
+                
+                # Handle input size - resize all inputs to 224x224 using interpolation
+                if actual_input.shape[2] != 224 or actual_input.shape[3] != 224:
+                    print(f"Resizing input from {actual_input.shape[2]}x{actual_input.shape[3]} to 224x224")
+                    # Use interpolate to resize the tensor to 224x224
+                    actual_input = torch.nn.functional.interpolate(
+                        actual_input, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                    print(f"Resized input shape: {actual_input.shape}")
             
-            # Strip out all kwargs except those definitely supported by the ViT model
-            # This avoids errors from PEFT or other wrappers adding unexpected arguments
-            vit_kwargs = {}
+            # Remove attention_mask from kwargs if it exists - ViT doesn't use it
+            vit_kwargs = {k: v for k, v in kwargs.items() if k not in ['attention_mask']}
             
-            # Only pass these specific kwargs to the original forward method
-            if 'labels' in kwargs:
-                vit_kwargs['labels'] = kwargs['labels']
-            if 'head_mask' in kwargs:
-                vit_kwargs['head_mask'] = kwargs['head_mask']
-            if 'output_attentions' in kwargs:
-                vit_kwargs['output_attentions'] = kwargs['output_attentions']
-            if 'output_hidden_states' in kwargs:
-                vit_kwargs['output_hidden_states'] = kwargs['output_hidden_states']
-            if 'return_dict' in kwargs:
-                vit_kwargs['return_dict'] = kwargs['return_dict']
+            # Add debug info to see what's being passed to the original forward
+            print(f"Passing to ViT: pixel_values={actual_input.shape if hasattr(actual_input, 'shape') else None}, kwargs={list(vit_kwargs.keys())}")
             
-            # Log what we're actually passing to the model
-            print(f"Passing to ViT: pixel_values={actual_input.shape if isinstance(actual_input, torch.Tensor) else None}, " 
-                  f"kwargs={list(vit_kwargs.keys())}")
-            
-            # Call the original forward method with carefully controlled arguments
-            return original_forward(pixel_values=actual_input, **vit_kwargs)
+            try:
+                return original_forward(pixel_values=actual_input, **vit_kwargs)
+            except Exception as e:
+                print(f"Forward pass error: {str(e)}")
+                print(f"Input shape: {actual_input.shape if hasattr(actual_input, 'shape') else None}, Input type: {type(actual_input)}")
+                
+                # Get model configuration to help debug
+                if hasattr(self, 'config'):
+                    print(f"Model config: {self.config}")
+                
+                # Re-raise the exception for proper error handling
+                raise
         
         # Replace the forward method
         model.forward = types.MethodType(new_forward, model)

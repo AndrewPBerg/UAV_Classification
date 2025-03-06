@@ -151,6 +151,28 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass - simply pass the input to the model
         # The model itself now handles the correct input parameter names
         try:
+            # Resize for ViT models if needed
+            is_vit_model = hasattr(self.model, "config") and getattr(self.model.config, "model_type", "") == "vit"
+            
+            if is_vit_model and len(x.shape) == 4:
+                # Check if the input dimensions match what ViT expects (224x224)
+                if x.shape[2] != 224 or x.shape[3] != 224:
+                    print(f"Resizing input from {x.shape[2]}x{x.shape[3]} to 224x224 for ViT model")
+                    x = torch.nn.functional.interpolate(
+                        x, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+                
+                # Ensure channel count is correct (3 channels for ViT)
+                if x.shape[1] == 1:
+                    print(f"Converting 1-channel input to 3-channel for ViT model")
+                    x = x.repeat(1, 3, 1, 1)
+            
+            # Print shape info for debugging
+            print(f"Final input shape passed to model: {x.shape}")
+            
             outputs = self.model(x)
         except Exception as e:
             print(f"Forward pass error: {e}")
