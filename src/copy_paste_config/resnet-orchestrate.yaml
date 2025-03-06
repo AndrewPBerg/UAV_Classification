@@ -16,34 +16,13 @@ runs:
   - id: 1
     type: script
     changes:
-
-        
-      general:
-        model_type: resnet34
-      wandb:
-        name: resnet34
-
-  - id: 2
-    type: script
-    changes:
-
         
       general:
         model_type: resnet50
       wandb:
         name: resnet50
 
-  - id: 3
-    type: script
-    changes:
-
-        
-      general:
-        model_type: resnet101
-      wandb:
-        name: resnet101
-
-  - id: 4
+  - id: 2
     type: script
     changes:
         

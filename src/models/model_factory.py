@@ -65,30 +65,26 @@ class ModelFactory:
             elif model_type == "vit":
                 model, feature_extractor = transformer_model._create_vit_model( num_classes, CACHE_DIR, general_config, peft_config)
             else:
-                raise ValueError(f"Unsupported transformer model type: {model_type}")
+                raise ValueError(f"Unsupported transformer model type: {model_type}, please use one of the following: {TransformerModel.transformer_models}")
         
         elif model_type in CNNModel.cnn_models:
             # Verify adapter_type is supported by CNN models
             if adapter_type is not None and adapter_type not in CNNModel.peft_type and adapter_type != "none":
-                raise ValueError(f"Adapter type {adapter_type} not supported by CNN models")
+                raise ValueError(f"Adapter type {adapter_type} not supported by CNN models, please use one of the following: {CNNModel.peft_type}")
             
             # Create CNN model
             cnn_model = CNNModel()
-            if model_type == "resnet":
-                model = cnn_model._create_resnet_model(model_type, num_classes, input_shape)
-            elif model_type == "mobilenet":
-                model = cnn_model._create_mobilenet_model(model_type, num_classes, input_shape)
-            elif model_type == "efficientnet":
-                model = cnn_model._create_efficientnet_model(model_type, num_classes, input_shape)
+            if "resnet" in model_type:
+                model = cnn_model._create_resnet_model(model_type, num_classes, peft_config)
+            elif "mobilenet" in model_type:
+                model = cnn_model._create_mobilenet_model(model_type, num_classes, peft_config)
+            elif "efficientnet" in model_type:
+                model = cnn_model._create_efficientnet_model(model_type, num_classes, peft_config)
             else:
-                raise ValueError(f"Unsupported CNN model type: {model_type}")
-            
-            # Apply PEFT to CNN model if configured
-            if peft_config is not None:
-                model = cnn_model.apply_peft(model, peft_config)
+                raise ValueError(f"Unsupported CNN model type: {model_type}, please use one of the following: {CNNModel.cnn_models}")
         
         else:
-            raise ValueError(f"Unsupported model type: {model_type}")
+            raise ValueError(f"Unsupported model type: {model_type}, please use one of the following: {TransformerModel.transformer_models + CNNModel.cnn_models}")
         
         # Move model to device if specified
         if device is not None:

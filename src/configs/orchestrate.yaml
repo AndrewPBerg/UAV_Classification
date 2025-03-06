@@ -1,7 +1,7 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
 
-SEND_MESSAGE: true
+SEND_MESSAGE: false
 
 runs:
 
@@ -13,437 +13,86 @@ runs:
   #       project: model-peft-test
   #       name: mert-none-classifier
   #     general:
-  #       model_type: mert
-  #       use_wandb: true
+  #       model_type: resnet18
+  #       use_wandb: false
   #       epochs: 2
-  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
   #       num_classes: 9
-  #       adapter_type: none-classifier
+  #       adapter_type: none-full
   #       learning_rate: 0.02
-      
-  
   # - id: 1
   #   type: script
   #   changes:
   #     wandb:
   #       project: model-peft-test
-  #       name: mert-none-full
+  #       name: mert-none-classifier
   #     general:
-  #       model_type: mert
-  #       adapter_type: none-full
-
+  #       model_type: resnet18
+  #       use_wandb: false
+  #       epochs: 2
+  #       data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+  #       num_classes: 9
+  #       adapter_type: ssf
+  #       learning_rate: 0.02
+  #     ssf:
+  #       target_modules:
+  #       - linear
+  #       - conv2d
+  #       - batchnorm2d
+  # - id: 1
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: mert-none-classifier
+  #     general:
+  #       model_type: resnet18
+  #       use_wandb: false
+  #       epochs: 2
+  #       data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+  #       num_classes: 9
+  #       adapter_type: batchnorm
+  #       learning_rate: 0.02
+  #     batchnorm:
+  #       target_modules:
+  #       - batchnorm2d
+      
+  - id: 1
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-none-classifier
+      general:
+        model_type: resnet50
+        use_wandb: false
+        epochs: 2
+        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+        num_classes: 9
+        adapter_type: none-classifier
+        learning_rate: 0.02
+      lorac:
+        target_modules:
+        - linear
+        - conv2d
+        - batchnorm2d
+        r: 8
+        alpha: 8
+        dropout: 0
+      
   # - id: 2
   #   type: script
   #   changes:
   #     wandb:
   #       project: model-peft-test
-  #       name: mert-lora
+  #       name: mert-none-classifier
   #     general:
-  #       model_type: mert
-  #       adapter_type: lora       
-  #     lora:
-  #       target_modules:
-  #       - q_proj
-  #       - k_proj
-  #       - v_proj
-  #       - out_proj
-  #       - output_dense
-
-
-  # - id: 3
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-ia3
-  #     general:
-  #       model_type: mert
-  #       adapter_type: ia3
-      
-  #     ia3:
-  #       target_modules:
-  #       - q_proj
-  #       - k_proj
-  #       - v_proj
-  #       - out_proj
-  #       - output_dense
-  #       feedforward_modules:
-  #       - output_dense
-
-      
-  
-  # - id: 4
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-adalora
-  #     general:
-  #       model_type: mert
-  #       adapter_type: adalora
-      
-
-  #     adalora:
-  #       target_modules:
-  #       - q_proj
-  #       - k_proj
-  #       - v_proj
-  #       - out_proj
-  #       - output_dense
-      
-  
-  # - id: 5
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-oft
-  #     general:
-  #       model_type: mert
-  #       adapter_type: oft
-  #     oft: 
-  #       target_modules:
-  #       - q_proj
-  #       - k_proj
-  #       - v_proj
-  #       - out_proj
-  #       - output_dense
-
-  # - id: 6
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-layernorm
-  #     general:
-  #       model_type: mert
-  #       adapter_type: layernorm
-      
-  #     layernorm:
-  #       target_modules:
-  #       - layer_norm
-  #       - final_layer_norm
-        
-        
-  # - id: 7
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-hra
-  #     general:
-  #       model_type: mert
-  #       adapter_type: hra
-  #     hra:
-  #       target_modules:
-  #       - q_proj
-  #       - k_proj
-  #       - v_proj
-  #       - out_proj
-  #       - output_dense
-  # - id: 8
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-ssf
-  #     general:
-  #       model_type: mert
-  #       adapter_type: ssf
-  # - id: 9
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: mert-bitfit
-  #     general:
-  #       model_type: mert
-  #       adapter_type: bitfit
-
-
-  # - id: 10
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-none-classifier
-  #     general:
-  #       model_type: vit
-  #       use_wandb: true
-  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       model_type: resnet152
+  #       use_wandb: false
+  #       epochs: 2
+  #       data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
   #       num_classes: 9
   #       adapter_type: none-classifier
+  #       learning_rate: 0.02
+      
   
-  # - id: 11
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-none-full
-  #     general:
-  #       model_type: vit
-  #       adapter_type: none-full
-
-  # - id: 12
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-lora
-  #     general:
-  #       model_type: vit
-  #       adapter_type: lora
-  #     lora:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-
-  # - id: 13
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-ia3
-  #     general:
-  #       model_type: vit
-  #       adapter_type: ia3
-  #     ia3:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-  #       feedforward_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-  
-  # - id: 14
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-adalora
-  #     general:
-  #       model_type: vit
-  #       adapter_type: adalora
-  #     adalora:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-  
-  # - id: 15
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-oft
-  #     general:
-  #       model_type: vit
-  #       adapter_type: oft
-  #     oft:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-
-  # - id: 16
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-layernorm
-  #     general:
-  #       model_type: vit
-  #       adapter_type: layernorm
-  #     layernorm:
-  #       target_modules:
-  #       - layernorm
-        
-  # - id: 17
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-hra
-  #     general:
-  #       model_type: vit
-  #       adapter_type: hra
-  #     hra:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       - linear
-
-  # - id: 18
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-ssf
-  #     general:
-  #       model_type: vit
-  #       adapter_type: ssf
-
-  # - id: 19
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: vit-bitfit
-  #     general:
-  #       model_type: vit
-  #       adapter_type: bitfit
-
-  # - id: 20
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-none-classifier
-  #     general:
-  #       model_type: ast
-  #       use_wandb: true
-  #       data_path: /app/src/datasets/UAV_Dataset_9
-  #       num_classes: 9
-  #       adapter_type: none-classifier
-  
-  # - id: 21
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-none-full
-  #     general:
-  #       model_type: ast
-  #       adapter_type: none-full
-
-  # - id: 22
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-lora
-  #     general:
-  #       model_type: ast
-  #       adapter_type: lora
-  #     lora:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       # - dense
-
-  # - id: 23
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-ia3
-  #     general:
-  #       batch_size: 8
-  #       model_type: ast
-  #       adapter_type: ia3
-  #     ia3:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       # - dense
-  #       feedforward_modules:
-  #       - key 
-  #       - value
-  #       - query
-  #       # - dense
-  
-  # - id: 24
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-adalora
-  #     general:
-  #       model_type: ast
-  #       adapter_type: adalora
-
-  #     adalora:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       # - dense
-  
-  # - id: 25
-  #   type: script
-  #   changes:
-  #     wandb:
-  #       project: model-peft-test
-  #       name: ast-oft
-  #     general:
-  #       model_type: ast
-  #       adapter_type: oft
-  #     oft:
-  #       target_modules:
-  #       - key
-  #       - value
-  #       - query
-  #       # - dense #TODO broken for AST adapters
-
-  - id: 26
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-layernorm
-      general:
-        model_type: ast
-        adapter_type: layernorm
-      layernorm:
-        target_modules:
-        # - layernorm #TODO broken w/  ast
-        - layernorm_before
-        - layernorm_after
-        
-  - id: 27
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-hra
-      general:
-        model_type: ast
-        adapter_type: hra
-      hra:
-        target_modules:
-        - key
-        - value
-        - query
-        # - dense
-        
-  - id: 28
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-ssf
-      general:
-        model_type: ast
-        adapter_type: ssf
-        use_wandb: false
-        
-  - id: 29
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: ast-bitfit
-      general:
-        model_type: ast
-        adapter_type: bitfit

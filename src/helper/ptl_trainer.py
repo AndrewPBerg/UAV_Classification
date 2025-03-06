@@ -54,7 +54,6 @@ class PTLTrainer:
         
         # Single GPU configuration
         self.gpu_available = torch.cuda.is_available()
-        print(f"GPU available: {self.gpu_available}")
         
         # Set up wandb logger
         self.wandb_logger = None
