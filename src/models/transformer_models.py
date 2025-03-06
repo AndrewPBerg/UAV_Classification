@@ -553,50 +553,56 @@ class TransformerModel:
             It also automatically converts 1-channel inputs to 3-channel to match model expectations.
             """
             # Add debug information
-            print(f"ViT model forward called with: pixel_values={pixel_values is not None}, "
-                  f"input_ids={input_ids is not None}, x={x is not None}, "
-                  f"inputs_embeds={inputs_embeds is not None}, kwargs={list(kwargs.keys())}")
+            # print(f"ViT model forward called with: pixel_values={pixel_values is not None}, "
+            #   f"input_ids={input_ids is not None}, x={x is not None}, "
+            #   f"inputs_embeds={inputs_embeds is not None}, kwargs={list(kwargs.keys())}")
             
             # Determine which input to use
             if pixel_values is not None:
                 actual_input = pixel_values
                 if hasattr(actual_input, 'shape'):
-                    print(f"pixel_values input shape: {actual_input.shape}")
+                    pass
+                    # print(f"pixel_values input shape: {actual_input.shape}")
             elif input_ids is not None:
                 actual_input = input_ids
                 if hasattr(actual_input, 'shape'):
-                    print(f"input_ids input shape: {actual_input.shape}")
+                    pass
+                    # print(f"input_ids input shape: {actual_input.shape}")
             elif x is not None:
                 actual_input = x
                 if hasattr(actual_input, 'shape'):
-                    print(f"x input shape: {actual_input.shape}")
+                    pass
+                    # print(f"x input shape: {actual_input.shape}")
             elif inputs_embeds is not None:
                 actual_input = inputs_embeds
                 if hasattr(actual_input, 'shape'):
-                    print(f"inputs_embeds input shape: {actual_input.shape}")
+                    pass
+                    # print(f"inputs_embeds input shape: {actual_input.shape}")
             else:
                 raise ValueError("No valid input provided to ViT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
             
             # Print the overall input shape for debugging
             if hasattr(actual_input, 'shape'):
-                print(f"Selected input shape: {actual_input.shape}")
+                # print(f"Selected input shape: {actual_input.shape}")
                 if len(actual_input.shape) >= 4:
                     # For typical image input (B, C, H, W)
-                    print(f"Image dimensions (Height × Width): {actual_input.shape[-2]}×{actual_input.shape[-1]}")
+                    pass
+                    # print(f"Image dimensions (Height × Width): {actual_input.shape[-2]}×{actual_input.shape[-1]}")
             
             # Check if actual_input is a tensor and has 1 channel instead of 3
             if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:
-                print(f"Input tensor shape: {actual_input.shape}")
+                # print(f"Input tensor shape: {actual_input.shape}")
+
                 
                 # Handle channel count - convert from 1 to 3 channels if needed
                 if actual_input.shape[1] == 1:
-                    print("Converting 1-channel input to 3-channel by repeating the channel")
+                    # print("Converting 1-channel input to 3-channel by repeating the channel")
                     actual_input = actual_input.repeat(1, 3, 1, 1)
-                    print(f"Converted input shape: {actual_input.shape}")
+                    # print(f"Converted input shape: {actual_input.shape}")
                 
                 # Handle input size - resize all inputs to 224x224 using interpolation
                 if actual_input.shape[2] != 224 or actual_input.shape[3] != 224:
-                    print(f"Resizing input from {actual_input.shape[2]}x{actual_input.shape[3]} to 224x224")
+                    # print(f"Resizing input from {actual_input.shape[2]}x{actual_input.shape[3]} to 224x224")
                     # Use interpolate to resize the tensor to 224x224
                     actual_input = torch.nn.functional.interpolate(
                         actual_input, 
@@ -604,19 +610,19 @@ class TransformerModel:
                         mode='bilinear', 
                         align_corners=False
                     )
-                    print(f"Resized input shape: {actual_input.shape}")
+                    # print(f"Resized input shape: {actual_input.shape}")
             
             # Remove attention_mask from kwargs if it exists - ViT doesn't use it
             vit_kwargs = {k: v for k, v in kwargs.items() if k not in ['attention_mask']}
             
             # Add debug info to see what's being passed to the original forward
-            print(f"Passing to ViT: pixel_values={actual_input.shape if hasattr(actual_input, 'shape') else None}, kwargs={list(vit_kwargs.keys())}")
+            # print(f"Passing to ViT: pixel_values={actual_input.shape if hasattr(actual_input, 'shape') else None}, kwargs={list(vit_kwargs.keys())}")
             
             try:
                 return original_forward(pixel_values=actual_input, **vit_kwargs)
             except Exception as e:
-                print(f"Forward pass error: {str(e)}")
-                print(f"Input shape: {actual_input.shape if hasattr(actual_input, 'shape') else None}, Input type: {type(actual_input)}")
+                # print(f"Forward pass error: {str(e)}")
+                # print(f"Input shape: {actual_input.shape if hasattr(actual_input, 'shape') else None}, Input type: {type(actual_input)}")
                 
                 # Get model configuration to help debug
                 if hasattr(self, 'config'):
@@ -627,7 +633,7 @@ class TransformerModel:
         
         # Replace the forward method
         model.forward = types.MethodType(new_forward, model)
-        print("Custom forward method added to handle different input parameter names and filter unsupported parameters")
+        # print("Custom forward method added to handle different input parameter names and filter unsupported parameters")
 
         # Note: We're using the standard 3-channel approach where grayscale spectrograms
         # are converted to RGB in the feature_extraction method in util.py.
