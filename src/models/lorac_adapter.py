@@ -111,17 +111,14 @@ class LoRACLayer(nn.Module):
             self.groups
         )
         
-        # LoRA-C branch
-        # Compute the layer-wise low-rank adaptation: ΔW = B·A
-        # We implement this as a series of operations that maintain the convolutional structure
+        # Get output dimensions for later reshaping
+        batch_size, _, out_height, out_width = out.shape
         
-        # Reshape input for efficient computation
-        batch_size, _, height, width = x.shape
-        
-        # Compute the LoRA-C contribution
+        # LoRA-C branch implementation
         # First, apply the down projection A
-        # We need to reshape A to be compatible with conv2d
-        lora_A_reshaped = self.lora_A.reshape(self.r * self.in_channels, 1, self.kernel_size_h, self.kernel_size_w)
+        lora_A_reshaped = self.lora_A.reshape(self.r, self.in_channels, self.kernel_size_h, self.kernel_size_w)
+        
+        # Apply down projection using grouped convolution
         x_down = F.conv2d(
             x,
             lora_A_reshaped,
@@ -129,38 +126,41 @@ class LoRACLayer(nn.Module):
             self.stride,
             self.padding,
             self.dilation,
-            self.in_channels  # Use groups=in_channels for depthwise convolution
+            1  # No grouping for down projection
         )
         
         # Apply dropout
         x_down = self.dropout(x_down)
         
-        # Reshape for the up projection
-        x_down = x_down.reshape(batch_size, self.r, -1)
-        
         # Apply the up projection B
-        # We need to reshape B to be compatible with our computation
-        lora_B_reshaped = self.lora_B.permute(0, 3, 1, 2).reshape(
-            self.out_channels * self.r, 1, self.kernel_size_h, self.kernel_size_w
-        )
+        # Reshape B for efficient computation
+        lora_B_reshaped = self.lora_B.reshape(self.out_channels, self.kernel_size_h, self.kernel_size_w, self.r)
+        lora_B_reshaped = lora_B_reshaped.permute(0, 3, 1, 2)  # [out_channels, r, kernel_h, kernel_w]
         
-        # Reshape x_down to match the expected input shape for the up projection
-        x_down = x_down.repeat_interleave(self.out_channels, dim=1)
-        x_down = x_down.reshape(batch_size * self.out_channels, self.r, height, width)
+        # Apply up projection using grouped convolution
+        lora_output = torch.zeros_like(out)
         
-        # Apply the up projection
-        lora_output = F.conv2d(
-            x_down,
-            lora_B_reshaped,
-            None,
-            (1, 1),
-            self.padding,
-            self.dilation,
-            self.r  # Use groups=r for grouped convolution
-        )
-        
-        # Reshape the output to the expected shape
-        lora_output = lora_output.reshape(batch_size, self.out_channels, height, width)
+        # Process each rank dimension separately and sum the results
+        for i in range(self.r):
+            # Extract the i-th rank feature maps
+            x_down_i = x_down[:, i:i+1]  # [batch_size, 1, height, width]
+            
+            # Extract the i-th rank filters for all output channels
+            B_i = lora_B_reshaped[:, i:i+1]  # [out_channels, 1, kernel_h, kernel_w]
+            
+            # Apply convolution for this rank
+            lora_output_i = F.conv2d(
+                x_down_i,
+                B_i,
+                None,
+                1,  # stride of 1
+                self.padding,
+                self.dilation,
+                1  # No grouping
+            )
+            
+            # Add to the output
+            lora_output += lora_output_i
         
         # Scale and add to the output
         return out + self.scaling * lora_output
@@ -173,22 +173,27 @@ class LoRACLayer(nn.Module):
         if self.merged:
             return
             
-        # Compute ΔW = B·A efficiently using tensor operations
-        # Reshape A and B for matrix multiplication
-        A_flat = self.lora_A.reshape(self.r, -1)  # r x (cin*kh*kw)
-        B_flat = self.lora_B.reshape(self.out_channels, -1, self.r)  # cout x (kh*kw) x r
+        # Compute ΔW = B·A efficiently
+        delta_w = torch.zeros_like(self.weight)
         
-        # Compute the matrix multiplication
-        delta_w_flat = torch.bmm(B_flat, A_flat.unsqueeze(0).expand(self.out_channels, -1, -1))  # cout x (kh*kw) x (cin*kh*kw)
+        # Reshape A and B for computation
+        A = self.lora_A.reshape(self.r, self.in_channels, self.kernel_size_h, self.kernel_size_w)
+        B = self.lora_B.reshape(self.out_channels, self.kernel_size_h, self.kernel_size_w, self.r)
         
-        # Reshape back to the weight tensor shape
-        delta_w = delta_w_flat.reshape(
-            self.out_channels, self.kernel_size_h, self.kernel_size_w, 
-            self.in_channels, self.kernel_size_h, self.kernel_size_w
-        )
-        
-        # Sum over the appropriate dimensions to get the final weight update
-        delta_w = delta_w.sum(dim=(1, 2)).permute(0, 1, 2, 3).reshape_as(self.weight)
+        # Compute the weight update for each output channel
+        for i in range(self.out_channels):
+            for j in range(self.r):
+                # For each rank, compute the outer product of B and A
+                B_ij = B[i, :, :, j].unsqueeze(0).unsqueeze(0)  # [1, 1, kernel_h, kernel_w]
+                A_j = A[j]  # [in_channels, kernel_h, kernel_w]
+                
+                # Compute outer product for this rank and add to delta_w
+                for k in range(self.in_channels):
+                    delta_w[i, k] += F.conv2d(
+                        A_j[k].unsqueeze(0).unsqueeze(0),
+                        B_ij,
+                        padding=self.kernel_size_h-1
+                    )[0, 0, :self.kernel_size_h, :self.kernel_size_w]
         
         # Scale and update the original weights
         self.weight.data += self.scaling * delta_w
@@ -202,22 +207,27 @@ class LoRACLayer(nn.Module):
         if not self.merged:
             return
             
-        # Compute ΔW = B·A efficiently using tensor operations
-        # Reshape A and B for matrix multiplication
-        A_flat = self.lora_A.reshape(self.r, -1)  # r x (cin*kh*kw)
-        B_flat = self.lora_B.reshape(self.out_channels, -1, self.r)  # cout x (kh*kw) x r
+        # Compute ΔW = B·A efficiently
+        delta_w = torch.zeros_like(self.weight)
         
-        # Compute the matrix multiplication
-        delta_w_flat = torch.bmm(B_flat, A_flat.unsqueeze(0).expand(self.out_channels, -1, -1))  # cout x (kh*kw) x (cin*kh*kw)
+        # Reshape A and B for computation
+        A = self.lora_A.reshape(self.r, self.in_channels, self.kernel_size_h, self.kernel_size_w)
+        B = self.lora_B.reshape(self.out_channels, self.kernel_size_h, self.kernel_size_w, self.r)
         
-        # Reshape back to the weight tensor shape
-        delta_w = delta_w_flat.reshape(
-            self.out_channels, self.kernel_size_h, self.kernel_size_w, 
-            self.in_channels, self.kernel_size_h, self.kernel_size_w
-        )
-        
-        # Sum over the appropriate dimensions to get the final weight update
-        delta_w = delta_w.sum(dim=(1, 2)).permute(0, 1, 2, 3).reshape_as(self.weight)
+        # Compute the weight update for each output channel
+        for i in range(self.out_channels):
+            for j in range(self.r):
+                # For each rank, compute the outer product of B and A
+                B_ij = B[i, :, :, j].unsqueeze(0).unsqueeze(0)  # [1, 1, kernel_h, kernel_w]
+                A_j = A[j]  # [in_channels, kernel_h, kernel_w]
+                
+                # Compute outer product for this rank and add to delta_w
+                for k in range(self.in_channels):
+                    delta_w[i, k] += F.conv2d(
+                        A_j[k].unsqueeze(0).unsqueeze(0),
+                        B_ij,
+                        padding=self.kernel_size_h-1
+                    )[0, 0, :self.kernel_size_h, :self.kernel_size_w]
         
         # Scale and restore the original weights
         self.weight.data -= self.scaling * delta_w
@@ -244,19 +254,29 @@ def apply_lorac_to_model(
     Returns:
         Model with LoRA-C applied
     """
-    # If no target modules specified, apply to all Conv2d layers
-    if target_modules is None:
-        target_modules = []
-        for name, module in model.named_modules():
-            if isinstance(module, nn.Conv2d):
-                target_modules.append(name)
-    
     # Dictionary to store LoRA-C layers
     lorac_layers = {}
     
+    # If no target modules specified, apply to all Conv2d layers
+    if target_modules is None or len(target_modules) == 0:
+        target_modules_list = []
+        for name, module in model.named_modules():
+            if isinstance(module, nn.Conv2d):
+                target_modules_list.append(name)
+    else:
+        # Convert target_modules to lowercase for case-insensitive matching
+        target_modules_lower = [module.lower() for module in target_modules]
+        target_modules_list = []
+        
+        # Find all modules that match the target module types
+        for name, module in model.named_modules():
+            module_type = module.__class__.__name__.lower()
+            if any(target_type.lower() in module_type for target_type in target_modules_lower) and isinstance(module, nn.Conv2d):
+                target_modules_list.append(name)
+    
     # Replace target modules with LoRA-C layers
     for name, module in model.named_modules():
-        if name in target_modules and isinstance(module, nn.Conv2d):
+        if name in target_modules_list:
             parent_name = '.'.join(name.split('.')[:-1])
             child_name = name.split('.')[-1]
             
