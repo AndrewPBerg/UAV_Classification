@@ -470,6 +470,10 @@ class TransformerModel:
     def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
         """
         Create a ViT model using Hugging Face's implementation.
+        
+        This implementation uses the standard 3-channel approach, where grayscale
+        spectrograms are converted to RGB format before processing. This is handled
+        in the feature_extraction method in util.py.
         """
         model_name = "google/vit-large-patch16-224"
         print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
@@ -512,30 +516,56 @@ class TransformerModel:
         print("Model architecture:")
         print(model)
 
-        # Modify the first layer to accept grayscale input (1 channel instead of 3)
-        print("Modifying ViT model to accept grayscale input (1 channel)...")
+        # Note: We're using the standard 3-channel approach where grayscale spectrograms
+        # are converted to RGB in the feature_extraction method in util.py.
+        # This is simpler and doesn't require modifying the model architecture.
+        
+        # If you want to use the 1-channel approach instead, uncomment the following code:
+        """
+        # 1-CHANNEL APPROACH (ALTERNATIVE)
+        # This modifies the model to accept 1-channel input directly.
+        
+        # First, modify the configuration to expect 1 channel
+        from transformers import ViTConfig
+        config = ViTConfig.from_pretrained(
+            model_name,
+            num_labels=num_classes,
+            cache_dir=CACHE_DIR
+        )
+        config.num_channels = 1  # Set number of channels to 1
+        print(f"Modified config to use {config.num_channels} channels")
+        
+        # Create model with modified config
+        model = ViTForImageClassification.from_pretrained(
+            model_name,
+            config=config,
+            ignore_mismatched_sizes=True
+        )
+        
+        # Get the original projection layer
         original_projection = model.vit.embeddings.patch_embeddings.projection
         print(f"Original projection layer: {original_projection}")
-
-        # Uncomment the following lines if you want to modify the projection layer
-        # model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
-        #     in_channels=3,  # Change from 3 to 1 for grayscale
-        #     out_channels=original_projection.out_channels,
-        #     kernel_size=original_projection.kernel_size,
-        #     stride=original_projection.stride,
-        #     padding=original_projection.padding
-        # )
+        
+        # Modify the projection layer to accept 1-channel input
+        model.vit.embeddings.patch_embeddings.projection = nn.Conv2d(
+            in_channels=1,  # Change from 3 to 1 for grayscale
+            out_channels=original_projection.out_channels,
+            kernel_size=original_projection.kernel_size,
+            stride=original_projection.stride,
+            padding=original_projection.padding
+        )
         
         # Initialize the weights of the new projection layer
-        # with torch.no_grad():
-        #     original_weights = original_projection.weight.data
-        #     new_weights = original_weights.mean(dim=1, keepdim=True)
-        #     model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
-        #     print("New weights initialized for the projection layer.")
-
-        # Set the model configuration to expect 1 channel for grayscale images
-        # model.config.num_channels = 1
-        # print("Model configuration updated to expect 1 channel.")
+        with torch.no_grad():
+            original_weights = original_projection.weight.data
+            new_weights = original_weights.mean(dim=1, keepdim=True)
+            model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
+        
+        # Double-check the configuration
+        print(f"Model config num_channels: {model.config.num_channels}")
+        print(f"Modified projection layer: {model.vit.embeddings.patch_embeddings.projection}")
+        print("Model modified to accept 1-channel input")
+        """
 
         # Apply PEFT configuration
         print("Applying PEFT configuration...")

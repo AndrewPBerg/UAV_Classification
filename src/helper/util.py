@@ -308,22 +308,26 @@ class AudioDataset(Dataset):
 
                 # Convert normalized mel spectrogram to 8-bit image array
                 image_array = (mel_spec_normalized * 255).astype(np.uint8)
-                print(f"Image array shape after normalization: {image_array.shape}")  # Debugging shape
-
+                logger.debug(f"Image array shape: {image_array.shape}")
+                
+                # Create PIL image from grayscale array
                 from PIL import Image
                 pil_img = Image.fromarray(image_array, mode="L")
-                print(f"PIL image size: {pil_img.size}")  # Debugging PIL image size
-
-                # Use the ViTImageProcessor's own preprocessing pipeline
-                features = self.feature_extractor(pil_img, return_tensors="pt")  # Process the PIL image
-                print(f"Features output shape from ViTImageProcessor: {features.pixel_values.shape}")  # Debugging shape
-                tensor_1ch = features.pixel_values[0]  # remove batch dimension
-
-                # Duplicate the tensor across the channel dimension to simulate RGB input
-                tensor_rgb = tensor_1ch.unsqueeze(0).repeat(3, 1, 1)  # Shape: [3, H, W]
-                print(f"Final tensor shape for ViT (simulated RGB): {tensor_rgb.shape}")  # Debugging shape
-
-                return tensor_rgb
+                logger.debug(f"PIL image size: {pil_img.size}")
+                
+                # Convert grayscale PIL image to RGB for ViT processor
+                pil_img_rgb = pil_img.convert('RGB')
+                logger.debug(f"PIL RGB image size: {pil_img_rgb.size}")
+                
+                # Use the ViTImageProcessor's own preprocessing pipeline with RGB image
+                features = self.feature_extractor(pil_img_rgb, return_tensors="pt")
+                logger.debug(f"Features shape from processor: {features.pixel_values.shape}")
+                
+                # This is already a 3-channel tensor from the processor
+                tensor_3ch = features.pixel_values[0]  # remove batch dimension
+                logger.debug(f"Final tensor shape for ViT: {tensor_3ch.shape}")
+                
+                return tensor_3ch
             elif isinstance(self.feature_extractor, WhisperProcessor):
                 # Whisper expects 30-second inputs
                 target_length = 30 * self.target_sr

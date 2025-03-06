@@ -13,7 +13,7 @@ import numpy as np
 import librosa
 import matplotlib.pyplot as plt
 from PIL import Image
-from transformers import ViTForImageClassification, ViTImageProcessor
+from transformers import ViTForImageClassification, ViTImageProcessor, ViTConfig
 from typing import Optional, Tuple, Any
 
 # Set up logging
@@ -22,8 +22,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Constants
-CACHE_DIR = "./cache"
-NUM_CLASSES = 10  # Adjust based on your actual number of classes
+CACHE_DIR = "app/src/model_cache"
+NUM_CLASSES = 9  # Adjust based on your actual number of classes
 SAMPLE_RATE = 16000
 AUDIO_DURATION = 5  # seconds
 
@@ -77,15 +77,21 @@ def process_for_vit_1channel(mel_spec_normalized: np.ndarray):
     pil_img = Image.fromarray(image_array, mode="L")
     logger.info(f"PIL image size: {pil_img.size}")
     
+    # Convert grayscale PIL image to RGB
+    pil_img_rgb = pil_img.convert('RGB')
+    logger.info(f"PIL RGB image size: {pil_img_rgb.size}")
+    
     # Load ViT processor
     processor = ViTImageProcessor.from_pretrained("google/vit-large-patch16-224", cache_dir=CACHE_DIR)
     
     # Process image
-    features = processor(pil_img, return_tensors="pt")
+    features = processor(pil_img_rgb, return_tensors="pt")
+    logger.info(f"Features keys: {features.keys()}")
     logger.info(f"Features shape from processor: {features.pixel_values.shape}")
     
-    # This will be a 1-channel tensor
-    tensor_1ch = features.pixel_values[0]
+    # Get the first channel to simulate 1-channel input
+    tensor_3ch = features.pixel_values[0]  # Shape: [3, H, W]
+    tensor_1ch = tensor_3ch[0:1]  # Take just the first channel, keeping dimension
     logger.info(f"1-channel tensor shape: {tensor_1ch.shape}")
     
     return tensor_1ch, processor
@@ -98,19 +104,25 @@ def process_for_vit_3channel(mel_spec_normalized: np.ndarray):
     
     # Convert normalized mel spectrogram to 8-bit image array
     image_array = (mel_spec_normalized * 255).astype(np.uint8)
+    logger.info(f"Image array shape: {image_array.shape}")
     
     # Create PIL image
     pil_img = Image.fromarray(image_array, mode="L")
+    logger.info(f"PIL image size: {pil_img.size}")
+    
+    # Convert grayscale PIL image to RGB
+    pil_img_rgb = pil_img.convert('RGB')
+    logger.info(f"PIL RGB image size: {pil_img_rgb.size}")
     
     # Load ViT processor
     processor = ViTImageProcessor.from_pretrained("google/vit-large-patch16-224", cache_dir=CACHE_DIR)
     
     # Process image
-    features = processor(pil_img, return_tensors="pt")
-    tensor_1ch = features.pixel_values[0]
+    features = processor(pil_img_rgb, return_tensors="pt")
+    logger.info(f"Features shape from processor: {features.pixel_values.shape}")
     
-    # Duplicate the tensor across the channel dimension to simulate RGB input
-    tensor_3ch = tensor_1ch.repeat(3, 1, 1)  # Shape: [3, H, W]
+    # This is already a 3-channel tensor
+    tensor_3ch = features.pixel_values[0]  # Shape: [3, H, W]
     logger.info(f"3-channel tensor shape: {tensor_3ch.shape}")
     
     return tensor_3ch, processor
@@ -148,13 +160,20 @@ def test_vit_with_1channel(audio_path: str):
     # Try to run inference (this will fail)
     try:
         logger.info("Attempting inference with 1-channel input...")
+        logger.info(f"Input tensor shape: {tensor_1ch.shape}")
+        input_tensor = tensor_1ch.unsqueeze(0)  # Add batch dimension
+        logger.info(f"Input tensor with batch dim: {input_tensor.shape}")
+        
         with torch.no_grad():
-            outputs = model(pixel_values=tensor_1ch.unsqueeze(0))
+            outputs = model(pixel_values=input_tensor)
+        
         logger.info("Inference successful (unexpected!)")
         logger.info(f"Output shape: {outputs.logits.shape}")
     except Exception as e:
         logger.error(f"Error during inference: {str(e)}")
         logger.info("This error is expected - the model requires 3-channel input")
+        import traceback
+        logger.error(traceback.format_exc())  # Print full traceback
 
 def test_vit_with_3channel(audio_path: str):
     """
@@ -188,10 +207,20 @@ def modify_vit_for_1channel():
     """
     logger.info("=== Modifying ViT to accept 1-channel input ===")
     
-    model = ViTForImageClassification.from_pretrained(
+    # First, modify the configuration to expect 1 channel
+    config = ViTConfig.from_pretrained(
         "google/vit-large-patch16-224",
         num_labels=NUM_CLASSES,
         cache_dir=CACHE_DIR
+    )
+    config.num_channels = 1  # Set number of channels to 1
+    logger.info(f"Modified config to use {config.num_channels} channels")
+    
+    # Create model with modified config
+    model = ViTForImageClassification.from_pretrained(
+        "google/vit-large-patch16-224",
+        config=config,
+        ignore_mismatched_sizes=True
     )
     
     # Get the original projection layer
@@ -213,9 +242,8 @@ def modify_vit_for_1channel():
         new_weights = original_weights.mean(dim=1, keepdim=True)
         model.vit.embeddings.patch_embeddings.projection.weight.data = new_weights
     
-    # Update the model configuration
-    model.config.num_channels = 1
-    
+    # Double-check the configuration
+    logger.info(f"Model config num_channels: {model.config.num_channels}")
     logger.info(f"Modified projection layer: {model.vit.embeddings.patch_embeddings.projection}")
     logger.info("Model modified to accept 1-channel input")
     
@@ -238,20 +266,30 @@ def test_modified_vit(audio_path: str):
     # Run inference
     try:
         logger.info("Attempting inference with 1-channel input on modified model...")
+        logger.info(f"Input tensor shape: {tensor_1ch.shape}")
+        input_tensor = tensor_1ch.unsqueeze(0)  # Add batch dimension
+        logger.info(f"Input tensor with batch dim: {input_tensor.shape}")
+        
+        # Verify the model's expected input
+        logger.info(f"Model expects {model.config.num_channels} channels")
+        
         with torch.no_grad():
-            outputs = model(pixel_values=tensor_1ch.unsqueeze(0))
+            outputs = model(pixel_values=input_tensor)
+        
         logger.info("Inference successful!")
         logger.info(f"Output shape: {outputs.logits.shape}")
         logger.info(f"Output logits: {outputs.logits}")
     except Exception as e:
         logger.error(f"Error during inference: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 def main():
     """
     Main function to run the demo.
     """
     # Replace with the path to your audio file
-    audio_path = "path/to/your/audio/file.wav"
+    audio_path = "/app/src/datasets/UAV_Dataset_9/David_Tricopter/David_Tricopter_1.wav"
     
     # Check if the audio file exists
     if not os.path.exists(audio_path):
@@ -260,11 +298,16 @@ def main():
         return
     
     # Run tests
-    test_vit_with_1channel(audio_path)
-    print("\n" + "="*80 + "\n")
-    test_vit_with_3channel(audio_path)
-    print("\n" + "="*80 + "\n")
-    test_modified_vit(audio_path)
+    try:
+        test_vit_with_1channel(audio_path)
+        print("\n" + "="*80 + "\n")
+        test_vit_with_3channel(audio_path)
+        print("\n" + "="*80 + "\n")
+        test_modified_vit(audio_path)
+    except Exception as e:
+        logger.error(f"Unhandled exception in main: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
 
 if __name__ == "__main__":
     main()

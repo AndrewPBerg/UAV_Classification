@@ -111,6 +111,7 @@ class AudioClassifier(pl.LightningModule):
         # Check for problematic 5D input shape for AST model specifically
         # Properly detect if this is an AST model
         is_ast_model = False
+        is_vit_model = False
 
         # Check if this is an AST model by looking for specific attributes
         if hasattr(self.model, 'audio_spectrogram_transformer'):
@@ -119,6 +120,9 @@ class AudioClassifier(pl.LightningModule):
         elif hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'audio-spectrogram-transformer':
             is_ast_model = True
 
+        # Check if this is a ViT model
+        if hasattr(self.model, 'vit') or (hasattr(self.model, 'config') and hasattr(self.model.config, 'model_type') and self.model.config.model_type == 'vit'):
+            is_vit_model = True
             
         
         # Handle 5D input for AST models
@@ -140,12 +144,15 @@ class AudioClassifier(pl.LightningModule):
         
         
         # Forward pass
-        
-
-        outputs = self.model(x)
+        # For ViT models, we need to pass the input as pixel_values
+        if is_vit_model:
+            outputs = self.model(pixel_values=x)
+        else:
+            # For other models, pass the input directly
+            outputs = self.model(x)
 
             
-            # If we're using an AST model and get an error, try one more approach
+        # If we're using an AST model and get an error, try one more approach
         if is_ast_model:                    
             # Try to reshape the input to match expected dimensions
             if len(x.shape) == 4:  # [batch, channels, height, width]
@@ -204,6 +211,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For ViT models, the output is a sequence classification output with logits
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
@@ -211,7 +222,6 @@ class AudioClassifier(pl.LightningModule):
         self.predict_accuracy(y_pred_class, y)
         self.predict_precision(y_pred_class, y)
         self.predict_recall(y_pred_class, y)
-        self.predict_f1(y_pred_class, y)
         
         # Store predictions and targets for later use
         self.predict_batch_preds.append(y_pred_class)
@@ -272,6 +282,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For ViT models, the output is a sequence classification output with logits
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -322,6 +336,10 @@ class AudioClassifier(pl.LightningModule):
         # Forward pass
         y_pred = self(x)
         
+        # For ViT models, the output is a sequence classification output with logits
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
+        
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
         
@@ -354,6 +372,10 @@ class AudioClassifier(pl.LightningModule):
         
         # Forward pass
         y_pred = self(x)
+        
+        # For ViT models, the output is a sequence classification output with logits
+        if hasattr(y_pred, 'logits'):
+            y_pred = y_pred.logits
         
         # Calculate loss
         loss = self.loss_fn(y_pred, y)
