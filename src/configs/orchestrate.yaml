@@ -6,6 +6,7 @@ SEND_MESSAGE: false
 runs:
 
 
+
   - id: 0
     type: script
     changes:
@@ -13,13 +14,30 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: mobilenet_v3_small
         use_wandb: false
         epochs: 2
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+        data_path: /app/src/datasets/UAV_Dataset_9
         num_classes: 9
         adapter_type: none-full
         learning_rate: 0.02
+      
+  - id: 4
+    type: script
+    changes:
+      wandb:
+        project: model-peft-test
+        name: mert-none-classifier
+      general:
+        model_type: mobilenet_v3_small
+        use_wandb: false
+        epochs: 2
+        data_path: /app/src/datasets/UAV_Dataset_9
+        num_classes: 9
+        adapter_type: none-classifier
+        learning_rate: 0.02
+      
+  
   - id: 1
     type: script
     changes:
@@ -27,10 +45,10 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: mobilenet_v3_small 
         use_wandb: false
         epochs: 2
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+        data_path: /app/src/datasets/UAV_Dataset_9
         num_classes: 9
         adapter_type: ssf
         learning_rate: 0.02
@@ -46,10 +64,10 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet18
+        model_type: mobilenet_v3_small
         use_wandb: false
         epochs: 2
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+        data_path: /app/src/datasets/UAV_Dataset_9
         num_classes: 9
         adapter_type: batchnorm
         learning_rate: 0.02
@@ -64,10 +82,10 @@ runs:
         project: model-peft-test
         name: mert-none-classifier
       general:
-        model_type: resnet50
+        model_type: mobilenet_v3_small
         use_wandb: false
         epochs: 2
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
+        data_path: /app/src/datasets/UAV_Dataset_9
         num_classes: 9
         adapter_type: none-classifier
         learning_rate: 0.02
@@ -79,20 +97,3 @@ runs:
         r: 8
         alpha: 8
         dropout: 0
-      
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: mert-none-classifier
-      general:
-        model_type: resnet152
-        use_wandb: false
-        epochs: 2
-        data_path: /Users/applefella/Documents/UAV_Classification/UAV_Classification/.datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
-        learning_rate: 0.02
-      
-  

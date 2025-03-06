@@ -15,7 +15,7 @@ import torch
 import torch.nn as nn
 from typing import Tuple, Optional, Any
 from configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoRACConfig
-from models.ssf_adapter import apply_ssf_to_model
+from .ssf_adapter import apply_ssf_to_model
 from configs import BatchNormConfig
 
 
@@ -193,7 +193,6 @@ def apply_peft(model: nn.Module, peft_config: Optional[PEFTConfig]) -> nn.Module
     
     elif isinstance(peft_config, SSFConfig):
         # Apply SSF adapter to the model
-        from src.models.ssf_adapter import apply_ssf_to_model
         
         model = apply_ssf_to_model(
             model=model,
