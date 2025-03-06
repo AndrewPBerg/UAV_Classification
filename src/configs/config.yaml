@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: hra
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -85,16 +85,15 @@ oft:
   init_weights: true
 layernorm:
   target_modules:
-  - layer_norm
+  - layernorm
   task_type: AUDIO_CLASSIFICATION
 hra:
   r: 4
   target_modules:
-  - q_proj
-  - k_proj
-  - v_proj
-  - out_proj
-  - output_dense
+  - key
+  - value
+  - query
+  - linear
 ssf:
   init_scale: 1.0
   init_shift: 0.0
@@ -103,7 +102,7 @@ bitfit:
   - bias
 wandb:
   project: model-peft-test
-  name: vit-none-full
+  name: vit-hra
   reinit: true
   notes: null
   tags: null

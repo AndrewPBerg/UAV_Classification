@@ -1,98 +1,136 @@
+SEND_MESSAGE: true
+
 runs:
 
-  - id: 0
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-none-classifier
-      general:
-        model_type: vit_b_16
-        use_wandb: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
+  # - id: 0
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-none-classifier
+  #     general:
+  #       model_type: vit
+  #       use_wandb: true
+  #       data_path: /app/src/datasets/UAV_Dataset_9
+  #       num_classes: 9
+  #       adapter_type: none-classifier
   
-  - id: 1
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-none-full
-      general:
-        model_type: vit_b_16
-        adapter_type: none-full
+  # - id: 1
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-none-full
+  #     general:
+  #       model_type: vit
+  #       adapter_type: none-full
 
-  - id: 2
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-lora
-      general:
-        model_type: vit_b_16
-        adapter_type: lora
-      lora:
-        r: 8
+  # - id: 2
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-lora
+  #     general:
+  #       model_type: vit
+  #       adapter_type: lora
+  #     lora:
+  #       target_modules:
+  #       - key
+  #       - value
+  #       - query
+  #       - linear
 
-  - id: 3
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-ia3
-      general:
-        model_type: vit_b_16
-        adapter_type: ia3
+  # - id: 3
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-ia3
+  #     general:
+  #       model_type: vit
+  #       adapter_type: ia3
+  #     ia3:
+  #       target_modules:
+  #       - key
+  #       - value
+  #       - query
+  #       - linear
+  #       feedforward_modules:
+  #       - key
+  #       - value
+  #       - query
+  #       - linear
   
-  - id: 4
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-adalora
-      general:
-        model_type: vit_b_16
-        adapter_type: adalora
+  # - id: 4
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-adalora
+  #     general:
+  #       model_type: vit
+  #       adapter_type: adalora
+  #     adalora:
+  #       target_modules:
+  #       - key
+  #       - value
+  #       - query
+  #       - linear
   
-  - id: 5
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_16-oft
-      general:
-        model_type: vit_b_16
-        adapter_type: oft
+  # - id: 5
+  #   type: script
+  #   changes:
+  #     wandb:
+  #       project: model-peft-test
+  #       name: vit-oft
+  #     general:
+  #       model_type: vit
+  #       adapter_type: oft
+  #     oft:
+  #       target_modules:
+  #       - key
+  #       - value
+  #       - query
+  #       - linear
 
   - id: 6
     type: script
     changes:
       wandb:
         project: model-peft-test
-        name: vit_b_16-layernorm
+        name: vit-layernorm
       general:
-        model_type: vit_b_16
+        model_type: vit
         adapter_type: layernorm
+      layernorm:
+        target_modules:
+        - layernorm
         
   - id: 7
     type: script
     changes:
       wandb:
         project: model-peft-test
-        name: vit_b_16-hra
+        name: vit-hra
       general:
-        model_type: vit_b_16
+        model_type: vit
         adapter_type: hra
+      hra:
+        target_modules:
+        - key
+        - value
+        - query
+        - linear
 
   - id: 8
     type: script
     changes:
       wandb:
         project: model-peft-test
-        name: vit_b_16-ssf
+        name: vit-ssf
       general:
-        model_type: vit_b_16
+        model_type: vit
         adapter_type: ssf
 
   - id: 9
@@ -100,421 +138,7 @@ runs:
     changes:
       wandb:
         project: model-peft-test
-        name: vit_b_16-bitfit
+        name: vit-bitfit
       general:
-        model_type: vit_b_16
-        adapter_type: bitfit
-
-  - id: 10
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-none-classifier
-      general:
-        model_type: vit_b_32
-        adapter_type: none-classifier
-  
-  - id: 11
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-none-full
-      general:
-        model_type: vit_b_32
-        adapter_type: none-full
-
-  - id: 12
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-lora
-      general:
-        model_type: vit_b_32
-        adapter_type: lora
-      lora:
-        r: 8
-
-  - id: 13
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-ia3
-      general:
-        model_type: vit_b_32
-        adapter_type: ia3
-  
-  - id: 14
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-adalora
-      general:
-        model_type: vit_b_32
-        adapter_type: adalora
-  
-  - id: 15
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-oft
-      general:
-        model_type: vit_b_32
-        adapter_type: oft
-
-  - id: 16
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-layernorm
-      general:
-        model_type: vit_b_32
-        adapter_type: layernorm
-        
-  - id: 17
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-hra
-      general:
-        model_type: vit_b_32
-        adapter_type: hra
-
-  - id: 18
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-ssf
-      general:
-        model_type: vit_b_32
-        adapter_type: ssf
-
-  - id: 19
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_b_32-bitfit
-      general:
-        model_type: vit_b_32
-        adapter_type: bitfit
-
-  - id: 20
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-none-classifier
-      general:
-        model_type: vit_l_16
-        use_wandb: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
-  
-  - id: 21
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-none-full
-      general:
-        model_type: vit_l_16
-        adapter_type: none-full
-
-  - id: 22
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-lora
-      general:
-        model_type: vit_l_16
-        adapter_type: lora
-      lora:
-        r: 8
-
-  - id: 23
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-ia3
-      general:
-        model_type: vit_l_16
-        adapter_type: ia3
-  
-  - id: 24
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-adalora
-      general:
-        model_type: vit_l_16
-        adapter_type: adalora
-  
-  - id: 25
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-oft
-      general:
-        model_type: vit_l_16
-        adapter_type: oft
-
-  - id: 26
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-layernorm
-      general:
-        model_type: vit_l_16
-        adapter_type: layernorm
-        
-  - id: 27
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-hra
-      general:
-        model_type: vit_l_16
-        adapter_type: hra
-
-  - id: 28
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-ssf
-      general:
-        model_type: vit_l_16
-        adapter_type: ssf
-
-  - id: 29
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_16-bitfit
-      general:
-        model_type: vit_l_16
-        adapter_type: bitfit
-
-  - id: 30
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-none-classifier
-      general:
-        model_type: vit_l_32
-        use_wandb: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
-  
-  - id: 31
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-none-full
-      general:
-        model_type: vit_l_32
-        adapter_type: none-full
-
-  - id: 32
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-lora
-      general:
-        model_type: vit_l_32
-        adapter_type: lora
-      lora:
-        r: 8
-
-  - id: 33
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-ia3
-      general:
-        model_type: vit_l_32
-        adapter_type: ia3
-  
-  - id: 34
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-adalora
-      general:
-        model_type: vit_l_32
-        adapter_type: adalora
-  
-  - id: 35
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-oft
-      general:
-        model_type: vit_l_32
-        adapter_type: oft
-
-  - id: 36
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-layernorm
-      general:
-        model_type: vit_l_32
-        adapter_type: layernorm
-        
-  - id: 37
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-hra
-      general:
-        model_type: vit_l_32
-        adapter_type: hra
-
-  - id: 38
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-ssf
-      general:
-        model_type: vit_l_32
-        adapter_type: ssf
-
-  - id: 39
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_l_32-bitfit
-      general:
-        model_type: vit_l_32
-        adapter_type: bitfit
-
-  - id: 40
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-none-classifier
-      general:
-        model_type: vit_h_14
-        adapter_type: none-classifier
-  
-  - id: 41
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-none-full
-      general:
-        model_type: vit_h_14
-        adapter_type: none-full
-
-  - id: 42
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-lora
-      general:
-        model_type: vit_h_14
-        adapter_type: lora
-      lora:
-        r: 8
-
-  - id: 43
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-ia3
-      general:
-        model_type: vit_h_14
-        adapter_type: ia3
-  
-  - id: 44
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-adalora
-      general:
-        model_type: vit_h_14
-        adapter_type: adalora
-  
-  - id: 45
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-oft
-      general:
-        model_type: vit_h_14
-        adapter_type: oft
-
-  - id: 46
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-layernorm
-      general:
-        model_type: vit_h_14
-        adapter_type: layernorm
-        
-  - id: 47
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-hra
-      general:
-        model_type: vit_h_14
-        adapter_type: hra
-
-  - id: 48
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-ssf
-      general:
-        model_type: vit_h_14
-        adapter_type: ssf
-
-  - id: 49
-    type: script
-    changes:
-      wandb:
-        project: model-peft-test
-        name: vit_h_14-bitfit
-      general:
-        model_type: vit_h_14
+        model_type: vit
         adapter_type: bitfit
