@@ -16,7 +16,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.02
   patience: 10
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
@@ -115,8 +115,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: testing-metrics
-  name: base-case
+  project: testing-metrics-kfold
+  name: base-case-kfold
   reinit: true
   notes: null
   tags: null

@@ -9,11 +9,11 @@ runs:
     type: script
     changes:
       wandb:
-        project: testing-metrics
-        name: base-case
+        project: testing-metrics-kfold
+        name: base-case-kfold
       general:
         model_type: resnet18
-        use_wandb: false
+        use_wandb: true
         use_sweep: false
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_9
