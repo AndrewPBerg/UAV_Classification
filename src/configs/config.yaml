@@ -115,15 +115,15 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: big-sweep-test-3-6
-  name: should-be-ignored
+  project: testing-metrics
+  name: base-case
   reinit: true
   notes: null
   tags: null
   dir: wandb
 sweep:
-  project: big-sweep-test-3-6
-  name: resnet18-classifier-sweep
+  project: testing-metrics
+  name: resnet18-sweep-metrics
   method: random
   metric:
     name: test_acc
