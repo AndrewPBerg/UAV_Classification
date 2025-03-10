@@ -9,18 +9,18 @@ runs:
     type: sweep
     changes:
       general:
-        model_type: resnet152
+        model_type: resnet50
         use_wandb: true
         use_sweep: true
         use_kfold: false
         data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
         num_classes: 31
         adapter_type: ssf
-        sweep_count: 500
+        sweep_count: 50
         epochs: 15
       sweep:
         project: 3-10-experiments
-        name: resnet-ssf
+        name: resnet50-ssf
         method: random
         metric:
           name: test_acc
@@ -28,28 +28,26 @@ runs:
         parameters:
           learning_rate:
             values:
-            - 0.001
             - 0.005
             - 0.05
+            - 0.1
             - 0.01
           init_scale:
             values:
             - 1.0
             - 2.0
-            - 0.5
+            - 3.0
           init_shift:
             values:
-            - 0.0
             - 0.1
             - 0.2
-            - 0.3
-            - 0.4
+            - 0.5
+            - 0.6
           target_modules: 
             values:
             - [linear, conv2d, batchnorm2d]
             - [conv2d, batchnorm2d]
             - [linear, batchnorm2d]
             - [batchnorm2d]
-            - [conv2d]
             
   

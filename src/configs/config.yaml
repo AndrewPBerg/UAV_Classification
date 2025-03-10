@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
-  model_type: resnet152
+  model_type: resnet50
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -12,7 +12,7 @@ general:
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
-  sweep_count: 500
+  sweep_count: 50
   accumulation_steps: 2
   learning_rate: 0.02
   patience: 10
@@ -123,7 +123,7 @@ wandb:
   dir: wandb
 sweep:
   project: 3-10-experiments
-  name: resnet-ssf
+  name: resnet50-ssf
   method: random
   metric:
     name: test_acc
@@ -131,22 +131,21 @@ sweep:
   parameters:
     learning_rate:
       values:
-      - 0.001
       - 0.005
       - 0.05
+      - 0.1
       - 0.01
     init_scale:
       values:
       - 1.0
       - 2.0
-      - 0.5
+      - 3.0
     init_shift:
       values:
-      - 0.0
       - 0.1
       - 0.2
-      - 0.3
-      - 0.4
+      - 0.5
+      - 0.6
     target_modules:
       values:
       - - linear
@@ -157,4 +156,3 @@ sweep:
       - - linear
         - batchnorm2d
       - - batchnorm2d
-      - - conv2d
