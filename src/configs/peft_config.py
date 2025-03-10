@@ -6,6 +6,7 @@ import torch
 from dataclasses import dataclass, field
 from peft.utils.peft_types import TaskType
 from peft import LoraConfig as PeftLoraConfig
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 from peft import (
     LoraConfig, 
@@ -18,8 +19,8 @@ from peft import (
 )
 
 # Define custom configs for options not available in PEFT
-@dataclass
-class NoneClassifierConfig:
+# @dataclass
+class NoneClassifierConfig(BaseModel):
     """None classifier configuration"""
     adapter_type: str = "none-classifier"
     task_type: str = "SEQ_CLS"
@@ -34,8 +35,8 @@ class NoneClassifierConfig:
             "task_type": self.task_type
         }
 
-@dataclass
-class NoneFullConfig:
+# @dataclass
+class NoneFullConfig(BaseModel):
     """Full configuration"""
     adapter_type: str = "none-full"
     task_type: str = "SEQ_CLS"
@@ -50,14 +51,14 @@ class NoneFullConfig:
             "task_type": self.task_type
         }
 
-@dataclass
-class SSFConfig:
+# @dataclass
+class SSFConfig(BaseModel):
     """Scale-Shift Factor configuration"""
     target_modules: List[str]
     adapter_type: str = "ssf"
     task_type: str = "SEQ_CLS"
-    init_scale: float = 1.0
-    init_shift: float = 0.0
+    init_scale: float
+    init_shift: float
     
     def __iter__(self):
         yield "adapter_type", self.adapter_type
@@ -75,8 +76,8 @@ class SSFConfig:
             "target_modules": self.target_modules
         }
 
-@dataclass
-class BatchNormConfig:
+# @dataclass
+class BatchNormConfig(BaseModel):
     """BatchNorm configuration"""
     target_modules: List[str] = field(default_factory=lambda: ["batchnorm2d"])
     adapter_type: str = "batchnorm"
@@ -96,12 +97,13 @@ class BatchNormConfig:
         
     
 
-@dataclass
-class BitFitConfig:
+# @dataclass
+class BitFitConfig(BaseModel):
     """BitFit configuration (bias-term fine-tuning)"""
     adapter_type: str = "bitfit"
     task_type: str = "SEQ_CLS"
-    trainable_components: List[str] = field(default_factory=lambda: ["bias"])
+    # trainable_components: List[str] = field(default_factory=lambda: ["bias"])
+    trainable_components: List[str] = ["bias"]
     
     def __iter__(self):
         yield "adapter_type", self.adapter_type
@@ -115,15 +117,16 @@ class BitFitConfig:
             "trainable_components": self.trainable_components
         }
 
-@dataclass
-class LoRACConfig:
+# @dataclass
+class LoRACConfig(BaseModel):
     """LoRA-C configuration for CNN models"""
     adapter_type: str = "lorac"
     task_type: str = "SEQ_CLS"
     r: int = 4
     alpha: float = 8.0
     dropout: float = 0.0
-    target_modules: List[str] = field(default_factory=list)
+    # target_modules: List[str] = field(default_factory=list)
+    target_modules: List[str]
     
     def __iter__(self):
         yield "adapter_type", self.adapter_type

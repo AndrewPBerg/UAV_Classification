@@ -6,40 +6,50 @@ SEND_MESSAGE: false
 runs:
 
   - id: 0
-    type: script
+    type: sweep
     changes:
-      wandb:
-        project: testing-metrics-kfold
-        name: base-case-kfold
       general:
-        model_type: resnet18
+        model_type: resnet152
         use_wandb: true
-        use_sweep: false
-        use_kfold: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        num_classes: 9
-        adapter_type: none-classifier
-        sweep_count: 10
-        epochs: 2
+        use_sweep: true
+        use_kfold: false
+        data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+        num_classes: 31
+        adapter_type: ssf
+        sweep_count: 500
+        epochs: 15
       sweep:
-        project: testing-metrics
-        name: resnet18-sweep-metrics
+        project: 3-10-experiments
+        name: resnet-ssf
         method: random
         metric:
           name: test_acc
           goal: maximize
         parameters:
-          seed:
-            values:
-            - 42
-            - 43
-            - 44
-            - 45
-            - 46
           learning_rate:
             values:
             - 0.001
-            - 0.002
-            - 0.003
-            - 0.004
+            - 0.005
+            - 0.05
+            - 0.01
+          init_scale:
+            values:
+            - 1.0
+            - 2.0
+            - 0.5
+          init_shift:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+            - 0.3
+            - 0.4
+          target_modules: 
+            values:
+            - [linear, conv2d, batchnorm2d]
+            - [conv2d, batchnorm2d]
+            - [linear, batchnorm2d]
+            - [batchnorm2d]
+            - [conv2d]
+            
   

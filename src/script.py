@@ -114,12 +114,12 @@ def main():
     #print(model.parameters())
     #sys.exit(1)
     
-    summary(model,
-            col_names=["num_params","trainable"],
-            col_width=20,
-            row_settings=["var_names"])
+    # summary(model,
+    #         col_names=["num_params","trainable"],
+    #         col_width=20,
+    #         row_settings=["var_names"])
 
-    print(model)
+    # print(model)
     # sys.exit(1)
     # Create PyTorch Lightning trainer
     trainer = PTLTrainer(

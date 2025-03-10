@@ -7,6 +7,7 @@ import os
 from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig, LNTuningConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
+from torchinfo import summary
 
 import math
 import logging
@@ -89,6 +90,14 @@ class ModelFactory:
         # Move model to device if specified
         if device is not None:
             model = model.to(device)
+
+            
+        summary(model,
+                col_names=["num_params","trainable"],
+                col_width=20,
+                row_settings=["var_names"])
+
+        print(model)
         
         return model, feature_extractor
     

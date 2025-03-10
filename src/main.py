@@ -144,7 +144,7 @@ def main():
         for error in validation_errors:
             ic(error)
         ic('Exiting...')
-        sys.exit()
+        sys.exit(1)
     
     ic('Orchestrate validation passed.')
 
