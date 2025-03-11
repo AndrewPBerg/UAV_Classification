@@ -341,14 +341,14 @@ class PTLTrainer:
             print("="*80 + "\n")
             
             # Log final test metrics to wandb summary
-            if self.wandb_logger:
-                for metric_name in test_metric_order:
-                    if metric_name in test_results[0]:
-                        value = test_results[0][metric_name]
-                        if isinstance(value, torch.Tensor):
-                            value = value.item()
-                        # Add to wandb summary
-                        self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
+            # if self.wandb_logger:
+            #     for metric_name in test_metric_order:
+            #         if metric_name in test_results[0]:
+            #             value = test_results[0][metric_name]
+            #             if isinstance(value, torch.Tensor):
+            #                 value = value.item()
+            #             # Add to wandb summary
+            #             self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
         
         # Run inference on the inference split if available
         inference_results = {}
@@ -397,8 +397,8 @@ class PTLTrainer:
                     for key, value in inference_results.items():
                         # Log to metrics (regular logging)
                         self.wandb_logger.log_metrics({key: value})
-                        # Also add to wandb summary
-                        self.wandb_logger.experiment.summary[f"final_{key}"] = value
+                        # # Also add to wandb summary
+                        # self.wandb_logger.experiment.summary[f"final_{key}"] = value
             else:
                 print("No inference data available, skipping inference evaluation.")
         except Exception as e:

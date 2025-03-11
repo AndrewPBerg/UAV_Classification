@@ -470,10 +470,10 @@ class AudioClassifier(pl.LightningModule):
                         self.best_val_recall = val_recall.item()
                         
                         # Log best validation metrics
-                        self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         except Exception as e:
             print(f"Warning: Error in on_train_epoch_end: {str(e)}")
             # Don't let this error stop training
