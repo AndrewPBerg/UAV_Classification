@@ -9,7 +9,7 @@ runs:
     type: sweep
     changes:
       general:
-        model_type: resnet50
+        model_type: resnet18
         use_wandb: true
         use_sweep: true
         use_kfold: false
@@ -20,7 +20,7 @@ runs:
         epochs: 15
       sweep:
         project: 3-10-experiments
-        name: resnet50-ssf
+        name: resnet18-ssf-testing-metrics
         method: random
         metric:
           name: test_acc
@@ -28,9 +28,9 @@ runs:
         parameters:
           learning_rate:
             values:
-            - 0.005
             - 0.05
             - 0.1
+            - 0.2
             - 0.01
           init_scale:
             values:

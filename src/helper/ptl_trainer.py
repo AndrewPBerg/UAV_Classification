@@ -1113,12 +1113,12 @@ class PTLTrainer:
         
         return avg_metrics
 
-    # Information about monitoring
-    print(f"Monitoring '{self.general_config.monitor}' in '{self.general_config.mode}' mode for early stopping and checkpointing")
-    print(f"  - Use 'val_loss' or 'val_acc' to monitor validation metrics (recommended)")
-    print(f"  - Use 'test_loss' or 'test_acc' to monitor test metrics (not typically recommended for training decisions)")
-    print(f"  - Use 'min' mode for loss metrics, 'max' mode for accuracy metrics")
-    print("\nTo change monitoring metric, update your config.yaml:")
-    print("  general_config:")
-    print("    monitor: \"val_acc\"  # or test_acc, val_loss, test_loss")
-    print("    mode: \"max\"        # use max for accuracy, min for loss")
+    # # Information about monitoring
+    # print(f"Monitoring '{self.general_config.monitor}' in '{self.general_config.mode}' mode for early stopping and checkpointing")
+    # print(f"  - Use 'val_loss' or 'val_acc' to monitor validation metrics (recommended)")
+    # print(f"  - Use 'test_loss' or 'test_acc' to monitor test metrics (not typically recommended for training decisions)")
+    # print(f"  - Use 'min' mode for loss metrics, 'max' mode for accuracy metrics")
+    # print("\nTo change monitoring metric, update your config.yaml:")
+    # print("  general_config:")
+    # print("    monitor: \"val_acc\"  # or test_acc, val_loss, test_loss")
+    # print("    mode: \"max\"        # use max for accuracy, min for loss")
