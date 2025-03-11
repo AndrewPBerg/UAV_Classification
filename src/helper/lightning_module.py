@@ -296,7 +296,7 @@ class AudioClassifier(pl.LightningModule):
         self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step with manual optimization."""
+        """Training step."""
         # Get optimizer
         opt = self.optimizers()
         
@@ -355,7 +355,7 @@ class AudioClassifier(pl.LightningModule):
         self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
 
-        test_loss = self.test_step(batch, batch_idx)
+        # test_loss = self.test_step(batch, batch_idx)
         
         return loss
     

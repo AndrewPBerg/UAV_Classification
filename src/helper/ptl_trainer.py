@@ -2,7 +2,7 @@ import os
 import torch
 import numpy as np
 import pytorch_lightning as pl
-from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor, TQDMProgressBar
+from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor, TQDMProgressBar, DeviceStatsMonitor, RichModelSummary
 from pytorch_lightning.loggers import WandbLogger
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 import wandb
@@ -85,46 +85,102 @@ class PTLTrainer:
         Get the callbacks for the trainer.
         
         Returns:
-            List of callbacks
+            List[pl.Callback]: List of callbacks
         """
         callbacks = []
         
-        # Early stopping callback
-        if self.general_config.patience > 0:
+        # EarlyStopping callback
+        if self.general_config.early_stopping:
             early_stopping = EarlyStopping(
-                monitor="val_loss",
+                monitor=self.general_config.monitor,
+                mode=self.general_config.mode,
                 patience=self.general_config.patience,
-                mode="min",
                 verbose=True
             )
             callbacks.append(early_stopping)
         
-        # Model checkpoint callback
-        checkpoint_callback = ModelCheckpoint(
-            dirpath="checkpoints",
-            filename="{epoch}-{val_loss:.4f}",
-            monitor="val_loss",
-            mode="min",
-            save_top_k=1,
-            verbose=True
-        )
-        callbacks.append(checkpoint_callback)
+        # ModelCheckpoint callback
+        if self.general_config.checkpointing:
+            filename = "{epoch:02d}-{val_loss:.2f}-{val_acc:.2f}"
+            checkpoint_callback = ModelCheckpoint(
+                monitor=self.general_config.monitor,
+                dirpath=f"checkpoints/{self.general_config.model_type}",
+                filename=filename,
+                save_top_k=self.general_config.save_top_k,
+                mode=self.general_config.mode,
+                verbose=True
+            )
+            callbacks.append(checkpoint_callback)
+            self.checkpoint_callback = checkpoint_callback
         
         # Learning rate monitor
-        lr_monitor = LearningRateMonitor(logging_interval="epoch")
-        callbacks.append(lr_monitor)
+        callbacks.append(LearningRateMonitor(logging_interval='step'))
         
-        # Custom progress bar with better metric display
+        # Custom callback for tracking time
+        callbacks.append(DeviceStatsMonitor())
+        
+        # Device stats monitor
+        callbacks.append(RichModelSummary(max_depth=2))
+        
+        # TestDuringTraining callback
+        class TestDuringTraining(pl.Callback):
+            """Callback that runs testing during training to track test metrics."""
+            
+            def __init__(self, test_every_n_epochs=1, data_module=None):
+                super().__init__()
+                self.test_every_n_epochs = test_every_n_epochs
+                self.data_module = data_module
+                
+            def on_train_epoch_end(self, trainer, pl_module):
+                """Run test step at the end of each training epoch."""
+                if trainer.current_epoch % self.test_every_n_epochs == 0:
+                    # Check if test dataloader is available
+                    if not hasattr(trainer, 'test_dataloaders') or trainer.test_dataloaders is None:
+                        try:
+                            # Try to get test dataloader from datamodule
+                            if hasattr(trainer, 'datamodule'):
+                                test_dataloaders = trainer.datamodule.test_dataloader()
+                            elif self.data_module is not None:
+                                # Use the data_module passed in the constructor
+                                test_dataloaders = self.data_module.test_dataloader()
+                            else:
+                                print("No test dataloader available")
+                                return
+                                
+                            # Run test and log metrics to be available for monitoring
+                            # verbose=False to not clutter the output
+                            test_results = trainer.test(model=pl_module, dataloaders=test_dataloaders, verbose=False)
+                            
+                            # Make test metrics available for monitoring (like early stopping or checkpointing)
+                            if test_results and len(test_results) > 0:
+                                for metric_name, value in test_results[0].items():
+                                    # Log as 'test_X' metrics but also as plain 'X' metrics
+                                    # This makes them available for monitoring without changing config
+                                    pl_module.log(metric_name, value, on_step=False, on_epoch=True)
+                                    
+                                print(f"Epoch {trainer.current_epoch}: Test metrics computed")
+                        except Exception as e:
+                            print(f"Couldn't run test during training: {str(e)}")
+                    else:
+                        # Run test with trainer's test dataloaders
+                        test_results = trainer.test(model=pl_module, verbose=False)
+                        
+                        # Make test metrics available for monitoring
+                        if test_results and len(test_results) > 0:
+                            for metric_name, value in test_results[0].items():
+                                pl_module.log(metric_name, value, on_step=False, on_epoch=True)
+                                
+                            print(f"Epoch {trainer.current_epoch}: Test metrics computed")
+                            
+        # Custom progress bar
         class CustomProgressBar(TQDMProgressBar):
             def get_metrics(self, trainer, model):
                 # Get metrics from parent class
                 items = super().get_metrics(trainer, model)
                 
-                # Format all metrics to 2 decimal places
+                # Format metric values to be more readable
                 for key in list(items.keys()):
-                    if key in ['v_num', 'epoch', 'step']:
-                        continue
-                    if isinstance(items[key], (float, int, torch.Tensor)):
+                    if key != 'v_num' and isinstance(items[key], (int, float)) or (isinstance(items[key], str) and items[key].replace('.', '', 1).isdigit()):
                         try:
                             # Convert to float first to handle tensor values
                             value = float(items[key])
@@ -133,40 +189,32 @@ class PTLTrainer:
                             # If conversion fails, keep the original value
                             pass
                 
-                # Reorder metrics to show in desired order
-                ordered_items = {}
-                
-                # First show epoch and step
-                if 'epoch' in items:
-                    ordered_items['epoch'] = items['epoch']
-                if 'step' in items:
-                    ordered_items['step'] = items['step']
-                
-                # Then show train metrics
-                for metric in ['train_loss', 'train_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show validation metrics
-                for metric in ['val_loss', 'val_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show test metrics
-                for metric in ['test_loss', 'test_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Add any remaining metrics
-                for key, val in items.items():
-                    if key not in ordered_items:
-                        ordered_items[key] = val
-                
+                # Sort items by key to ensure consistent order
+                ordered_items = {k: items[k] for k in sorted(items.keys())}
                 return ordered_items
         
         # Add custom progress bar
         progress_bar = CustomProgressBar()
         callbacks.append(progress_bar)
+
+        # Add TestDuringTraining callback with appropriate frequency
+        if getattr(self.general_config, 'test_during_training', False):
+            test_during_training_freq = getattr(self.general_config, 'test_during_training_freq', 1)
+            callbacks.append(TestDuringTraining(
+                test_every_n_epochs=test_during_training_freq, 
+                data_module=self.data_module
+            ))
+            print(f"Test metrics will be tracked during training every {test_during_training_freq} epoch(s)")
+            
+            # Information about monitoring
+            print(f"Monitoring '{self.general_config.monitor}' in '{self.general_config.mode}' mode for early stopping and checkpointing")
+            print(f"  - Use 'val_loss' or 'val_acc' to monitor validation metrics (recommended)")
+            print(f"  - Use 'test_loss' or 'test_acc' to monitor test metrics (not typically recommended for training decisions)")
+            print(f"  - Use 'min' mode for loss metrics, 'max' mode for accuracy metrics")
+            print("\nTo change monitoring metric, update your config.yaml:")
+            print("  general_config:")
+            print("    monitor: \"val_acc\"  # or test_acc, val_loss, test_loss")
+            print("    mode: \"max\"        # use max for accuracy, min for loss")
 
         return callbacks
     
@@ -195,6 +243,10 @@ class PTLTrainer:
         
         # Create a custom callback to display metrics after each epoch
         class MetricsDisplayCallback(pl.Callback):
+            def __init__(self, general_config):
+                super().__init__()
+                self.general_config = general_config
+                
             def on_train_epoch_end(self, trainer, pl_module):
                 metrics = trainer.callback_metrics
                 
@@ -203,6 +255,10 @@ class PTLTrainer:
                 train_acc = metrics.get('train_acc_epoch', None)
                 val_loss = metrics.get('val_loss', None)
                 val_acc = metrics.get('val_acc', None)
+                
+                # Also look for test metrics if they've been computed
+                test_loss = metrics.get('test_loss', None)
+                test_acc = metrics.get('test_acc', None)
                 
                 # Convert tensors to floats
                 if isinstance(train_loss, torch.Tensor):
@@ -213,6 +269,10 @@ class PTLTrainer:
                     val_loss = val_loss.item()
                 if isinstance(val_acc, torch.Tensor):
                     val_acc = val_acc.item()
+                if isinstance(test_loss, torch.Tensor):
+                    test_loss = test_loss.item()
+                if isinstance(test_acc, torch.Tensor):
+                    test_acc = test_acc.item()
                 
                 # Print metrics in a nice format
                 print("\n" + "-"*50)
@@ -223,14 +283,32 @@ class PTLTrainer:
                 train_acc_str = f"{train_acc:.4f}" if train_acc is not None else "N/A"
                 val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "N/A"
                 val_acc_str = f"{val_acc:.4f}" if val_acc is not None else "N/A"
+                test_loss_str = f"{test_loss:.4f}" if test_loss is not None else "N/A"
+                test_acc_str = f"{test_acc:.4f}" if test_acc is not None else "N/A"
                 
                 print(f"Train Loss: {train_loss_str} | Train Acc: {train_acc_str}")
                 print(f"Val Loss: {val_loss_str} | Val Acc: {val_acc_str}")
+                
+                # Only display test metrics if they exist
+                if test_loss is not None or test_acc is not None:
+                    print(f"Test Loss: {test_loss_str} | Test Acc: {test_acc_str}")
+                
+                # Display monitoring information
+                monitor = getattr(self.general_config, 'monitor', 'val_loss')
+                mode = getattr(self.general_config, 'mode', 'min')
+                
+                # Highlight the monitored metric
+                if monitor in metrics:
+                    monitored_value = metrics[monitor]
+                    if isinstance(monitored_value, torch.Tensor):
+                        monitored_value = monitored_value.item()
+                    print(f"Monitored metric '{monitor}': {monitored_value:.4f} ({mode} mode)")
+                
                 print("-"*50 + "\n")
-        
+                
         # Create trainer with our custom callbacks
         callbacks = self._get_callbacks()
-        callbacks.append(MetricsDisplayCallback())
+        callbacks.append(MetricsDisplayCallback(self.general_config))
         
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
@@ -1034,3 +1112,13 @@ class PTLTrainer:
                 avg_metrics[f"std_{key}"] = std_value
         
         return avg_metrics
+
+    # Information about monitoring
+    print(f"Monitoring '{self.general_config.monitor}' in '{self.general_config.mode}' mode for early stopping and checkpointing")
+    print(f"  - Use 'val_loss' or 'val_acc' to monitor validation metrics (recommended)")
+    print(f"  - Use 'test_loss' or 'test_acc' to monitor test metrics (not typically recommended for training decisions)")
+    print(f"  - Use 'min' mode for loss metrics, 'max' mode for accuracy metrics")
+    print("\nTo change monitoring metric, update your config.yaml:")
+    print("  general_config:")
+    print("    monitor: \"val_acc\"  # or test_acc, val_loss, test_loss")
+    print("    mode: \"max\"        # use max for accuracy, min for loss")
