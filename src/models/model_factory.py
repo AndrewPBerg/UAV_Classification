@@ -8,6 +8,7 @@ from peft import get_peft_model, LoraConfig, IA3Config, AdaLoraConfig, OFTConfig
 from peft.utils.peft_types import TaskType
 from icecream import ic
 from torchinfo import summary
+import wandb
 
 import math
 import logging
@@ -26,6 +27,53 @@ class ModelFactory:
     """
     Factory class for creating models based on configuration.
     """
+    @staticmethod
+    def log_model_parameters(model: nn.Module) -> Dict[str, Any]:
+        """
+        Calculate and log model parameter metrics.
+        
+        Args:
+            model: The PyTorch model
+            
+        Returns:
+            Dictionary containing parameter metrics
+        """
+        # Calculate total parameters
+        total_params = sum(p.numel() for p in model.parameters())
+        
+        # Calculate trainable parameters
+        trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        
+        # Calculate percentage of trainable parameters
+        trainable_percentage = (trainable_params / total_params) * 100 if total_params > 0 else 0
+        
+        # Calculate memory footprint (assuming float32/4 bytes per parameter)
+        memory_footprint_bytes = total_params * 4  # 4 bytes for float32
+        memory_footprint_mb = memory_footprint_bytes / (1024 * 1024)
+        
+        # Create metrics dictionary
+        metrics = {
+            "model/total_parameters": total_params,
+            "model/trainable_parameters": trainable_params,
+            "model/trainable_percentage": trainable_percentage,
+            "model/memory_footprint_mb": memory_footprint_mb
+        }
+        
+        # Log to console
+        print(f"Model Parameters Summary:")
+        print(f"  Total Parameters: {total_params:,}")
+        print(f"  Trainable Parameters: {trainable_params:,}")
+        print(f"  Trainable Parameters (%): {trainable_percentage:.2f}%")
+        print(f"  Memory Footprint: {memory_footprint_mb:.2f} MB")
+        
+        # Log to wandb if it's initialized
+        if wandb.run is not None:
+            wandb.log(metrics)
+            # wandb.summary.update(metrics)
+            # self.wandb_logger.experiment.summary(metrics)
+        
+        return metrics
+    
     @staticmethod
     def create_model(
         general_config: GeneralConfig,
@@ -92,13 +140,16 @@ class ModelFactory:
             model = model.to(device)
 
             
-        summary(model,
-                col_names=["num_params","trainable"],
-                col_width=20,
-                row_settings=["var_names"])
+        # summary(model,
+        #         col_names=["num_params","trainable"],
+        #         col_width=20,
+        #         row_settings=["var_names"])
 
-        print(model)
+        # print(model)
         
+        # Log model parameter metrics
+        ModelFactory.log_model_parameters(model)
+
         return model, feature_extractor
     
     @staticmethod

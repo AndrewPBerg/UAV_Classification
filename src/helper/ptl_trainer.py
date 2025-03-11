@@ -308,47 +308,47 @@ class PTLTrainer:
             })
         
         # Run test evaluation after training
-        print("\n" + "="*80)
-        print("RUNNING TEST EVALUATION")
-        print("="*80 + "\n")
+        # print("\n" + "="*80)
+        # print("RUNNING TEST EVALUATION")
+        # print("="*80 + "\n")
         
-        test_results = trainer.test(
-            model=lightning_module,
-            datamodule=self.data_module
-        )
+        # test_results = trainer.test(
+        #     model=lightning_module,
+        #     datamodule=self.data_module
+        # )
         
-        # Print test results in a nice table
-        if test_results:
-            print("\n" + "="*80)
-            print("TEST RESULTS")
-            print("="*80)
+        # # Print test results in a nice table
+        # if test_results:
+        #     print("\n" + "="*80)
+        #     print("TEST RESULTS")
+        #     print("="*80)
             
-            print(f"{'Metric':<20} {'Value':<10}")
-            print("-"*30)
+        #     print(f"{'Metric':<20} {'Value':<10}")
+        #     print("-"*30)
             
-            # Print test metrics in a specific order
-            test_metric_order = [
-                'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
-            ]
+        #     # Print test metrics in a specific order
+        #     test_metric_order = [
+        #         'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
+        #     ]
             
-            for metric_name in test_metric_order:
-                if metric_name in test_results[0]:
-                    value = test_results[0][metric_name]
-                    if isinstance(value, torch.Tensor):
-                        value = value.item()
-                    print(f"{metric_name:<20} {value:.2f}")
+        #     for metric_name in test_metric_order:
+        #         if metric_name in test_results[0]:
+        #             value = test_results[0][metric_name]
+        #             if isinstance(value, torch.Tensor):
+        #                 value = value.item()
+        #             print(f"{metric_name:<20} {value:.2f}")
             
-            print("="*80 + "\n")
+        #     print("="*80 + "\n")
             
-            # Log final test metrics to wandb summary
-            if self.wandb_logger:
-                for metric_name in test_metric_order:
-                    if metric_name in test_results[0]:
-                        value = test_results[0][metric_name]
-                        if isinstance(value, torch.Tensor):
-                            value = value.item()
-                        # Add to wandb summary
-                        self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
+        #     # Log final test metrics to wandb summary
+        #     if self.wandb_logger:
+        #         for metric_name in test_metric_order:
+        #             if metric_name in test_results[0]:
+        #                 value = test_results[0][metric_name]
+        #                 if isinstance(value, torch.Tensor):
+        #                     value = value.item()
+        #                 # Add to wandb summary
+        #                 self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
         
         # Run inference on the inference split if available
         inference_results = {}
@@ -398,7 +398,7 @@ class PTLTrainer:
                         # Log to metrics (regular logging)
                         self.wandb_logger.log_metrics({key: value})
                         # Also add to wandb summary
-                        self.wandb_logger.experiment.summary[f"final_{key}"] = value
+                        # self.wandb_logger.experiment.summary[f"final_{key}"] = value
             else:
                 print("No inference data available, skipping inference evaluation.")
         except Exception as e:

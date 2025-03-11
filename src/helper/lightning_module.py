@@ -354,6 +354,8 @@ class AudioClassifier(pl.LightningModule):
         self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
+
+        test_loss = self.test_step(batch, batch_idx)
         
         return loss
     
@@ -443,10 +445,10 @@ class AudioClassifier(pl.LightningModule):
             train_recall = self.train_recall.compute()
             
             # Log epoch-level metrics
-            self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
             
             # Also log train loss at epoch level if available
             if hasattr(self, 'current_train_loss'):
