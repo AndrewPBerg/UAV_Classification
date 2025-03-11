@@ -296,7 +296,7 @@ class AudioClassifier(pl.LightningModule):
         self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
-        """Training step with manual optimization."""
+        """Training step."""
         # Get optimizer
         opt = self.optimizers()
         
@@ -354,6 +354,8 @@ class AudioClassifier(pl.LightningModule):
         self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
+
+        # test_loss = self.test_step(batch, batch_idx)
         
         return loss
     
@@ -443,10 +445,10 @@ class AudioClassifier(pl.LightningModule):
             train_recall = self.train_recall.compute()
             
             # Log epoch-level metrics
-            self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
             
             # Also log train loss at epoch level if available
             if hasattr(self, 'current_train_loss'):
@@ -468,10 +470,10 @@ class AudioClassifier(pl.LightningModule):
                         self.best_val_recall = val_recall.item()
                         
                         # Log best validation metrics
-                        self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
+                        # self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
         except Exception as e:
             print(f"Warning: Error in on_train_epoch_end: {str(e)}")
             # Don't let this error stop training

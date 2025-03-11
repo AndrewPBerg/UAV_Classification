@@ -83,7 +83,15 @@ class GeneralConfig(BaseModel):
     k_folds: int = 5
 
     adapter_type: str = "none-classifier"
-
+    
+    # Training monitoring settings
+    early_stopping: bool = True
+    checkpointing: bool = True
+    monitor: str = "test_loss"  # Metric to monitor for early stopping and model checkpointing (val_loss, val_acc, etc.)
+    mode: str = "min"  # "min" for loss metrics, "max" for accuracy metrics
+    save_top_k: int = 1
+    test_during_training: bool = True
+    test_during_training_freq: int = 1  # Run test evaluation every N epochs
 
 class _FeatureExtractionType(BaseModel):
     type: List[str] = ['melspectrogram','mfcc'] 

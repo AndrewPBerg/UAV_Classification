@@ -62,6 +62,8 @@ CMD ["/bin/bash"]
 # Build and run commands (commented out):
     # sudo docker compose build app
     # sudo docker compose run app
+    # sudo docker compose run -d app
+    # sudo docker attach
 
 # prune commands
     # sudo docker image prune
