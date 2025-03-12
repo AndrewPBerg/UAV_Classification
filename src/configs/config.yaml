@@ -133,26 +133,32 @@ sweep:
       values:
       - 0.05
       - 0.1
-      - 0.2
       - 0.01
-    init_scale:
-      values:
-      - 1.0
-      - 2.0
-      - 3.0
-    init_shift:
-      values:
-      - 0.1
-      - 0.2
-      - 0.5
-      - 0.6
-    target_modules:
-      values:
-      - - linear
-        - conv2d
-        - batchnorm2d
-      - - conv2d
-        - batchnorm2d
-      - - linear
-        - batchnorm2d
-      - - batchnorm2d
+    
+
+
+
+
+
+
+    # init_scale:
+    #   values:
+    #   - 1.0
+    #   - 2.0
+    #   - 3.0
+    # init_shift:
+    #   values:
+    #   - 0.1
+    #   - 0.2
+    #   - 0.5
+    #   - 0.6
+    # target_modules:
+    #   values:
+    #   - - linear
+    #     - conv2d
+    #     - batchnorm2d
+    #   - - conv2d
+    #     - batchnorm2d
+    #   - - linear
+    #     - batchnorm2d
+    #   - - batchnorm2d

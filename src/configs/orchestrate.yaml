@@ -18,14 +18,14 @@ runs:
         use_wandb: true
         use_sweep: true
         use_kfold: false
-        data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+        data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ssf
-        sweep_count: 50
+        adapter_type: none-classifier
+        sweep_count: 30
         epochs: 15
       sweep:
         project: resnet-experiments
-        name: resnet18-ssf-3-augs
+        name: resnet18-none-classifer-0-augs
         method: random
         metric:
           name: test_acc
@@ -37,23 +37,10 @@ runs:
             - 0.1
             - 0.2
             - 0.01
-          init_scale:
-            values:
-            - 1.0
-            - 2.0
-            - 3.0
-          init_shift:
-            values:
-            - 0.1
-            - 0.2
-            - 0.5
-            - 0.6
-          target_modules: 
-            values:
-            - [linear, conv2d, batchnorm2d]
-            - [conv2d, batchnorm2d]
-            - [linear, batchnorm2d]
-            - [batchnorm2d]
+          seed:
+          # TODO randomize through wandb API
+          # TODO rename all the other names for resnet model none-classifier
+          
   - id: 1
     type: sweep
     changes:
