@@ -18,14 +18,14 @@ runs:
         use_wandb: true
         use_sweep: true
         use_kfold: false
-        data_path: /app/src/datasets/UAV_Dataset_31
+        data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
         num_classes: 31
-        adapter_type: none-classifier
-        sweep_count: 30
-        epochs: 15
+        adapter_type: lorac
+        sweep_count: 50
+        epochs: 30
       sweep:
         project: resnet-experiments
-        name: resnet18-none-classifer-0-augs
+        name: resnet50-none-classifer-0-augs
         method: random
         metric:
           name: test_acc
@@ -33,14 +33,29 @@ runs:
         parameters:
           learning_rate:
             values:
-            - 0.05
+            - 0.1
+            - 0.01
+            - 0.001
+          target_modules:
+            values:
+            - [linear,conv2d, batchnorm2d]
+            - [conv2d,linear]
+            - [batchnorm2d, linear]
+          r: 
+            values:
+            - 8
+            - 4
+            - 2
+          alpha:
+            values:
+            - 4
+            - 8
+            - 16
+          dropout: 
+            values:
+            - 0
             - 0.1
             - 0.2
-            - 0.01
-          seed:
-            distribution: int_uniform
-            min: 0
-            max: 1000
           
   - id: 1
     type: sweep
@@ -49,7 +64,7 @@ runs:
         model_type: resnet50
       sweep:
         project: resnet-experiments
-        name: resnet50-none-classifer-0-augs
+        name: resnet50-lorac-0-augs
         method: random
 
   - id: 2
@@ -59,7 +74,7 @@ runs:
         model_type: resnet152
       sweep:
         project: resnet-experiments
-        name: resnet152-none-classifier-0-augs
+        name: resnet152-lorac-0-augs
   
   - id: 3
     type: sweep
@@ -69,7 +84,7 @@ runs:
         data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
       sweep:
         project: resnet-experiments
-        name: resnet18-none-classifier-3-augs
+        name: resnet18-lorac-3-augs
 
   - id: 4
     type: sweep
@@ -78,14 +93,15 @@ runs:
         model_type: resnet50
       sweep:
         project: resnet-experiments
-        name: resnet50-none-classifier-3-augs
+        name: resnet50-lorac-3-augs
 
+  - id: 5
     type: sweep
     changes:
       general:
         model_type: resnet152
       sweep:
         project: resnet-experiments
-        name: resnet152-none-classifier-3-augs
+        name: resnet152-lorac-3-augs
             
   

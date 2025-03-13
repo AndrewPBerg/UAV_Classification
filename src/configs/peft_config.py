@@ -239,11 +239,11 @@ def get_peft_config(config: dict) -> Optional[PEFTConfig]:
             
             match adapter_type:
                 case "lorac":
-                    lorac_config = config["lorac"].copy()
+                    lorac_config = config.copy()
                     lorac_config["task_type"] = "SEQ_CLS"
                     return LoRACConfig(**lorac_config)
                 case "batchnorm":
-                    batchnorm_config = config["batchnorm"].copy()
+                    batchnorm_config = config.copy()
                     batchnorm_config["task_type"] = "SEQ_CLS"
                     return BatchNormConfig(**batchnorm_config)
                 case "lora":

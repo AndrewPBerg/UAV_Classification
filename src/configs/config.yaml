@@ -1,5 +1,5 @@
 general:
-  data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+  data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
   model_type: resnet18
@@ -7,7 +7,7 @@ general:
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
-  epochs: 15
+  epochs: 30
   save_model: false
   test_size: 0.2
   inference_size: 0.1
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: ssf
+  adapter_type: lorac
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -110,7 +110,7 @@ lorac:
   - batchnorm2d
   r: 8
   alpha: 8
-  dropout: 0
+  dropout: 0.1
 bitfit:
   trainable_components:
   - bias
@@ -122,8 +122,8 @@ wandb:
   tags: null
   dir: wandb
 sweep:
-  project: 3-10-experiments
-  name: resnet18-ssf-testing-metrics
+  project: resnet-experiments
+  name: resnet50-none-classifer-0-augs
   method: random
   metric:
     name: test_acc
@@ -131,38 +131,30 @@ sweep:
   parameters:
     learning_rate:
       values:
-      - 0.05
       - 0.1
       - 0.01
-    seed:
-      distribution: int_uniform
-      min: 0
-      max: 1000
-    
-
-
-
-
-
-
-    # init_scale:
-    #   values:
-    #   - 1.0
-    #   - 2.0
-    #   - 3.0
-    # init_shift:
-    #   values:
-    #   - 0.1
-    #   - 0.2
-    #   - 0.5
-    #   - 0.6
-    # target_modules:
-    #   values:
-    #   - - linear
-    #     - conv2d
-    #     - batchnorm2d
-    #   - - conv2d
-    #     - batchnorm2d
-    #   - - linear
-    #     - batchnorm2d
-    #   - - batchnorm2d
+      - 0.001
+    target_modules:
+      values:
+      - - linear
+        - conv2d
+        - batchnorm2d
+      - - conv2d
+        - linear
+      - - batchnorm2d
+        - linear
+    r:
+      values:
+      - 8
+      - 4
+      - 2
+    alpha:
+      values:
+      - 4
+      - 8
+      - 16
+    dropout:
+      values:
+      - 0
+      - 0.1
+      - 0.2
