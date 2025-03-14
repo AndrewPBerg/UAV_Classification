@@ -10,7 +10,7 @@ SEND_MESSAGE: true
 runs:
 # TODO update the config to work with new sweep :)
 # TODO a script to make sure it works 
-  - id: 100
+  - id: 10
     type: script
     changes:
       general:
