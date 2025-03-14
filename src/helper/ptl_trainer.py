@@ -426,18 +426,18 @@ class PTLTrainer:
                 results_dict[key] = value
         
         # Log best validation metrics to wandb summary
-        if self.wandb_logger and hasattr(lightning_module, 'best_val_accuracy'):
-            self.wandb_logger.experiment.summary['final_best_val_acc'] = lightning_module.best_val_accuracy
+        # if self.wandb_logger and hasattr(lightning_module, 'best_val_accuracy'):
+        #     self.wandb_logger.experiment.summary['final_best_val_acc'] = lightning_module.best_val_accuracy
             
-            # Log other best validation metrics if available
-            if hasattr(lightning_module, 'best_val_f1'):
-                self.wandb_logger.experiment.summary['final_best_val_f1'] = lightning_module.best_val_f1
+        #     # Log other best validation metrics if available
+        #     if hasattr(lightning_module, 'best_val_f1'):
+        #         self.wandb_logger.experiment.summary['final_best_val_f1'] = lightning_module.best_val_f1
             
-            if hasattr(lightning_module, 'best_val_precision'):
-                self.wandb_logger.experiment.summary['final_best_val_precision'] = lightning_module.best_val_precision
+        #     if hasattr(lightning_module, 'best_val_precision'):
+        #         self.wandb_logger.experiment.summary['final_best_val_precision'] = lightning_module.best_val_precision
                 
-            if hasattr(lightning_module, 'best_val_recall'):
-                self.wandb_logger.experiment.summary['final_best_val_recall'] = lightning_module.best_val_recall
+        #     if hasattr(lightning_module, 'best_val_recall'):
+        #         self.wandb_logger.experiment.summary['final_best_val_recall'] = lightning_module.best_val_recall
         
         # Print a summary of all metrics at the end
         print("\n" + "="*80)
