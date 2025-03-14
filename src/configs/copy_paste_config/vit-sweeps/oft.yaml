@@ -1,0 +1,73 @@
+# This file is used to orchestrate the sweeps and script in main.py
+# Define a list of runs that can be easily iterated over
+
+
+# resnet18,resnet50,resnet152, mobilenet_v3_small, mobilenet_v3_large, efficientnet_b0, efficientnet_b4, efficientnet_b7
+
+# ast, vit, vit
+SEND_MESSAGE: true
+
+runs:
+# TODO update the config to work with new sweep :)
+# TODO a script to make sure it works 
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: vit
+        use_wandb: false
+        use_sweep: false
+        use_kfold: false
+        data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
+        num_classes: 31
+        adapter_type: oft
+        sweep_count: 50
+        epochs: 30
+          
+  - id: 0
+    type: sweep
+    changes:
+      general:
+        model_type: vit
+        use_wandb: true
+        use_sweep: true
+        use_kfold: false
+        data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
+        num_classes: 31
+        adapter_type: oft
+        sweep_count: 50
+        epochs: 30
+      sweep:
+        project: vit-experiments
+        name: vit-oft-0-augs
+        method: random
+        metric:
+          name: test_acc
+          goal: maximize
+        parameters: # TODO configure hyperparameters
+          # oft:
+          #   r: 768
+          #   target_modules:
+          #   - key
+          #   - value
+          #   - query
+          # module_dropout: 0.0
+          # init_weights: true
+          
+  - id: 1
+    type: sweep
+    changes:
+      general:
+        model_type: vit
+        data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+      sweep:
+        name: vit-oft-3-augs
+
+  - id: 2
+    type: sweep
+    changes:
+      general:
+        model_type: vit
+        data_path: /app/src/datasets/static/31-augs-5-time_stretch-sin_distortion
+      sweep:
+        name: vit-oft-5-augs
