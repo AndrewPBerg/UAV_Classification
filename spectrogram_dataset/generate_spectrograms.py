@@ -9,9 +9,13 @@ from pathlib import Path
 import sys
 
 def main():
+    DIR_NAME = 'UAV_31_MEL_SPECTROGRAM_PLOTS'
+    print(f"Starting to generate spectrograms in directory: {DIR_NAME}")
+    # 'UAV_9_MEL_SPECTROGRAM_PLOTS'
     # Get the current file's directory and navigate to .datasets
     current_dir = Path(__file__).resolve().parent
-    datasets_dir = current_dir.parent / '.datasets' / 'UAV_Dataset_9'
+    datasets_dir = current_dir.parent / '.datasets' / 'UAV_Dataset_31'
+    print(f"Datasets directory: {datasets_dir}")
 
     # Function to get all audio files recursively
     def get_audio_files(root_dir: Path):
@@ -19,6 +23,7 @@ def main():
 
     # Get all WAV files from datasets
     audio_files = get_audio_files(datasets_dir)
+    print(f"Found {len(audio_files)} audio files.")
 
     # Setup spectrogram parameters
     sampling_rate = 16000
@@ -39,6 +44,7 @@ def main():
     # Process each audio file
     for audio_path in audio_files:
         try:
+            print(f"Processing audio file: {audio_path}")
             # Load the audio file
             waveform, sample_rate = torchaudio.load(str(audio_path))
             
@@ -47,9 +53,9 @@ def main():
             mel_spec_db = torch.log10(mel_spec + 1e-9)
             
             # Create output directory for spectrograms
-            output_dir = current_dir / 'UAV_9_MEL_SPECTROGRAM_PLOTS' / audio_path.parent.name
-            # print(output_dir)
+            output_dir = current_dir / DIR_NAME / audio_path.parent.name
             output_dir.mkdir(parents=True, exist_ok=True)
+            print(f"Output directory created: {output_dir}")
             
             # Plot and save
             plt.figure(figsize=(12, 8))
@@ -63,14 +69,10 @@ def main():
             output_path = output_dir / f"{audio_path.stem}_mel_spectrogram.png"
             plt.savefig(str(output_path), format='png', dpi=300, bbox_inches='tight')
             plt.close()
-            
-            # print(f"Processed: {audio_path.name}")
-            # sys.exit()
+            print(f"Saved spectrogram to: {output_path}")
             
         except Exception as e:
             print(f"Error processing {audio_path}: {str(e)}")
-
-
 
 if __name__ == '__main__':
     main()
