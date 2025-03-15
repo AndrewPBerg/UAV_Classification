@@ -137,8 +137,8 @@ class LoRACLayer(nn.Module):
         lora_B_reshaped = self.lora_B.reshape(self.out_channels, self.kernel_size_h, self.kernel_size_w, self.r)
         lora_B_reshaped = lora_B_reshaped.permute(0, 3, 1, 2)  # [out_channels, r, kernel_h, kernel_w]
         
-        # Apply up projection using grouped convolution
-        lora_output = torch.zeros_like(out)
+        # Initialize lora_output with zeros that require grad
+        lora_output = torch.zeros_like(out, requires_grad=True)
         
         # Process each rank dimension separately and sum the results
         for i in range(self.r):
@@ -160,10 +160,10 @@ class LoRACLayer(nn.Module):
             )
             
             # Add to the output
-            lora_output += lora_output_i
+            lora_output = lora_output + lora_output_i
         
-        # Scale and add to the output
-        return out + self.scaling * lora_output
+        # Scale and add to the output, ensuring we maintain gradient information
+        return out + (self.scaling * lora_output)
     
     def merge_weights(self) -> None:
         """
