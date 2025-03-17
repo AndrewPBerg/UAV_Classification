@@ -1,3 +1,7 @@
+# Papers
+
+- Accepted: DATA 2025 Conference (paper link TBD)
+
 # UAV Classification
 
 This repository contains a machine learning project for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
