@@ -1,8 +1,8 @@
 general:
-  data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+  data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
-  model_type: resnet152
+  model_type: efficientnet_b0
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -12,16 +12,16 @@ general:
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
-  sweep_count: 50
+  sweep_count: 30
   accumulation_steps: 2
   learning_rate: 0.02
   patience: 10
-  use_wandb: false
-  use_sweep: false
+  use_wandb: true
+  use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: none-classifier
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -122,8 +122,8 @@ wandb:
   tags: null
   dir: wandb
 sweep:
-  project: resnet-experiments
-  name: broke-for-sweeps
+  project: efficientnet-experiments
+  name: efficientnet_b0-none-classifier-0-augs
   method: random
   metric:
     name: test_acc
@@ -134,20 +134,7 @@ sweep:
       - 0.1
       - 0.01
       - 0.001
-    target_modules:
-    - batchnorm2d
-    r:
-      values:
-      - 8
-      - 4
-      - 2
-    alpha:
-      values:
-      - 4
-      - 8
-      - 16
-    dropout:
-      values:
-      - 0
-      - 0.1
-      - 0.2
+    seed:
+      distribution: int_uniform
+      min: 0
+      max: 1000
