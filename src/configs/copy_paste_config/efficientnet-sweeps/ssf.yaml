@@ -7,6 +7,13 @@
 # ast, mert, vit
 SEND_MESSAGE: true
 
+# taget_modules:
+# BatchNorm2d
+# Conv2dNormActivation
+# Conv2d
+# SiLU
+# Linear
+
 runs:
 # TODO update the config to work with new sweep :)
 # TODO a script to make sure it works 
@@ -14,23 +21,24 @@ runs:
     type: script
     changes:
       general:
-        model_type: efficientnet_b0
+        # model_type: efficientnet_b0
+        model_type: resnet18
         use_wandb: false
         use_sweep: false
         use_kfold: false
         data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: batchnorm
         sweep_count: 50
         epochs: 30
-      sweep:
-        project: efficientnet-experiments
-        name: efficientnet_b0-ssf-0-augs
-        method: random
-        metric:
-          name: test_acc
-          goal: maximize
-        parameters:
+      # sweep:
+      #   project: efficientnet-experiments
+      #   name: efficientnet_b0-ssf-0-augs
+      #   method: random
+      #   metric:
+      #     name: test_acc
+      #     goal: maximize
+      #   parameters:
           # TODO add hyperparameters
           
   - id: 0
@@ -54,7 +62,40 @@ runs:
           name: test_acc
           goal: maximize
         parameters:
-          # TODO add hyperparameters
+          init_scale:
+            values:
+            - 0.11
+            - 0.2
+            - 0.3
+          init_shift:
+            values:
+            - 0
+            - 0.05
+            - 0.1
+          target_modules:
+            learning_rate:
+              values:
+              - 0.05
+              - 0.1
+              - 0.2
+              - 0.01
+            init_scale:
+              values:
+              - 1.0
+              - 2.0
+              - 3.0
+            init_shift:
+              values:
+              - 0.1
+              - 0.2
+              - 0.5
+              - 0.6
+            target_modules: 
+              values:
+              - [linear, conv2d, batchnorm2d,]
+              - [conv2d, batchnorm2d]
+              - [linear, batchnorm2d]
+              - [batchnorm2d]
           
   - id: 1
     type: sweep
