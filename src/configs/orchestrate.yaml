@@ -7,13 +7,6 @@
 # ast, mert, vit
 SEND_MESSAGE: true
 
-# taget_modules:
-# BatchNorm2d
-# Conv2dNormActivation
-# Conv2d
-# SiLU
-# Linear
-
 runs:
 # TODO update the config to work with new sweep :)
 # TODO a script to make sure it works 
@@ -21,25 +14,24 @@ runs:
   #   type: script
   #   changes:
   #     general:
-  #       # model_type: efficientnet_b0
-  #       model_type: resnet18
+  #       model_type: efficientnet_b0
   #       use_wandb: false
   #       use_sweep: false
   #       use_kfold: false
   #       data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
   #       num_classes: 31
-  #       adapter_type: batchnorm
+  #       adapter_type: lorac
   #       sweep_count: 50
   #       epochs: 30
       # sweep:
       #   project: efficientnet-experiments
-      #   name: efficientnet_b0-ssf-0-augs
+      #   name: efficientnet_b0-lorac-0-augs
       #   method: random
       #   metric:
       #     name: test_acc
       #     goal: maximize
       #   parameters:
-          # TODO add hyperparameters
+      #     # TODO add hyperparameters
           
   - id: 0
     type: sweep
@@ -51,40 +43,40 @@ runs:
         use_kfold: false
         data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: lorac
         sweep_count: 50
         epochs: 30
       sweep:
         project: efficientnet-experiments
-        name: efficientnet_b0-ssf-0-augs
+        name: efficientnet_b0-lorac-0-augs
         method: random
         metric:
           name: test_acc
           goal: maximize
         parameters:
-          learning_rate:
+          target_modules:
             values:
-            - 0.05
-            - 0.1
-            - 0.2
-            - 0.01
-          init_scale:
-            values:
-            - 1.0
-            - 2.0
-            - 3.0
-          init_shift:
-            values:
-            - 0.1
-            - 0.2
-            - 0.5
-            - 0.6
-          target_modules: 
-            values:
-            - [linear, conv2d, batchnorm2d,]
+            - [linear, conv2d, batchnorm2d]
             - [conv2d, batchnorm2d]
-            - [linear, batchnorm2d]
             - [batchnorm2d]
+            - [conv2d]
+          r:
+            values:
+            - 8
+            - 16
+            - 4
+            - 32
+          alpha:
+            values: 
+            - 8
+            - 16
+            - 32
+            - 4
+          dropout:
+            values:
+            - 0.1
+            - 0
+            - 0.2
           
   - id: 1
     type: sweep
@@ -92,7 +84,7 @@ runs:
       general:
         model_type: efficientnet_b4
       sweep:
-        name: efficientnet_b4-ssf-0-augs
+        name: efficientnet_b4-lorac-0-augs
 
   - id: 2
     type: sweep
@@ -100,7 +92,7 @@ runs:
       general:
         model_type: efficientnet_b7
       sweep:
-        name: efficientnet_b7-ssf-0-augs
+        name: efficientnet_b7-lorac-0-augs
   
   - id: 3
     type: sweep
@@ -109,7 +101,7 @@ runs:
         model_type: efficientnet_b0
         data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
       sweep:
-        name: efficientnet_b0-ssf-3-augs
+        name: efficientnet_b0-lorac-3-augs
 
   - id: 4
     type: sweep
@@ -117,7 +109,7 @@ runs:
       general:
         model_type: efficientnet_b4
       sweep:
-        name: efficientnet_b4-ssf-3-augs
+        name: efficientnet_b4-lorac-3-augs
 
   - id: 5
     type: sweep
@@ -125,70 +117,5 @@ runs:
       general:
         model_type: efficientnet_b7
       sweep:
-        name: efficientnet_b7-ssf-3-augs
-  
-
-  # - id: 0
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       use_wandb: true
-  #       use_sweep: true
-  #       use_kfold: false
-  #       data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
-  #       num_classes: 31
-  #       adapter_type: batchnorm
-  #       sweep_count: 50
-  #       epochs: 30
-  #     sweep:
-  #       project: efficientnet-experiments
-  #       name: efficientnet_b0-batchnorm-0-augs
-  #       method: random
-  #       metric:
-  #         name: test_acc
-  #         goal: maximize
-  #       parameters:
-  #         # TODO add hyperparameters
-          
-  # - id: 1
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b4
-  #     sweep:
-  #       name: efficientnet_b4-batchnorm-0-augs
-
-  # - id: 2
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b7
-  #     sweep:
-  #       name: efficientnet_b7-batchnorm-0-augs
-  
-  # - id: 3
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
-  #     sweep:
-  #       name: efficientnet_b0-batchnorm-3-augs
-
-  # - id: 4
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b4
-  #     sweep:
-  #       name: efficientnet_b4-batchnorm-3-augs
-
-  # - id: 5
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b7
-  #     sweep:
-  #       name: efficientnet_b7-batchnorm-3-augs
+        name: efficientnet_b7-lorac-3-augs
   

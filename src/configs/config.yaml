@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: ssf
+  adapter_type: lorac
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -108,9 +108,9 @@ lorac:
   - linear
   - conv2d
   - batchnorm2d
-  r: 8
+  r: 4
   alpha: 8
-  dropout: 0.1
+  dropout: 0
 bitfit:
   trainable_components:
   - bias
@@ -123,29 +123,12 @@ wandb:
   dir: wandb
 sweep:
   project: efficientnet-experiments
-  name: efficientnet_b0-ssf-0-augs
+  name: efficientnet_b0-lorac-0-augs
   method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    learning_rate:
-      values:
-      - 0.05
-      - 0.1
-      - 0.2
-      - 0.01
-    init_scale:
-      values:
-      - 1.0
-      - 2.0
-      - 3.0
-    init_shift:
-      values:
-      - 0.1
-      - 0.2
-      - 0.5
-      - 0.6
     target_modules:
       values:
       - - linear
@@ -153,6 +136,22 @@ sweep:
         - batchnorm2d
       - - conv2d
         - batchnorm2d
-      - - linear
-        - batchnorm2d
       - - batchnorm2d
+      - - conv2d
+    r:
+      values:
+      - 8
+      - 16
+      - 4
+      - 32
+    alpha:
+      values:
+      - 8
+      - 16
+      - 32
+      - 4
+    dropout:
+      values:
+      - 0.1
+      - 0
+      - 0.2
