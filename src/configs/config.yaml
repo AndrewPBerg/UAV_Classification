@@ -1,8 +1,8 @@
 general:
-  data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
+  data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
-  model_type: efficientnet_b0
+  model_type: efficientnet_b7
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -12,7 +12,7 @@ general:
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
-  sweep_count: 50
+  sweep_count: 25
   accumulation_steps: 2
   learning_rate: 0.02
   patience: 10
@@ -123,7 +123,7 @@ wandb:
   dir: wandb
 sweep:
   project: efficientnet-experiments
-  name: efficientnet_b0-lorac-0-augs
+  name: efficientnet_b7-lorac-3-augs
   method: random
   metric:
     name: test_acc
@@ -133,10 +133,9 @@ sweep:
       values:
       - - linear
         - conv2d
-        - batchnorm2d
+        - BatchNorm2d
       - - conv2d
-        - batchnorm2d
-      - - batchnorm2d
+        - BatchNorm2d
       - - conv2d
     r:
       values:
