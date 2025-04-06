@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+title: "UAV Classifcation training approaches on small data"
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+authors:
+  - family-names: Andrew
+    given-names: Berg
+  - name: ""
+abstract:  >-
+  Small data approaches to training deep neural networks given a small UAV dataset
+license: MIT
+license-url: "https://github.com/AndrewPBerg/UAV_Classification/blob/master/LICENSE"
+repository-code: "https://github.com/AndrewPBerg/UAV_Classification"
+keywords:
+  - audio classification
+  - UAV
+type: software

@@ -1,41 +1,25 @@
-# Papers
+# Papers 📜
 
-- Accepted: DATA 2025 Conference (paper link TBD)
+- Accepted DATA 2025 Conference Paper (paper link TBD): 4,500 Seconds: Small Data Training Approaches for Deep UAV Audio Classification
+- Upcoming: 15,500 Seconds
 
-# UAV Classification
+# UAV Classification 🛩️
 
-This repository contains a machine learning project for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
+Code repository for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
 
-# **NOTE**
+# **NOTE** 📎
 
 The Datasets used in this project are not included in the repository due to their visibility -> We have decided not to open-source the datasets.
 
 If you would like to use the codebase, please use this example directory to store your datasets. and update the `config.yaml` file to point to your datasets.
 
-## Project Structure
+## Prerequisites 🔮
 
-```
-├── src/                    # Source code directory
-│   ├── main.py            # Main training script
-│   ├── script.py          # Utility scripts
-│   ├── sweeps.py          # Hyperparameter tuning
-│   ├── config.yaml        # Configuration file
-│   ├── helper/            # Helper functions
-│   ├── notebooks/         # Jupyter notebooks
-│   └── run_configs/       # Run configurations
-├── .datasets/             # Dataset directory
-├── docker-compose.yml     # Docker compose configuration
-├── Dockerfile            # Docker build instructions
-└── requirements.txt      # Python dependencies
-```
-
-## Prerequisites
-
-- Docker and Docker Compose
+- Docker
 - Python 3.8+
 - CUDA-compatible GPU (recommended)
 
-## Setup
+## Setup 🏗️
 
 1. Clone the repository:
 ```bash
@@ -48,45 +32,28 @@ cd UAV_Classification_repo
 cp .env.example .env
 ```
 
-3. Install dependencies (if running locally):
-> Note: If you are running the container, you can skip this step.
-```bash
-pip install -r requirements.txt
-```
-
-4. Build and using Docker:
+3. Build and using Docker:
 
 ```bash
 docker compose build app
 ```
 
+## Environment Variables 📨
 
-
-## Environment Variables
-
-Create a `.env` file in the root directory with the following variables:
+Create a `.env` file in the root directory with the following variables (see [.env.example](https://github.com/AndrewPBerg/UAV_Classification/blob/master/.env.example)):
 > Note: see setup section for more details
 
 - `WANDB_API_KEY`: Your Weights & Biases API key
 - `BOT_TOKEN`: Telegram bot token for notifications (optional)
 - `CHAT_ID`: Telegram chat ID for notifications (optional)
 
-## Python Usage
-
-1. Configure your experiment in `src/config.yaml` & `orchestrate.yaml`
-
-2. Run training:
-```bash
-python src/main.py
-```
-
-## Docker Usage
+## Usage 🐳
 1. Configure your experiment in `src/config.yaml` & `orchestrate.yaml`
 
 2. Run training:
 ```bash
 docker compose run app
 ```
-## License
+## License ⚖️
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
