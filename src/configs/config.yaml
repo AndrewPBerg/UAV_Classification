@@ -1,8 +1,8 @@
 general:
-  data_path: /app/src/datasets/static/31-augs-3-time_stretch-sin_distortion
+  data_path: /app/src/datasets/static/31-augs-0-time_stretch-sin_distortion
   num_classes: 31
   save_dataloader: false
-  model_type: efficientnet_b7
+  model_type: mobilenet_v3_small
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -12,7 +12,7 @@ general:
   test_size: 0.2
   inference_size: 0.1
   val_size: 0.1
-  sweep_count: 25
+  sweep_count: 30
   accumulation_steps: 2
   learning_rate: 0.02
   patience: 10
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: lorac
+  adapter_type: none-classifier
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -122,35 +122,19 @@ wandb:
   tags: null
   dir: wandb
 sweep:
-  project: efficientnet-experiments
-  name: efficientnet_b7-lorac-3-augs
+  project: mobilenet-experiments
+  name: mobilenet_v3_small-none-classifier-0-augs
   method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    target_modules:
-      values:
-      - - linear
-        - conv2d
-        - BatchNorm2d
-      - - conv2d
-        - BatchNorm2d
-      - - conv2d
-    r:
-      values:
-      - 8
-      - 16
-      - 4
-      - 32
-    alpha:
-      values:
-      - 8
-      - 16
-      - 32
-      - 4
-    dropout:
+    learning_rate:
       values:
       - 0.1
-      - 0
-      - 0.2
+      - 0.01
+      - 0.001
+    seed:
+      distribution: int_uniform
+      min: 0
+      max: 1000
