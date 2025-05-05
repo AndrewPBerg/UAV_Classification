@@ -21,9 +21,9 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: none-classifier
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 5
   augmentations:
   - time_stretch
   - sin_distortion
@@ -116,14 +116,14 @@ bitfit:
   - bias
 wandb:
   project: DATA-2025-Presentation
-  name: ast-9-full-kfold
+  name: ast-9-classifier-kfold-5aug
   reinit: true
   notes: null
   tags:
   - 9-class
   - kfold
   - ast
-  - full
+  - none-classifier
   dir: wandb
 sweep:
   project: ast-experiments
