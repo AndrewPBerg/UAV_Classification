@@ -19,6 +19,7 @@ instructions.md
 /checkpoints/
 lightning_logs/
 checkpoints/
+Drone_Lab_Server_Access.ipynb
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

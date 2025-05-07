@@ -1,5 +1,5 @@
 general:
-  data_path: /app/src/datasets//UAV_Dataset_9
+  data_path: /app/src/datasets/UAV_Dataset_9
   num_classes: 9
   save_dataloader: false
   model_type: ast
@@ -23,7 +23,7 @@ general:
   k_folds: 5
   adapter_type: none-classifier
 augmentations:
-  augmentations_per_sample: 5
+  augmentations_per_sample: 1
   augmentations:
   - time_stretch
   - sin_distortion
@@ -45,8 +45,8 @@ none-classifier:
 none-full:
   task_type: AUDIO_CLASSIFICATION
 lora:
-  r: 8
-  lora_alpha: 16
+  r: 4
+  lora_alpha: 8
   target_modules:
   - key
   - value
@@ -116,7 +116,7 @@ bitfit:
   - bias
 wandb:
   project: DATA-2025-Presentation
-  name: ast-9-classifier-kfold-5aug
+  name: ast-9-classifier-kfold-1aug
   reinit: true
   notes: null
   tags:
