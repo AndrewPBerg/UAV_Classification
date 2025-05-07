@@ -14,16 +14,16 @@ general:
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 2
-  learning_rate: 0.02
+  learning_rate: 0.06
   patience: 10
   use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: ia3
 augmentations:
-  augmentations_per_sample: 1
+  augmentations_per_sample: 0
   augmentations:
   - time_stretch
   - sin_distortion
@@ -45,8 +45,8 @@ none-classifier:
 none-full:
   task_type: AUDIO_CLASSIFICATION
 lora:
-  r: 4
-  lora_alpha: 8
+  r: 8
+  lora_alpha: 16
   target_modules:
   - key
   - value
@@ -66,21 +66,21 @@ ia3:
   - query
   - dense
 adalora:
-  init_r: 32
-  target_r: 16
+  init_r: 4
+  target_r: 256
   target_modules:
   - key
   - value
   - query
   - dense
-  lora_alpha: 8
+  lora_alpha: 4
 oft:
-  r: 768
+  r: 256
   target_modules:
   - key
   - value
   - query
-  module_dropout: 0.0
+  module_dropout: 0.2
   init_weights: true
 layernorm:
   target_modules:
@@ -116,14 +116,14 @@ bitfit:
   - bias
 wandb:
   project: DATA-2025-Presentation
-  name: ast-9-classifier-kfold-1aug
+  name: ast-9-ia3-kfold-0aug
   reinit: true
   notes: null
   tags:
   - 9-class
   - kfold
   - ast
-  - none-classifier
+  - ia3
   dir: wandb
 sweep:
   project: ast-experiments
