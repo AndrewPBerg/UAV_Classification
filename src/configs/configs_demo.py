@@ -33,6 +33,7 @@ class _ModelNames(BaseModel):
                              "efficientnet_b0", "efficientnet_b1", "efficientnet_b2", "efficientnet_b3", "efficientnet_b4", 
                              "efficientnet_b5", "efficientnet_b6", "efficientnet_b7",
                              "mobilenet_v3_small", "mobilenet_v3_large",
+                             "custom_cnn"
                             ]
 
 class GeneralConfig(BaseModel):

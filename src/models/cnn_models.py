@@ -28,7 +28,7 @@ class CNNModel:
     
     peft_type = ['lorac', 'none-full', 'none-classifier', 'ssf', 'batchnorm']
     
-    cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b4', 'efficientnet_b7']
+    cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b4', 'efficientnet_b7', 'custom_cnn']
     @staticmethod
     def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
         """
@@ -66,6 +66,84 @@ class CNNModel:
         
         return model
     
+    @staticmethod
+    def _create_custom_cnn_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+        class CustomCNN(nn.Module):
+            def __init__(self, num_classes: int, hidden_units: int = 256, input_shape: tuple = (128, 157)):
+                """
+                Initialize the CNN model with configurable hidden units for the fully connected layers.
+                
+                Args:
+                    num_classes (int): Number of output classes
+                    hidden_units (int): Number of hidden units in the fully connected layer
+                    input_shape (tuple): Expected input shape (height, width) for feature maps
+                """
+                super(CustomCNN, self).__init__()
+                
+                # First convolutional block
+                self.conv1 = nn.Sequential(
+                    nn.Conv2d(1, 16, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.MaxPool2d(2),
+                    nn.BatchNorm2d(16)
+                )
+                
+                # Second convolutional block
+                self.conv2 = nn.Sequential(
+                    nn.Conv2d(16, 32, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.MaxPool2d(2),
+                    nn.BatchNorm2d(32)
+                )
+                
+                # Third convolutional block
+                self.conv3 = nn.Sequential(
+                    nn.Conv2d(32, 64, kernel_size=3, padding=1),
+                    nn.ReLU(),
+                    nn.MaxPool2d(2),
+                    nn.BatchNorm2d(64)
+                )
+                
+                # Calculate the size of flattened features
+                self._to_linear = None
+                self._get_conv_output_size(input_shape)  # Initialize _to_linear
+                
+                # Dense layers with configurable hidden units
+                self.fc1 = nn.Linear(self._to_linear, hidden_units)
+                self.dropout = nn.Dropout(p=0.5)
+                self.fc2 = nn.Linear(hidden_units, num_classes)
+
+    def _get_conv_output_size(self, shape):
+        """Helper function to calculate conv output size"""
+        bs = 1
+        x = torch.rand(bs, *shape)
+        x = x.unsqueeze(1)
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        x = x.flatten(1)
+        self._to_linear = x.shape[1]
+        return self._to_linear
+
+    def forward(self, x):
+        # Add channel dimension if not present
+        if x.dim() == 3:
+            x = x.unsqueeze(1)
+            
+        # Convolutional layers
+        x = self.conv1(x)
+        x = self.conv2(x)
+        x = self.conv3(x)
+        
+        # Flatten
+        x = x.flatten(1)
+        
+        # Dense layers
+        x = F.relu(self.fc1(x))
+        x = self.dropout(x)
+        x = self.fc2(x)
+        
+        return x
     @staticmethod
     def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
         """

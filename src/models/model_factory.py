@@ -129,6 +129,9 @@ class ModelFactory:
                 model = cnn_model._create_mobilenet_model(model_type, num_classes, peft_config)
             elif "efficientnet" in model_type:
                 model = cnn_model._create_efficientnet_model(model_type, num_classes, peft_config)
+            elif "custom_cnn" in model_type:
+                model = cnn_model._create_custom_cnn_model(model_type, num_classes, peft_config)
+                model = model.CustomCNN
             else:
                 raise ValueError(f"Unsupported CNN model type: {model_type}, please use one of the following: {CNNModel.cnn_models}")
         
