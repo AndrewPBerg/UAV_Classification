@@ -14,16 +14,16 @@ general:
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 2
-  learning_rate: 0.06
+  learning_rate: 0.01
   patience: 10
   use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: ia3
+  adapter_type: oft
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 5
   augmentations:
   - time_stretch
   - sin_distortion
@@ -116,14 +116,14 @@ bitfit:
   - bias
 wandb:
   project: DATA-2025-Presentation
-  name: ast-9-ia3-kfold-0aug
+  name: ast-9-oft-kfold-5aug
   reinit: true
   notes: null
   tags:
   - 9-class
   - kfold
   - ast
-  - ia3
+  - oft
   dir: wandb
 sweep:
   project: ast-experiments
