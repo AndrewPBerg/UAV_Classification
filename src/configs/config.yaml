@@ -16,7 +16,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 10
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
@@ -116,14 +116,14 @@ bitfit:
   - bias
 wandb:
   project: DATA-2025-Presentation
-  name: ast-9-oft-kfold-5aug
+  name: custom-cnn-9-kfold-0aug
   reinit: true
   notes: null
   tags:
   - 9-class
   - kfold
-  - ast
-  - oft
+  - custom-cnn
+  - 0-aug
   dir: wandb
 sweep:
   project: ast-experiments
