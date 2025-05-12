@@ -13,6 +13,7 @@
 # AdaLoRA 
 # Oft
 
+# SEND_MESSAGE: true
 SEND_MESSAGE: true
 
 runs:
@@ -24,84 +25,94 @@ runs:
         use_wandb: true
         use_sweep: false
         use_kfold: true
-        data_path: /app/src/datasets/UAV_Dataset_9
-        # data_path: /app/src/datasets/static/9-augs-1-time_stretch-sin_distortion
-        num_classes: 9
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
         adapter_type: none-full
         k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 5
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
       augmentations:
         augmentations_per_sample: 0
       wandb:
-        project: testing_5-12
-        name: testing-augmentation-dict
+        project: 31-class-kfold
+        name: AST-none-full-0augs-31-class-kfold
         reinit: true
-
-  # - id: 1
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: custom_cnn
-  #       use_wandb: true
-  #       use_sweep: false
-  #       use_kfold: true
-  #       data_path: /app/src/datasets/UAV_Dataset_9
-  #       num_classes: 9
-  #       adapter_type: none-full
-  #       k_folds: 5
-  #     augmentations:
-  #       augmentations_per_sample: 1
-  #     wandb:
-  #       project: DATA-2025-Presentation
-  #       name: custom-cnn-9-kfold-0aug
-  #       reinit: true
-  #       tags: 
-  #         - 9-class
-  #         - kfold
-  #         - custom-cnn
-  #         - 1-aug
-  # - id: 2
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: custom_cnn
-  #       use_wandb: true
-  #       use_sweep: false
-  #       use_kfold: true
-  #       data_path: /app/src/datasets/UAV_Dataset_9
-  #       num_classes: 9
-  #       adapter_type: none-full
-  #       k_folds: 5
-  #     augmentations:
-  #       augmentations_per_sample: 3
-  #     wandb:
-  #       project: DATA-2025-Presentation
-  #       name: custom-cnn-9-kfold-0aug
-  #       reinit: true
-  #       tags: 
-  #         - 9-class
-  #         - kfold
-  #         - custom-cnn
-  #         - 3-aug
-  # - id: 3
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: custom_cnn
-  #       use_wandb: true
-  #       use_sweep: false
-  #       use_kfold: true
-  #       data_path: /app/src/datasets/UAV_Dataset_9
-  #       num_classes: 9
-  #       adapter_type: none-full
-  #       k_folds: 5
-  #     augmentations:
-  #       augmentations_per_sample: 5
-  #     wandb:
-  #       project: DATA-2025-Presentation
-  #       name: custom-cnn-9-kfold-0aug
-  #       reinit: true
-  #       tags: 
-  #         - 9-class
-  #         - kfold
-  #         - custom-cnn
-  #         - 5-aug
+        tags: 
+          - 31-class
+          - kfold
+          - ast
+          - none-full
+          - 0-augs
+  - id: 1
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-full
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 5
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: 31-class-kfold
+        name: AST-none-full-3augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - ast
+          - none-full
+          - 3-augs
+  - id: 2
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-full
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 5
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 5
+      wandb:
+        project: 31-class-kfold
+        name: AST-none-full-5augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - ast
+          - none-full
+          - 5-augs
