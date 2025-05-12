@@ -175,7 +175,7 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
 
         return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
 
-def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config):
+def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config, augmentation_config):
     """
     What dis do:
     - takes in all the configs and returns a correctly formatted
@@ -187,6 +187,7 @@ def wandb_config_dict(general_config, feature_extraction_config, peft_config, wa
     res['general_config'] = dict(general_config)
     res['peft_config'] = dict(peft_config.to_dict())
     res['feature_extraction_config'] = dict(feature_extraction_config)
+    res['augmentation_config'] = dict(augmentation_config)
     
     return res
 
@@ -203,7 +204,7 @@ def main():
         augmentation_config
     ) = load_configs(config)
 
-    ic(wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config))
+    ic(wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config, augmentation_config))
 
 if __name__ == '__main__':
     main()

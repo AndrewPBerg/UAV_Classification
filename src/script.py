@@ -129,7 +129,8 @@ def main():
         wandb_config=wandb_config,
         sweep_config=sweep_config,
         data_module=data_module,
-        model_factory=model_factory
+        model_factory=model_factory,
+        augmentation_config=augmentation_config
     )
     
     ic("trainer created")

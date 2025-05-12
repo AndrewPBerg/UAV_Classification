@@ -70,6 +70,10 @@ def model_pipeline(sweep_config=None):
         augmentation_config
          ) = load_configs(mixed_params)
         
+        # Log the augmentation config to the W&B run
+        if augmentation_config:
+             wandb.config.update({"augmentations": augmentation_config.dict()}, allow_val_change=True)
+
         # Create data module
         data_module = AudioDataModule(
             general_config=general_config,

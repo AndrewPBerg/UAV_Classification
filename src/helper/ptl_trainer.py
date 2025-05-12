@@ -1,4 +1,5 @@
 import os
+from src.configs.augmentation_config import AugmentationConfig
 import torch
 import numpy as np
 import pytorch_lightning as pl
@@ -31,6 +32,7 @@ class PTLTrainer:
         sweep_config: SweepConfig,
         data_module: AudioDataModule,
         model_factory: Callable,
+        augmentation_config: AugmentationConfig,
     ):
         """
         Initialize the PTLTrainer.
@@ -43,6 +45,7 @@ class PTLTrainer:
             sweep_config: Sweep configuration
             data_module: Audio data module
             model_factory: Model factory function
+            augmentation_config: Augmentation configuration
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -51,6 +54,7 @@ class PTLTrainer:
         self.sweep_config = sweep_config
         self.data_module = data_module
         self.model_factory = model_factory
+        self.augmentation_config = augmentation_config
         
         # Single GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -66,7 +70,7 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
                 reinit=True  # Force reinitialize a new wandb run
             )
@@ -650,7 +654,7 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config),
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
                 reinit=True  # Force reinitialize a new wandb run
             )
