@@ -17,8 +17,9 @@ from typing import Tuple, Optional, Any
 from configs.peft_config import PEFTConfig, NoneClassifierConfig, NoneFullConfig, SSFConfig, LoRACConfig
 from .ssf_adapter import apply_ssf_to_model
 from .lorac_adapter import apply_lorac_to_model
-
-from configs import BatchNormConfig
+import sys
+from torch.nn import functional as F
+from configs import BatchNormConfig,NoneFullConfig
 
 
 
@@ -113,37 +114,58 @@ class CNNModel:
                 self.dropout = nn.Dropout(p=0.5)
                 self.fc2 = nn.Linear(hidden_units, num_classes)
 
-    def _get_conv_output_size(self, shape):
-        """Helper function to calculate conv output size"""
-        bs = 1
-        x = torch.rand(bs, *shape)
-        x = x.unsqueeze(1)
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = x.flatten(1)
-        self._to_linear = x.shape[1]
-        return self._to_linear
 
-    def forward(self, x):
-        # Add channel dimension if not present
-        if x.dim() == 3:
-            x = x.unsqueeze(1)
+
+
+            def _get_conv_output_size(self, shape):
+                """Helper function to calculate conv output size"""
+                bs = 1
+                x = torch.rand(bs, *shape)
+                x = x.unsqueeze(1)
+                x = self.conv1(x)
+                x = self.conv2(x)
+                x = self.conv3(x)
+                x = x.flatten(1)
+                self._to_linear = x.shape[1]
+                return self._to_linear
+
+            def forward(self, x):
+                # Add channel dimension if not present
+                if x.dim() == 3:
+                    x = x.unsqueeze(1)
+                    
+                # Convolutional layers
+                x = self.conv1(x)
+                x = self.conv2(x)
+                x = self.conv3(x)
+                
+                # Flatten
+                x = x.flatten(1)
+                
+                # Dense layers
+                x = F.relu(self.fc1(x))
+                x = self.dropout(x)
+                x = self.fc2(x)
+                
+                return x
             
-        # Convolutional layers
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
+            # Get input shape from the first batch of data
+            def get_input_shape(self, dataloader):
+                """Get the input shape from the first batch of data"""
+                for batch in dataloader:
+                    if isinstance(batch, (tuple, list)):
+                        x = batch[0]
+                    else:
+                        x = batch
+                    return x.shape[1:]  # Return shape without batch dimension
+                
+            
+        # model = CustomCNN(num_classes=num_classes, input_shape=(128, 157))
+        model = CustomCNN(num_classes=num_classes)
+        model = apply_peft(model, NoneFullConfig())
+        return model
+
         
-        # Flatten
-        x = x.flatten(1)
-        
-        # Dense layers
-        x = F.relu(self.fc1(x))
-        x = self.dropout(x)
-        x = self.fc2(x)
-        
-        return x
     @staticmethod
     def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
         """
@@ -215,8 +237,7 @@ class CNNModel:
         # Replace classification head
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
-        
-        model = apply_peft(model, peft_config)
+
         
         return model
 
