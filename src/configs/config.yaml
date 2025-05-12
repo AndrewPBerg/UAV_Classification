@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_9
   num_classes: 9
   save_dataloader: false
-  model_type: custom_cnn
+  model_type: ast
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -115,8 +115,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: DATA-2025-Presentation
-  name: custom-cnn-9-kfold-0aug
+  project: testing_5-12
+  name: testing-augmentation-dict
   reinit: true
   notes: null
   tags:

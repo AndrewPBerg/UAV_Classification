@@ -1,5 +1,5 @@
 import os
-from src.configs.augmentation_config import AugmentationConfig
+from configs.augmentation_config import AugmentationConfig
 import torch
 import numpy as np
 import pytorch_lightning as pl
