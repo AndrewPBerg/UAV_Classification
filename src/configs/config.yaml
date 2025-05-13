@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: oft
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -75,11 +75,12 @@ adalora:
   - dense
   lora_alpha: 4
 oft:
-  r: 256
+  r: 128
   target_modules:
   - key
   - value
   - query
+  - dense
   module_dropout: 0.2
   init_weights: true
 layernorm:
@@ -116,14 +117,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: AST-none-classifier-0augs-31-class-kfold
+  name: AST-oft-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
   - ast
-  - none-classifier
+  - oft
   - 0-augs
   dir: wandb
 sweep:
