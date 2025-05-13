@@ -15,13 +15,13 @@ general:
   sweep_count: 50
   accumulation_steps: 2
   learning_rate: 0.001
-  patience: 5
+  patience: 3
   use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: none-classifier
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -116,14 +116,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: AST-none-full-0augs-31-class-kfold
+  name: AST-none-classifier-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
   - ast
-  - none-full
+  - none-classifier
   - 0-augs
   dir: wandb
 sweep:
