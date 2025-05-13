@@ -16,12 +16,12 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 3
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: oft
+  adapter_type: ia3
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -117,14 +117,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: AST-oft-0augs-31-class-kfold
+  name: AST-ia3-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
   - ast
-  - oft
+  - ia3
   - 0-augs
   dir: wandb
 sweep:
