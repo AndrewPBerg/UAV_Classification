@@ -24,7 +24,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: none-classifier
+        adapter_type: none-full
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -39,13 +39,13 @@ runs:
         augmentations_per_sample: 0
       wandb:
         project: 31-class-kfold
-        name: resnet18-none-classifier-0augs-31-class-kfold
+        name: resnet18-none-full-0augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - resnet18
-          - none-classifier
+          - none-full
           - 0-augs
   - id: 1
     type: script
@@ -57,7 +57,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: none-classifier
+        adapter_type: none-full
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -72,13 +72,13 @@ runs:
         augmentations_per_sample: 3
       wandb:
         project: 31-class-kfold
-        name: resnet18-none-classifier-3augs-31-class-kfold
+        name: resnet18-none-full-3augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - resnet18
-          - none-classifier
+          - none-full
           - 3-augs
   - id: 2
     type: script
@@ -90,7 +90,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: none-classifier
+        adapter_type: none-full
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -105,13 +105,13 @@ runs:
         augmentations_per_sample: 0
       wandb:
         project: 31-class-kfold
-        name: resnet152-none-classifier-0augs-31-class-kfold
+        name: resnet152-none-full-0augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - resnet152
-          - none-classifier
+          - none-full
           - 0-augs
   - id: 3
     type: script
@@ -123,7 +123,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: none-classifier
+        adapter_type: none-full
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -138,11 +138,11 @@ runs:
         augmentations_per_sample: 3
       wandb:
         project: 31-class-kfold
-        name: resnet152-none-classifier-3augs-31-class-kfold
+        name: resnet152-none-full-3augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - resnet152
-          - none-classifier
+          - none-full
           - 3-augs
