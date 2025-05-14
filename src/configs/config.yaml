@@ -16,12 +16,12 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 3
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: ia3
+  adapter_type: ssf
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -96,11 +96,11 @@ hra:
   - query
 ssf:
   init_scale: 1.0
-  init_shift: 0.0
+  init_shift: 0.5
   target_modules:
   - linear
-  - conv2d
-  - batchnorm2d
+  - dense
+  - layernorm
 batchnorm:
   target_modules:
   - batchnorm2d
@@ -117,14 +117,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: AST-ia3-0augs-31-class-kfold
+  name: AST-ssf-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
   - ast
-  - ia3
+  - ssf
   - 0-augs
   dir: wandb
 sweep:

@@ -26,7 +26,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ia3
+        adapter_type: ssf
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -41,13 +41,13 @@ runs:
         augmentations_per_sample: 0
       wandb:
         project: 31-class-kfold
-        name: AST-ia3-0augs-31-class-kfold
+        name: AST-ssf-0augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - ast
-          - ia3
+          - ssf
           - 0-augs
   - id: 1
     type: script
@@ -59,7 +59,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ia3
+        adapter_type: ssf
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -74,13 +74,11 @@ runs:
         augmentations_per_sample: 3
       wandb:
         project: 31-class-kfold
-        name: AST-ia3-3augs-31-class-kfold
+        name: AST-ssf-3augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - ast
-          - ia3
+          - ssf
           - 3-augs
-
-          # ssf
