@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: resnet152
+  model_type: mobilenet_v3_large
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: batchnorm
+  adapter_type: none-classifier
 augmentations:
   augmentations_per_sample: 3
   augmentations:
@@ -117,14 +117,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: resnet152-batchnorm-3augs-31-class-kfold
+  name: mobilenet_v3_large-none-classifier-3augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
-  - resnet152
-  - batchnorm
+  - mobilenet_v3_large
+  - none-classifier
   - 3-augs
   dir: wandb
 sweep:
