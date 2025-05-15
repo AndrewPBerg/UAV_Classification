@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: ssf
+  adapter_type: batchnorm
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -117,14 +117,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: resnet18-ssf-0augs-31-class-kfold
+  name: resnet18-batchnorm-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
   - resnet18
-  - ssf
+  - batchnorm
   - 0-augs
   dir: wandb
 sweep:
