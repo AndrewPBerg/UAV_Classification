@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: mobilenet_v3_large
+  model_type: mobilenet_v3_small
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -21,9 +21,9 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: ssf
 augmentations:
-  augmentations_per_sample: 3
+  augmentations_per_sample: 0
   augmentations:
   - time_stretch
   - sin_distortion
@@ -101,6 +101,7 @@ ssf:
   - linear
   - dense
   - batchnorm2d
+  - conv2d
 batchnorm:
   target_modules:
   - batchnorm2d
@@ -117,15 +118,15 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: mobilenet_v3_large-none-classifier-3augs-31-class-kfold
+  name: mobilenet_v3_small-ssf-0augs-31-class-kfold
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
-  - mobilenet_v3_large
-  - none-classifier
-  - 3-augs
+  - mobilenet_v3_small
+  - ssf
+  - 0-augs
   dir: wandb
 sweep:
   project: ast-experiments
