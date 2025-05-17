@@ -7,8 +7,6 @@
 # ast, ast, vit
 
 
-# efficientnet b0, efficientnet b7: none-classifier, batchnorm
-# Custom CNN full FT
 
 SEND_MESSAGE: true
 runs:
@@ -22,7 +20,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: batchnorm
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -37,13 +35,13 @@ runs:
         augmentations_per_sample: 0
       wandb:
         project: 31-class-kfold
-        name: efficientnet_b0-ssf-0augs-31-class-kfold
+        name: efficientnet_b0-batchnorm-0augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - efficientnet_b0
-          - ssf
+          - batchnorm
           - 0-augs
   - id: 1
     type: script
@@ -55,7 +53,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: batchnorm
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -70,13 +68,13 @@ runs:
         augmentations_per_sample: 3
       wandb:
         project: 31-class-kfold
-        name: efficientnet_b0-ssf-3augs-31-class-kfold
+        name: efficientnet_b0-batchnorm-3augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - efficientnet_b0
-          - ssf
+          - batchnorm
           - 3-augs
   - id: 2
     type: script
@@ -88,7 +86,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: batchnorm
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -103,13 +101,13 @@ runs:
         augmentations_per_sample: 0
       wandb:
         project: 31-class-kfold
-        name: efficientnet_b7-ssf-0augs-31-class-kfold
+        name: efficientnet_b7-batchnorm-0augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - efficientnet_b7
-          - ssf
+          - batchnorm
           - 0-augs
   - id: 3
     type: script
@@ -121,7 +119,7 @@ runs:
         use_kfold: true
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
-        adapter_type: ssf
+        adapter_type: batchnorm
         k_folds: 5
         learning_rate: 0.001
         batch_size: 8
@@ -136,15 +134,147 @@ runs:
         augmentations_per_sample: 3
       wandb:
         project: 31-class-kfold
-        name: efficientnet_b7-ssf-3augs-31-class-kfold
+        name: efficientnet_b7-batchnorm-3augs-31-class-kfold
         reinit: true
         tags: 
           - 31-class
           - kfold
           - efficientnet_b7
-          - ssf
+          - batchnorm
           - 3-augs
   - id: 4
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-classifier
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b0-none-classifier-0augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - efficientnet_b0
+          - none-classifier
+          - 0-augs
+  - id: 5
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-classifier
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b0-none-classifier-3augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - efficientnet_b0
+          - none-classifier
+          - 3-augs
+  - id: 6
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-classifier
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b7-none-classifier-0augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - efficientnet_b7
+          - none-classifier
+          - 0-augs
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-classifier
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b7-none-classifier-3augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - efficientnet_b7
+          - none-classifier
+          - 3-augs
+  - id: 8
     type: script
     changes:
       general:
@@ -177,3 +307,69 @@ runs:
           - mobilenet_v3_small
           - ssf
           - 0-augs
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: custom_cnn
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-full
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: custom_cnn-ssf-0augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - custom_cnn
+          - none-full
+          - 0-augs
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: custom_cnn
+        use_wandb: true
+        use_sweep: false
+        use_kfold: true
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-full
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: 31-class-kfold
+        name: custom_cnn-ssf-0augs-31-class-kfold
+        reinit: true
+        tags: 
+          - 31-class
+          - kfold
+          - custom_cnn
+          - none-full
+          - 3-augs
