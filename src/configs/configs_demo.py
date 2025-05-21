@@ -26,7 +26,7 @@ class _ModelNames(BaseModel):
     """
 
     model_list: List[str] = [
-                             "vit",
+                             "vit-base","vit-large",
                              "ast", 
                              "mert",
                              "resnet18", "resnet34", "resnet50", "resnet101", "resnet152",

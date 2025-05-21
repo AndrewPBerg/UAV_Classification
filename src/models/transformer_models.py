@@ -230,7 +230,7 @@ class TransformerModel:
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
                  'none-full', 'none-classifier', 'ssf', 'bitfit']
     
-    transformer_models = ['ast', 'mert', 'vit']  # Changed to just 'vit' instead of multiple variants
+    transformer_models = ['ast', 'mert', 'vit-base', 'vit-large']  # Updated to include both ViT variants
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
@@ -544,9 +544,19 @@ class TransformerModel:
     
     
     @staticmethod
-    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
+    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None, model_type: str = "base") -> Tuple[nn.Module, Any]:
         """
         Create a ViT model using Hugging Face's implementation.
+
+        Args:
+            num_classes (int): Number of output classes
+            CACHE_DIR (str): Directory to cache model files
+            general_config (GeneralConfig): General configuration object
+            peft_config (Optional[PEFTConfig]): PEFT configuration if using parameter efficient fine-tuning
+            model_variant (str): Which ViT variant to use - "base" or "large". Defaults to "base"
+
+        TODO: Might need to change the model instead of the feature extractor. AST for example uses a 1-d Grayscale input, taking the avg. 
+        of the color channels for initialization. This would have the advantage of standardizing the spectrogram data across all models.
         
         This implementation uses the standard 3-channel approach, where grayscale
         spectrograms are converted to RGB format before processing. This is handled
@@ -554,13 +564,22 @@ class TransformerModel:
         
         The model automatically handles resizing of input tensors to the required 224x224 size.
         """
-        model_name = "google/vit-large-patch16-224"
-        print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
+        # Map model types str to HuggingFace checkpoint str
+        model_mapping = {
+            "vit-base": "google/vit-base-patch16-224",
+            "vit-large": "google/vit-large-patch16-224"
+        }
+        
+        if model_type not in model_mapping:
+            raise ValueError(f"Invalid model_type: {model_type}. Must be one of {list(model_mapping.keys())}")
+            
+        model_checkpoint = model_mapping[model_type]
+        print(f"Attempting to load ViT model: {model_checkpoint} with {num_classes} classes.")
 
         try:
             print("Loading model with local_files_only=True...")
             model = ViTForImageClassification.from_pretrained(
-                model_name,
+                model_checkpoint,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
                 local_files_only=True,
@@ -570,7 +589,7 @@ class TransformerModel:
             
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
-                model_name,
+                model_checkpoint,
                 cache_dir=CACHE_DIR,
                 local_files_only=True,
                 size={"height": 224, "width": 224},  # Force resize to 224x224
@@ -582,7 +601,7 @@ class TransformerModel:
         except Exception as e:
             print(f"Failed to load model with local_files_only=True, trying to download: {e}")
             model = ViTForImageClassification.from_pretrained(
-                model_name,
+                model_checkpoint,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
                 ignore_mismatched_sizes=True
@@ -591,7 +610,7 @@ class TransformerModel:
             
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
-                model_name,
+                model_checkpoint,
                 cache_dir=CACHE_DIR,
                 size={"height": 224, "width": 224},  # Force resize to 224x224
                 do_resize=True,
