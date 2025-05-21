@@ -1,7 +1,8 @@
 # Papers 📜
 
-- Accepted DATA 2025 Conference Paper (paper link TBD): 4,500 Seconds: Small Data Training Approaches for Deep UAV Audio Classification
-- Upcoming: 15,500 Seconds
+ 1️⃣ 4,500 Seconds [Accepted, Preprint]: Link TBA
+ 2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA
+ 3️⃣ The Unbearable Weight: TBD
 
 # UAV Classification 🛩️
 
