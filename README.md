@@ -1,8 +1,8 @@
 # Papers 📜
 
- 1️⃣ 4,500 Seconds [Accepted, Preprint]: Link TBA
- 2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA
- 3️⃣ The Unbearable Weight: TBD
+ 1️⃣ 4,500 Seconds [Accepted, Preprint]: Link TBA </br>
+ 2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA </br>
+ 3️⃣ The Unbearable Weight: TBD </br>
 
 # UAV Classification 🛩️
 
