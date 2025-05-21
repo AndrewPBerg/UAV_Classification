@@ -5,7 +5,12 @@ from torchvision.models import (
     resnet152, ResNet152_Weights,
     # EfficientNet variants
     efficientnet_b0, EfficientNet_B0_Weights,
+    efficientnet_b1, EfficientNet_B1_Weights,
+    efficientnet_b2, EfficientNet_B2_Weights,
+    efficientnet_b3, EfficientNet_B3_Weights,
     efficientnet_b4, EfficientNet_B4_Weights,
+    efficientnet_b5, EfficientNet_B5_Weights,
+    efficientnet_b6, EfficientNet_B6_Weights,
     efficientnet_b7, EfficientNet_B7_Weights,
     # MobileNet variants
     mobilenet_v3_small, MobileNet_V3_Small_Weights,
@@ -217,8 +222,18 @@ class CNNModel:
         # Parse model size from model type
         if "b0" in model_type:
             model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
+        elif "b1" in model_type:
+            model = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
+        elif "b2" in model_type:
+            model = efficientnet_b2(weights=EfficientNet_B2_Weights.DEFAULT)
+        elif "b3" in model_type:
+            model = efficientnet_b3(weights=EfficientNet_B3_Weights.DEFAULT)
         elif "b4" in model_type:
             model = efficientnet_b4(weights=EfficientNet_B4_Weights.DEFAULT)
+        elif "b5" in model_type:
+            model = efficientnet_b5(weights=EfficientNet_B5_Weights.DEFAULT)
+        elif "b6" in model_type:
+            model = efficientnet_b6(weights=EfficientNet_B6_Weights.DEFAULT)
         elif "b7" in model_type:
             model = efficientnet_b7(weights=EfficientNet_B7_Weights.DEFAULT)
         else:
