@@ -119,6 +119,14 @@ class ModelFactory:
                     peft_config=peft_config,
                     model_type=model_type
                 )
+            elif model_type.startswith("deit"):
+                model, feature_extractor = transformer_model._create_deit_model(
+                    num_classes=num_classes,
+                    CACHE_DIR=CACHE_DIR,
+                    general_config=general_config,
+                    peft_config=peft_config,
+                    model_type=model_type
+                )
             else:
                 raise ValueError(f"Unsupported transformer model type: {model_type}, please use one of the following: {TransformerModel.transformer_models}")
         
