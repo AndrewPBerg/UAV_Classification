@@ -34,7 +34,7 @@ class CNNModel:
     
     peft_type = ['lorac', 'none-full', 'none-classifier', 'ssf', 'batchnorm']
     
-    cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b4', 'efficientnet_b7', 'custom_cnn']
+    cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'custom_cnn']
     @staticmethod
     def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
         """
