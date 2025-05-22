@@ -230,7 +230,12 @@ class TransformerModel:
     peft_type = ['lora', 'adalora', 'hra', 'ia3', 'oft', 'layernorm', 
                  'none-full', 'none-classifier', 'ssf', 'bitfit']
     
-    transformer_models = ['ast', 'mert', 'vit']  # Changed to just 'vit' instead of multiple variants
+    transformer_models = [
+        'ast', 'mert', 
+        'vit-base', 'vit-large',
+        'deit-tiny', 'deit-small', 'deit-base',
+        'deit-tiny-distil', 'deit-small-distil', 'deit-base-distil'
+    ]  # Updated to include both ViT and DeiT variants
     
     @staticmethod
     def _create_ast_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
@@ -544,9 +549,19 @@ class TransformerModel:
     
     
     @staticmethod
-    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None) -> Tuple[nn.Module, Any]:
+    def _create_vit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None, model_type: str = "base") -> Tuple[nn.Module, Any]:
         """
         Create a ViT model using Hugging Face's implementation.
+
+        Args:
+            num_classes (int): Number of output classes
+            CACHE_DIR (str): Directory to cache model files
+            general_config (GeneralConfig): General configuration object
+            peft_config (Optional[PEFTConfig]): PEFT configuration if using parameter efficient fine-tuning
+            model_variant (str): Which ViT variant to use - "base" or "large". Defaults to "base"
+
+        TODO: Might need to change the model instead of the feature extractor. AST for example uses a 1-d Grayscale input, taking the avg. 
+        of the color channels for initialization. This would have the advantage of standardizing the spectrogram data across all models.
         
         This implementation uses the standard 3-channel approach, where grayscale
         spectrograms are converted to RGB format before processing. This is handled
@@ -554,13 +569,22 @@ class TransformerModel:
         
         The model automatically handles resizing of input tensors to the required 224x224 size.
         """
-        model_name = "google/vit-large-patch16-224"
-        print(f"Attempting to load ViT model: {model_name} with {num_classes} classes.")
+        # Map model types str to HuggingFace checkpoint str
+        model_mapping = {
+            "vit-base": "google/vit-base-patch16-224",
+            "vit-large": "google/vit-large-patch16-224"
+        }
+        
+        if model_type not in model_mapping:
+            raise ValueError(f"Invalid model_type: {model_type}. Must be one of {list(model_mapping.keys())}")
+            
+        model_checkpoint = model_mapping[model_type]
+        print(f"Attempting to load ViT model: {model_checkpoint} with {num_classes} classes.")
 
         try:
             print("Loading model with local_files_only=True...")
             model = ViTForImageClassification.from_pretrained(
-                model_name,
+                model_checkpoint,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
                 local_files_only=True,
@@ -570,7 +594,7 @@ class TransformerModel:
             
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
-                model_name,
+                model_checkpoint,
                 cache_dir=CACHE_DIR,
                 local_files_only=True,
                 size={"height": 224, "width": 224},  # Force resize to 224x224
@@ -582,7 +606,7 @@ class TransformerModel:
         except Exception as e:
             print(f"Failed to load model with local_files_only=True, trying to download: {e}")
             model = ViTForImageClassification.from_pretrained(
-                model_name,
+                model_checkpoint,
                 num_labels=num_classes,
                 cache_dir=CACHE_DIR,
                 ignore_mismatched_sizes=True
@@ -591,7 +615,7 @@ class TransformerModel:
             
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
-                model_name,
+                model_checkpoint,
                 cache_dir=CACHE_DIR,
                 size={"height": 224, "width": 224},  # Force resize to 224x224
                 do_resize=True,
@@ -762,6 +786,160 @@ class TransformerModel:
         print(f"Modified projection layer: {model.vit.embeddings.patch_embeddings.projection}")
         print("Model modified to accept 1-channel input")
         """
+
+        # Apply PEFT configuration
+        print("Applying PEFT configuration...")
+        model = apply_peft(model, peft_config, general_config)
+        print("PEFT configuration applied successfully.")
+
+        return model, processor
+    
+    @staticmethod
+    def _create_deit_model(num_classes: int, CACHE_DIR: str, general_config: GeneralConfig, peft_config: Optional[PEFTConfig] = None, model_type: str = "base") -> Tuple[nn.Module, Any]:
+        """
+        Create a DeiT model using Hugging Face's implementation.
+
+        Args:
+            num_classes (int): Number of output classes
+            CACHE_DIR (str): Directory to cache model files
+            general_config (GeneralConfig): General configuration object
+            peft_config (Optional[PEFTConfig]): PEFT configuration if using parameter efficient fine-tuning
+            model_type (str): Which DeiT variant to use. Options:
+                - deit-tiny
+                - deit-small
+                - deit-base
+                - deit-tiny-distil
+                - deit-small-distil
+                - deit-base-distil
+        """
+        # Map model types to HuggingFace checkpoint names
+        model_mapping = {
+            "deit-tiny": "facebook/deit-tiny-patch16-224",
+            "deit-small": "facebook/deit-small-patch16-224",
+            "deit-base": "facebook/deit-base-patch16-224",
+            "deit-tiny-distil": "facebook/deit-tiny-distilled-patch16-224",
+            "deit-small-distil": "facebook/deit-small-distilled-patch16-224",
+            "deit-base-distil": "facebook/deit-base-distilled-patch16-224"
+        }
+        
+        if model_type not in model_mapping:
+            raise ValueError(f"Invalid model_type: {model_type}. Must be one of {list(model_mapping.keys())}")
+            
+        model_checkpoint = model_mapping[model_type]
+        print(f"Attempting to load DeiT model: {model_checkpoint} with {num_classes} classes.")
+
+        try:
+            print("Loading model with local_files_only=True...")
+            model = ViTForImageClassification.from_pretrained(
+                model_checkpoint,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR,
+                local_files_only=True,
+                ignore_mismatched_sizes=True
+            )
+            print("Model loaded successfully with local_files_only=True.")
+            
+            # Load the processor with explicit resize configuration to 224x224
+            processor = ViTImageProcessor.from_pretrained(
+                model_checkpoint,
+                cache_dir=CACHE_DIR,
+                local_files_only=True,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
+            )
+            print("Processor loaded successfully with local_files_only=True and configured for 224x224 images.")
+            
+        except Exception as e:
+            print(f"Failed to load model with local_files_only=True, trying to download: {e}")
+            model = ViTForImageClassification.from_pretrained(
+                model_checkpoint,
+                num_labels=num_classes,
+                cache_dir=CACHE_DIR,
+                ignore_mismatched_sizes=True
+            )
+            print("Model downloaded successfully.")
+            
+            # Load the processor with explicit resize configuration to 224x224
+            processor = ViTImageProcessor.from_pretrained(
+                model_checkpoint,
+                cache_dir=CACHE_DIR,
+                size={"height": 224, "width": 224},  # Force resize to 224x224
+                do_resize=True,
+                do_normalize=True
+            )
+            print("Processor downloaded successfully and configured for 224x224 images.")
+
+        # Debugging model architecture
+        print("Model architecture:")
+        print(model)
+        
+        # Update model configuration to accept inputs of any size
+        print("Updating model configuration to handle dynamic input sizes...")
+        if hasattr(model, 'config'):
+            # Save the original image_size
+            original_image_size = model.config.image_size if hasattr(model.config, 'image_size') else 224
+            print(f"Original image_size in config: {original_image_size}")
+            
+            # Explicitly set model to handle 224x224 images
+            model.config.image_size = 224
+            print(f"Updated image_size in config: {model.config.image_size}")
+        
+        # Create a custom forward method to handle different input parameter names
+        original_forward = model.forward
+        
+        def new_forward(self, pixel_values=None, input_ids=None, inputs_embeds=None, x=None, **kwargs):
+            """
+            Custom forward method that handles different input parameter names and is compatible with PEFT.
+            
+            This method accepts all common input parameter names and routes them correctly:
+            - pixel_values: Standard DeiT input name
+            - input_ids: Used by some PEFT models
+            - inputs_embeds: Used by some transformer models
+            - x: Generic input used in many custom implementations
+            
+            It also automatically converts 1-channel inputs to 3-channel to match model expectations.
+            """
+            # Determine which input to use
+            if pixel_values is not None:
+                actual_input = pixel_values
+            elif input_ids is not None:
+                actual_input = input_ids
+            elif x is not None:
+                actual_input = x
+            elif inputs_embeds is not None:
+                actual_input = inputs_embeds
+            else:
+                raise ValueError("No valid input provided to DeiT model. Expected one of: pixel_values, input_ids, x, or inputs_embeds")
+            
+            # Check if actual_input is a tensor and has 1 channel instead of 3
+            if isinstance(actual_input, torch.Tensor) and len(actual_input.shape) == 4:
+                # Handle channel count - convert from 1 to 3 channels if needed
+                if actual_input.shape[1] == 1:
+                    actual_input = actual_input.repeat(1, 3, 1, 1)
+                
+                # Handle input size - resize all inputs to 224x224 using interpolation
+                if actual_input.shape[2] != 224 or actual_input.shape[3] != 224:
+                    actual_input = torch.nn.functional.interpolate(
+                        actual_input, 
+                        size=(224, 224), 
+                        mode='bilinear', 
+                        align_corners=False
+                    )
+            
+            # Remove attention_mask from kwargs if it exists - DeiT doesn't use it
+            deit_kwargs = {k: v for k, v in kwargs.items() if k not in ['attention_mask']}
+            
+            try:
+                return original_forward(pixel_values=actual_input, **deit_kwargs)
+            except Exception as e:
+                # Get model configuration to help debug
+                if hasattr(self, 'config'):
+                    print(f"Model config: {self.config}")
+                raise
+        
+        # Replace the forward method
+        model.forward = types.MethodType(new_forward, model)
 
         # Apply PEFT configuration
         print("Applying PEFT configuration...")
