@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: ast
+  model_type: efficientnet_b1
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: hra
+  adapter_type: none-full
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -119,14 +119,14 @@ bitfit:
   - bias
 wandb:
   project: 31-class-kfold
-  name: ast-hra-0augs-31-class-kfold
+  name: efficientnet_b1-none-full-0-augs
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
-  - ast
-  - hra
+  - efficientnet_b1
+  - none-full
   - 0-augs
   dir: wandb
 sweep:
