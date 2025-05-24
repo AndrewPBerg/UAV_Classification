@@ -180,6 +180,7 @@ runs:
       augmentations:
         augmentations_per_sample: 0
       wandb:
+        project: EfficientNet-B0-to-B7
         name: efficientnet_b1-none-full-0-augs
         tags:
           - 31-class

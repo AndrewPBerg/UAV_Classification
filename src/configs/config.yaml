@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: efficientnet_b1
+  model_type: efficientnet_b7
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -21,9 +21,9 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: batchnorm
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 3
   augmentations:
   - time_stretch
   - sin_distortion
@@ -118,16 +118,16 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: 31-class-kfold
-  name: efficientnet_b1-none-full-0-augs
+  project: EfficientNet-B0-to-B7
+  name: efficientnet_b7-batchnorm-3-augs
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
-  - efficientnet_b1
-  - none-full
-  - 0-augs
+  - efficientnet_b7
+  - batchnorm
+  - 3-augs
   dir: wandb
 sweep:
   project: ast-experiments
