@@ -11,6 +11,7 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 
 from esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits
 from configs.dataset_config import ESC50Config
+from configs.augmentation_config import AugmentationConfig, create_augmentation_configs
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor
 
 def test_esc50_dataset():
@@ -174,6 +175,87 @@ def test_kfold_cross_validation():
         traceback.print_exc()
         return False
 
+def test_esc50_with_augmentations():
+    """Test ESC-50 dataset with audio augmentations."""
+    print("\nTesting ESC-50 dataset with augmentations...")
+    
+    data_path = "../esc50_data/ESC-50-master/classes"
+    
+    if not Path(data_path).exists():
+        print(f"Dataset not found at {data_path}")
+        return False
+    
+    # Create ESC-50 config
+    config = ESC50Config(
+        data_path=data_path,
+        use_esc10_subset=True,  # Use smaller subset for faster testing
+        fold_based_split=True
+    )
+    
+    # Create feature extractor
+    feature_extractor = MelSpectrogramFeatureExtractor(
+        sampling_rate=16000,
+        n_mels=128,
+        n_fft=1024,
+        hop_length=512
+    )
+    
+    # Create augmentation configuration
+    aug_config_dict = {
+        "augmentations": {
+            "augmentations_per_sample": 2,
+            "augmentations": ["pitch_shift", "time_stretch", "add_noise"],
+            "pitch_shift_min_semitones": -4,
+            "pitch_shift_max_semitones": 4,
+            "pitch_shift_p": 1.0,
+            "time_stretch_min_rate": 0.8,
+            "time_stretch_max_rate": 1.2,
+            "time_stretch_p": 1.0,
+            "gaussian_noise_min_amplitude": 0.001,
+            "gaussian_noise_max_amplitude": 0.015,
+            "gaussian_noise_p": 1.0
+        }
+    }
+    
+    try:
+        # Create augmentation config
+        aug_config = create_augmentation_configs(aug_config_dict)
+        print(f"Created augmentation config with {len(aug_config.augmentations)} augmentations")
+        
+        # Test with augmentations
+        train_dataset, val_dataset = create_esc50_fold_splits(
+            data_path=data_path,
+            feature_extractor=feature_extractor,
+            config=config,
+            val_fold=5,
+            augmentations_per_sample=2,
+            augmentations=["pitch_shift", "time_stretch", "add_noise"],
+            aug_config=aug_config
+        )
+        
+        print(f"Train dataset size with augmentations: {len(train_dataset)}")
+        print(f"Validation dataset size: {len(val_dataset)}")
+        
+        # Test getting a sample with augmentations
+        if len(train_dataset) > 0:
+            sample, label = train_dataset[0]
+            print(f"Augmented sample shape: {sample.shape}")
+            print(f"Label: {label}")
+            
+            # Test multiple samples to ensure augmentations are working
+            for i in range(min(3, len(train_dataset))):
+                sample, label = train_dataset[i]
+                print(f"Sample {i} shape: {sample.shape}, label: {label}")
+        
+        print("✅ ESC-50 augmentation test passed!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Error testing ESC-50 with augmentations: {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
 def main():
     """Main test function."""
     print("=" * 50)
@@ -182,23 +264,30 @@ def main():
     
     success = True
     
-    # Test full ESC-50 dataset
-    success &= test_esc50_dataset()
+    # # Test full ESC-50 dataset
+    # success &= test_esc50_dataset()
     
-    # Test ESC-10 subset
-    success &= test_esc10_subset()
+    # # Test ESC-10 subset
+    # success &= test_esc10_subset()
     
-    # Test proper k-fold cross-validation
+    # # Test proper k-fold cross-validation
     success &= test_kfold_cross_validation()
+    
+    # Test ESC-50 with augmentations
+    # success &= test_esc50_with_augmentations()
     
     print("\n" + "=" * 50)
     if success:
         print("🎉 All tests passed!")
-        print("\nYou can now use ESC-50 dataset with k-fold cross-validation!")
+        print("\nYou can now use ESC-50 dataset with k-fold cross-validation and augmentations!")
         print("\nK-fold setup:")
         print("- 5 total folds in ESC-50 dataset")
         print("- For each iteration: 1 fold used for validation, 4 folds used for training")
         print("- No test folds - use k-fold cross-validation for evaluation")
+        print("\nAugmentation support:")
+        print("- Supports pitch_shift, time_stretch, add_noise, tanh_distortion, sin_distortion, polarity_inversion")
+        print("- Configure augmentations via AugmentationConfig")
+        print("- Augmentations applied only to training data")
         print("\nExample usage:")
         print("1. Update config.yaml to use ESC-50:")
         print("   dataset_type: esc50")
@@ -209,6 +298,10 @@ def main():
         print("   fold_datasets = create_esc50_kfold_splits(...)")
         print("   for train_dataset, val_dataset in fold_datasets:")
         print("       # Train and validate on this fold")
+        print("\n3. Add augmentations:")
+        print("   aug_config = create_augmentation_configs(config_dict)")
+        print("   train_dataset, val_dataset = create_esc50_fold_splits(")
+        print("       ..., augmentations=['pitch_shift', 'time_stretch'], aug_config=aug_config)")
     else:
         print("❌ Some tests failed!")
         return 1

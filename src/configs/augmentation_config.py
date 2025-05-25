@@ -74,47 +74,47 @@ def create_augmentation_configs(config: dict) -> AugmentationConfig:
             'sin_distortion': {
                 'class': SinDistortionConfig,
                 'params': {
-                    'min_distortion': aug_config.get('sin_distortion_min_rate'),
-                    'max_distortion': aug_config.get('sin_distortion_max_rate'),
-                    'p': aug_config.get('sin_distortion_p')
+                    'min_distortion': config.get('sin_distortion_min_rate'),
+                    'max_distortion': config.get('sin_distortion_max_rate'),
+                    'p': config.get('sin_distortion_p')
                 }
             },
             'time_stretch': {
                 'class': TimeStretchConfig,
                 'params': {
-                    'min_rate': aug_config.get('time_stretch_min_rate'),
-                    'max_rate': aug_config.get('time_stretch_max_rate'),
-                    'p': aug_config.get('time_stretch_p')
+                    'min_rate': config.get('time_stretch_min_rate'),
+                    'max_rate': config.get('time_stretch_max_rate'),
+                    'p': config.get('time_stretch_p')
                 }
             },
             'pitch_shift': {
                 'class': PitchShiftConfig,
                 'params': {
-                    'min_semitones': aug_config.get('pitch_shift_min_semitones'),
-                    'max_semitones': aug_config.get('pitch_shift_max_semitones'),
-                    'p': aug_config.get('pitch_shift_p')
+                    'min_semitones': config.get('pitch_shift_min_semitones'),
+                    'max_semitones': config.get('pitch_shift_max_semitones'),
+                    'p': config.get('pitch_shift_p')
                 }
             },
             'polarity_inversion': {
                 'class': PolarityInversionConfig,
                 'params': {
-                    'p': aug_config.get('polarity_inversion_p')
+                    'p': config.get('polarity_inversion_p')
                 }
             },
             'gaussian_noise': {
                 'class': AddGaussianNoiseConfig,
                 'params': {
-                    'min_amplitude': aug_config.get('gaussian_noise_min_amplitude'),
-                    'max_amplitude': aug_config.get('gaussian_noise_max_amplitude'),
-                    'p': aug_config.get('gaussian_noise_p')
+                    'min_amplitude': config.get('gaussian_noise_min_amplitude'),
+                    'max_amplitude': config.get('gaussian_noise_max_amplitude'),
+                    'p': config.get('gaussian_noise_p')
                 }
             },
             'tanh_distortion': {
                 'class': TanhDistortionConfig,
                 'params': {
-                    'min_distortion': aug_config.get('tanh_distortion_min_rate'),
-                    'max_distortion': aug_config.get('tanh_distortion_max_rate'),
-                    'p': aug_config.get('tanh_distortion_p')
+                    'min_distortion': config.get('tanh_distortion_min_rate'),
+                    'max_distortion': config.get('tanh_distortion_max_rate'),
+                    'p': config.get('tanh_distortion_p')
                 }
             }
         }

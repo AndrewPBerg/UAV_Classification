@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent / "src"))
 from helper.util import AudioDataset, find_classes
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from configs.dataset_config import ESC50Config
+from configs.augmentation_config import AugmentationConfig, create_augmentation_configs
 
 class ESC50Dataset(AudioDataset):
     """
@@ -36,7 +37,7 @@ class ESC50Dataset(AudioDataset):
                  augmentations_per_sample: int = 0,
                  augmentations: List[str] = [],
                  num_channels: int = 1,
-                 aug_config: Optional[dict] = None) -> None:
+                 aug_config: Optional[Union[dict, AugmentationConfig]] = None) -> None:
         
         self.esc50_config = config
         self.metadata_df = None
@@ -49,6 +50,12 @@ class ESC50Dataset(AudioDataset):
         if self.esc50_config and self.esc50_config.use_esc10_subset:
             data_paths = self._filter_esc10_subset(data_paths)
         
+        # Convert AugmentationConfig to dict if needed
+        if isinstance(aug_config, AugmentationConfig):
+            aug_config_dict = aug_config.aug_configs
+        else:
+            aug_config_dict = aug_config or {}
+        
         # Initialize parent AudioDataset
         super().__init__(
             data_path=data_path,
@@ -60,7 +67,7 @@ class ESC50Dataset(AudioDataset):
             augmentations_per_sample=augmentations_per_sample,
             augmentations=augmentations,
             num_channels=num_channels,
-            config=aug_config
+            config=aug_config_dict
         )
     
     def _load_metadata(self, data_path: str) -> None:
@@ -145,7 +152,7 @@ def create_esc50_fold_splits(
     val_fold: int = 5,
     augmentations_per_sample: int = 0,
     augmentations: Optional[List[str]] = None,
-    aug_config: Optional[dict] = None
+    aug_config: Optional[Union[dict, AugmentationConfig]] = None
 ) -> Tuple[ESC50Dataset, ESC50Dataset]:
     """
     Create ESC-50 dataset splits based on predefined folds.
@@ -258,7 +265,7 @@ def create_esc50_kfold_splits(
     k_folds: int = 5,
     augmentations_per_sample: int = 0,
     augmentations: Optional[List[str]] = None,
-    aug_config: Optional[dict] = None
+    aug_config: Optional[Union[dict, AugmentationConfig]] = None
 ) -> List[Tuple[ESC50Dataset, ESC50Dataset]]:
     """
     Create ESC-50 k-fold cross-validation splits using predefined folds.
