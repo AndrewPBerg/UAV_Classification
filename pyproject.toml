@@ -10,6 +10,7 @@ dependencies = [
     "icecream>=2.1.4",
     "librosa>=0.10.2.post1",
     "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
     "peft>=0.14.0",
     "pip>=25.0.1",
     "pydantic>=2.10.6",

@@ -1,8 +1,5 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_31
-  num_classes: 31
-  save_dataloader: false
-  model_type: efficientnet_b1
+  model_type: efficientnet_b0
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -16,12 +13,23 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 3
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
   adapter_type: none-full
+  save_dataloader: false
+
+dataset:
+  dataset_type: uav
+  data_path: ./datasets/UAV_Dataset_9
+  # data_path: ./datasets/UAV_Dataset_9
+  num_classes: 31
+  target_sr: 16000
+  target_duration: 5
+  file_extension: .wav
+
 augmentations:
   augmentations_per_sample: 0
   augmentations:

@@ -1,6 +1,6 @@
 from configs import load_configs
 import yaml
-from helper.datamodule import AudioDataModule
+from helper.datamodule_factory import create_datamodule
 from icecream import ic
 import torch
 import numpy as np
@@ -21,7 +21,8 @@ def main():
         config = yaml.safe_load(file)
     
     (general_config, 
-     feature_extraction_config,  
+     feature_extraction_config,
+     dataset_config,  
      peft_config, 
      wandb_config,
      sweep_config, 
@@ -34,10 +35,11 @@ def main():
     torch.cuda.manual_seed(general_config.seed)
     np.random.seed(general_config.seed)
     
-    # Create data module directly from configs
-    data_module = AudioDataModule(
+    # Create data module using the factory
+    data_module = create_datamodule(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
+        dataset_config=dataset_config,
         augmentation_config=augmentation_config
     )
     ic("Created the audio data module")
@@ -60,10 +62,10 @@ def main():
                 ic(f"Fold {fold} train loader: {train_samples} samples")
                 ic(f"Fold {fold} val loader: {val_samples} samples")
 
-        elif "static" in general_config.data_path:
+        elif "static" in dataset_config.data_path:
 
             ic("Loading from static dataloaders")
-            data_module.load_dataloaders(general_config.data_path)
+            data_module.load_dataloaders(dataset_config.data_path)
 
         else:
 
@@ -102,6 +104,7 @@ def main():
     model_factory = ModelFactory.get_model_factory(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
+        dataset_config=dataset_config,
         peft_config=peft_config
     )
 
@@ -125,6 +128,7 @@ def main():
     trainer = PTLTrainer(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
+        dataset_config=dataset_config,
         peft_config=peft_config,
         wandb_config=wandb_config,
         sweep_config=sweep_config,

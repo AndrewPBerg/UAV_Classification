@@ -12,8 +12,8 @@ from icecream import ic
 from datetime import datetime
 
 from .lightning_module import AudioClassifier
-from .datamodule import AudioDataModule
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
+from configs.dataset_config import DatasetConfig
 from .util import wandb_login
 import time
 
@@ -27,10 +27,11 @@ class PTLTrainer:
         self,
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
+        dataset_config: DatasetConfig,
         peft_config: Any,
         wandb_config: WandbConfig,
         sweep_config: SweepConfig,
-        data_module: AudioDataModule,
+        data_module: pl.LightningDataModule,
         model_factory: Callable,
         augmentation_config: AugmentationConfig,
     ):
@@ -40,15 +41,17 @@ class PTLTrainer:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
+            dataset_config: Dataset configuration
             peft_config: PEFT configuration
             wandb_config: WandB configuration
             sweep_config: Sweep configuration
-            data_module: Audio data module
+            data_module: Lightning data module (AudioDataModule, UAVDataModule, or ESC50DataModule)
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
+        self.dataset_config = dataset_config
         self.peft_config = peft_config
         self.wandb_config = wandb_config
         self.sweep_config = sweep_config
@@ -70,8 +73,14 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
-                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
+                config=wandb_config_dict(
+                    self.general_config, 
+                    self.feature_extraction_config, 
+                    self.dataset_config,
+                    self.peft_config, 
+                    self.wandb_config, 
+                    self.augmentation_config
+                ),
                 reinit=True  # Force reinitialize a new wandb run
             )
         
@@ -86,156 +95,67 @@ class PTLTrainer:
     
     def _get_callbacks(self) -> List[pl.Callback]:
         """
-        Get the callbacks for the trainer.
+        Get PyTorch Lightning callbacks.
         
         Returns:
             List of callbacks
         """
         callbacks = []
         
-        # Early stopping callback
-        if self.general_config.patience > 0:
-            early_stopping = EarlyStopping(
-                monitor="val_loss",
+        # Add progress bar
+        callbacks.append(TQDMProgressBar(refresh_rate=10))
+        
+        # Add learning rate monitor
+        callbacks.append(LearningRateMonitor(logging_interval='epoch'))
+        
+        # Add model checkpoint callback
+        if self.general_config.checkpointing:
+            checkpoint_callback = ModelCheckpoint(
+                monitor=self.general_config.monitor,
+                mode=self.general_config.mode,
+                save_top_k=self.general_config.save_top_k,
+                save_last=True,
+                filename='{epoch}-{val_loss:.2f}',
+                auto_insert_metric_name=False
+            )
+            callbacks.append(checkpoint_callback)
+        
+        # Add early stopping callback
+        if self.general_config.early_stopping:
+            early_stop_callback = EarlyStopping(
+                monitor=self.general_config.monitor,
+                mode=self.general_config.mode,
                 patience=self.general_config.patience,
-                mode="min",
                 verbose=True
             )
-            callbacks.append(early_stopping)
+            callbacks.append(early_stop_callback)
         
-        # Model checkpoint callback
-        checkpoint_callback = ModelCheckpoint(
-            dirpath="checkpoints",
-            filename="{epoch}-{val_loss:.4f}",
-            monitor="val_loss",
-            mode="min",
-            save_top_k=1,
-            verbose=True
-        )
-        callbacks.append(checkpoint_callback)
-        
-        # Learning rate monitor
-        lr_monitor = LearningRateMonitor(logging_interval="epoch")
-        callbacks.append(lr_monitor)
-        
-        # Custom progress bar with better metric display
-        class CustomProgressBar(TQDMProgressBar):
-            def get_metrics(self, trainer, model):
-                # Get metrics from parent class
-                items = super().get_metrics(trainer, model)
-                
-                # Format all metrics to 2 decimal places
-                for key in list(items.keys()):
-                    if key in ['v_num', 'epoch', 'step']:
-                        continue
-                    if isinstance(items[key], (float, int, torch.Tensor)):
-                        try:
-                            # Convert to float first to handle tensor values
-                            value = float(items[key])
-                            items[key] = f"{value:.2f}"
-                        except (ValueError, TypeError):
-                            # If conversion fails, keep the original value
-                            pass
-                
-                # Reorder metrics to show in desired order
-                ordered_items = {}
-                
-                # First show epoch and step
-                if 'epoch' in items:
-                    ordered_items['epoch'] = items['epoch']
-                if 'step' in items:
-                    ordered_items['step'] = items['step']
-                
-                # Then show train metrics
-                for metric in ['train_loss', 'train_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show validation metrics
-                for metric in ['val_loss', 'val_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show test metrics
-                for metric in ['test_loss', 'test_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Add any remaining metrics
-                for key, val in items.items():
-                    if key not in ordered_items:
-                        ordered_items[key] = val
-                
-                return ordered_items
-        
-        # Add custom progress bar
-        progress_bar = CustomProgressBar()
-        callbacks.append(progress_bar)
-
         return callbacks
+    
+    def _get_num_classes(self) -> int:
+        """
+        Get the number of classes from the data module.
+        
+        Returns:
+            Number of classes
+        """
+        if hasattr(self.data_module, 'num_classes'):
+            return self.data_module.num_classes
+        else:
+            # Fallback to dataset config
+            return self.dataset_config.get_num_classes()
     
     def train(self) -> Dict[str, Any]:
         """
-        Train the model.
+        Train the model using PyTorch Lightning.
         
         Returns:
-            Dict[str, Any]: Test results
+            Dictionary of test results
         """
-        import torch
-        
-        # Set float32 matmul precision to 'high' to properly utilize Tensor Cores on CUDA devices
-        if torch.cuda.is_available():
-            torch.set_float32_matmul_precision('high')
-            print("Set float32 matmul precision to 'high' for better performance on Tensor Core GPUs")
-        
-        # Check if deterministic algorithms are enabled and disable them if needed
-        # This is necessary for operations like interpolation that don't have deterministic implementations
-        if torch.are_deterministic_algorithms_enabled():
-            print("Deterministic algorithms are enabled. Disabling for compatibility with certain operations.")
-            torch.use_deterministic_algorithms(False)
-        
-        # Create model
-        model, feature_extractor = self.model_factory(self.device)
-        
-        # Create a custom callback to display metrics after each epoch
-        class MetricsDisplayCallback(pl.Callback):
-            def on_train_epoch_end(self, trainer, pl_module):
-                metrics = trainer.callback_metrics
-                
-                # Extract metrics
-                train_loss = metrics.get('train_loss_epoch', None)
-                train_acc = metrics.get('train_acc_epoch', None)
-                val_loss = metrics.get('val_loss', None)
-                val_acc = metrics.get('val_acc', None)
-                
-                # Convert tensors to floats
-                if isinstance(train_loss, torch.Tensor):
-                    train_loss = train_loss.item()
-                if isinstance(train_acc, torch.Tensor):
-                    train_acc = train_acc.item()
-                if isinstance(val_loss, torch.Tensor):
-                    val_loss = val_loss.item()
-                if isinstance(val_acc, torch.Tensor):
-                    val_acc = val_acc.item()
-                
-                # Print metrics in a nice format
-                print("\n" + "-"*50)
-                print(f"Epoch {trainer.current_epoch} Metrics:")
-                
-                # Format metrics safely, handling None values
-                train_loss_str = f"{train_loss:.4f}" if train_loss is not None else "N/A"
-                train_acc_str = f"{train_acc:.4f}" if train_acc is not None else "N/A"
-                val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "N/A"
-                val_acc_str = f"{val_acc:.4f}" if val_acc is not None else "N/A"
-                
-                print(f"Train Loss: {train_loss_str} | Train Acc: {train_acc_str}")
-                print(f"Val Loss: {val_loss_str} | Val Acc: {val_acc_str}")
-                print("-"*50 + "\n")
-        
-        # Create trainer with our custom callbacks
+        # Get callbacks
         callbacks = self._get_callbacks()
-        callbacks.append(MetricsDisplayCallback())
         
+        # Create trainer
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
@@ -249,24 +169,28 @@ class PTLTrainer:
         
         # Ensure data module is set up - call setup directly
         try:
-            self.data_module.setup()
+            self.data_module.setup(stage="fit")
         except Exception as e:
             print(f"Warning: Error during data module setup: {str(e)}")
             print("This may be normal if the data module is already set up.")
             
         # Validate number of classes
-        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes <= 0:
-            raise ValueError(f"Invalid number of classes: {getattr(self.data_module, 'num_classes', None)}. Must be positive.")
+        num_classes = self._get_num_classes()
+        if num_classes <= 0:
+            raise ValueError(f"Invalid number of classes: {num_classes}. Must be positive.")
             
         # Log number of classes for debugging
-        print(f"Number of classes in data module: {self.data_module.num_classes}")
+        print(f"Number of classes in data module: {num_classes}")
+        
+        # Create model
+        model, feature_extractor = self.model_factory(self.device)
         
         # Create lightning module
         lightning_module = AudioClassifier(
             model=model,
             general_config=self.general_config,
             peft_config=self.peft_config,
-            num_classes=self.data_module.num_classes
+            num_classes=num_classes
         )
         
         # Print training start message with clear formatting

@@ -78,6 +78,7 @@ class ModelFactory:
     def create_model(
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
+        dataset_config: Any,
         peft_config: Optional[PEFTConfig] = None,
         device: Optional[torch.device] = None
     ) -> Tuple[nn.Module, Any]:
@@ -93,8 +94,8 @@ class ModelFactory:
         if len(input_shape) == 3:
             input_shape = (input_shape[2], input_shape[0], input_shape[1])
         
-        # Get number of classes
-        num_classes = general_config.num_classes
+        # Get number of classes from dataset_config instead of general_config
+        num_classes = dataset_config.get_num_classes()
         
         # Make sure adapter type is supported by the model
         adapter_type = general_config.adapter_type if hasattr(general_config, "adapter_type") else None
@@ -210,6 +211,7 @@ class ModelFactory:
     def get_model_factory(
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
+        dataset_config: Any,
         peft_config: Optional[Any] = None
     ) -> Callable[[torch.device], Tuple[nn.Module, Any]]:
         """
@@ -218,6 +220,7 @@ class ModelFactory:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
+            dataset_config: Dataset configuration
             peft_config: PEFT configuration (optional)
             
         Returns:
@@ -227,6 +230,7 @@ class ModelFactory:
             return ModelFactory.create_model(
                 general_config=general_config,
                 feature_extraction_config=feature_extraction_config,
+                dataset_config=dataset_config,
                 peft_config=peft_config,
                 device=device
             )

@@ -5,13 +5,13 @@ from icecream import ic
 import sys
 try:
     from .peft_config import * # noqa: F403
-    from .peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
+    from .peft_config import PEFTConfig, get_peft_config  # Import the PEFTConfig type alias and get_peft_config function explicitly
     from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
     from .dataset_config import get_dataset_config, DatasetConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
-    from peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
+    from peft_config import PEFTConfig, get_peft_config  # Import the PEFTConfig type alias and get_peft_config function explicitly
     from wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from augmentation_config import create_augmentation_configs, AugmentationConfig
     from dataset_config import get_dataset_config, DatasetConfig
@@ -237,4 +237,4 @@ def main():
     ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config))
 
 if __name__ == '__main__':
-    main()
+    main() 
