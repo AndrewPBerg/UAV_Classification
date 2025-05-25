@@ -8,11 +8,13 @@ try:
     from .peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
+    from .dataset_config import get_dataset_config, DatasetConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
     from peft_config import PEFTConfig  # Import the PEFTConfig type alias explicitly
     from wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from augmentation_config import create_augmentation_configs, AugmentationConfig
+    from dataset_config import get_dataset_config, DatasetConfig
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Custom exception handler that terminates the script on any exception"""
@@ -44,17 +46,14 @@ class GeneralConfig(BaseModel):
 
     Required Keys (will not be defaulted):
         - model_type
-        - num_classes
     
+    Note: data_path and num_classes are now handled by DatasetConfig
     """
     class Config:
         strict = True
 
-    data_path: str # "/app/src/datasets/UAV_Dataset_31"
-    num_classes: int
-    save_dataloader: bool = False
-
-    model_type: str # "vit232"
+    # Core model configuration
+    model_type: str # "efficientnet_b1"
 
     @field_validator('model_type')
     @classmethod
@@ -62,7 +61,9 @@ class GeneralConfig(BaseModel):
         if v not in _ModelNames().model_list:
             raise ValueError(f'model_type must be one of {_ModelNames().model_list}')
         return v
-        
+    
+    # Training configuration
+    save_dataloader: bool = False
     batch_size: int = 32
     seed: int = 42
     num_cuda_workers: int = 10
@@ -70,10 +71,12 @@ class GeneralConfig(BaseModel):
     epochs: int = 10
     save_model: bool = False
 
+    # Data splitting configuration (kept here for backward compatibility)
     test_size: float = 0.2
     inference_size: float = 0.1
     val_size: float = 0.1
 
+    # Hyperparameter and experiment configuration
     sweep_count: int = 200
     accumulation_steps: int = 2
     learning_rate: float = 0.001
@@ -82,9 +85,11 @@ class GeneralConfig(BaseModel):
     use_sweep: bool = False
     torch_viz: bool = False
 
+    # Cross-validation configuration
     use_kfold: bool = False
     k_folds: int = 5
 
+    # Adapter configuration
     adapter_type: str = "none-classifier"
     
     # Training monitoring settings
@@ -127,11 +132,16 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig ]: # noqa: F405
-
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig]: # noqa: F405
+    """
+    Load and validate all configuration objects from the config dictionary.
     
+    Returns:
+        Tuple containing all configuration objects in order:
+        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config)
+    """
 
-    # Create GeneralConfig instance from the dictionary
+    # Create configuration instances from the dictionary
     try:
         general_config = GeneralConfig(**config["general"])
         ic("GeneralConfig instance created successfully:")
@@ -139,6 +149,9 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         feature_extraction_config = FeatureExtractionConfig(**config["feature_extraction"])
         ic("FeatureExtractionConfig instance created successfully:")
 
+        dataset_config = get_dataset_config(config)
+        ic("DatasetConfig instance created successfully:")
+
         peft_config = get_peft_config(config) # noqa: F405
         ic("PeftConfig instance created successfully:")
 
@@ -149,35 +162,48 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         augmentation_config = create_augmentation_configs(config)
         ic("AugmentationConfig instance created successfully:")
 
-        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
+        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config
+        
     except ValidationError as e:
         ic("Validation error occurred: ")
         ic(e)
+        raise e
     
     except ValueError as e:
         ic("ValueError occurred: ")
         ic(e)
+        raise e
+        
     except KeyError as e:
-        ic("Key error occurred, defaulting to sweeps case: ", e)
-        general_config = GeneralConfig(**config)
-        ic("GeneralConfig instance created successfully:")
+        ic("Key error occurred, attempting fallback for sweeps case: ", e)
+        try:
+            # Fallback for sweep configurations that might have flattened structure
+            general_config = GeneralConfig(**config)
+            ic("GeneralConfig instance created successfully (fallback):")
 
-        feature_extraction_config = FeatureExtractionConfig(**config)
-        ic("FeatureExtractionConfig instance created successfully:")
+            feature_extraction_config = FeatureExtractionConfig(**config)
+            ic("FeatureExtractionConfig instance created successfully (fallback):")
 
-        peft_config = get_peft_config(config) # noqa: F405
-        ic("PeftConfig instance created successfully:")
+            dataset_config = get_dataset_config(config)
+            ic("DatasetConfig instance created successfully (fallback):")
 
-        wandb_config, sweep_config = get_wandb_config(config)
-        ic("WandbConfig instance created successfully:")
-        ic("SweepConfig instance created successfully:")
+            peft_config = get_peft_config(config) # noqa: F405
+            ic("PeftConfig instance created successfully (fallback):")
 
-        augmentation_config = create_augmentation_configs(config)
-        ic("AugmentationConfig instance created successfully:")
+            wandb_config, sweep_config = get_wandb_config(config)
+            ic("WandbConfig instance created successfully (fallback):")
+            ic("SweepConfig instance created successfully (fallback):")
 
-        return general_config, feature_extraction_config, peft_config, wandb_config, sweep_config, augmentation_config
+            augmentation_config = create_augmentation_configs(config)
+            ic("AugmentationConfig instance created successfully (fallback):")
 
-def wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config, augmentation_config):
+            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config
+            
+        except Exception as fallback_error:
+            ic("Fallback also failed:", fallback_error)
+            raise e  # Raise the original KeyError
+
+def wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config):
     """
     What dis do:
     - takes in all the configs and returns a correctly formatted
@@ -187,6 +213,7 @@ def wandb_config_dict(general_config, feature_extraction_config, peft_config, wa
     res = {}
     res['wandb_config'] = dict(wandb_config)
     res['general_config'] = dict(general_config)
+    res['dataset_config'] = dict(dataset_config)
     res['peft_config'] = dict(peft_config.to_dict())
     res['feature_extraction_config'] = dict(feature_extraction_config)
     res['augmentation_config'] = dict(augmentation_config)
@@ -200,13 +227,14 @@ def main():
     (
         general_config,
         feature_extraction_config,
+        dataset_config,
         peft_config,
         wandb_config,
         sweep_config,
         augmentation_config
     ) = load_configs(config)
 
-    ic(wandb_config_dict(general_config, feature_extraction_config, peft_config, wandb_config, augmentation_config))
+    ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config))
 
 if __name__ == '__main__':
     main()

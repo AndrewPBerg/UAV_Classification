@@ -1,106 +1,146 @@
-# Code to download the ESC-50 dataset from the official Github
-# github: https://github.com/karolpiczak/ESC-50
-
 import os
-import urllib.request
 import zipfile
-import glob
+import requests
+from pathlib import Path
+from tqdm import tqdm
+import pandas as pd
+from typing import Optional
 
-def download_esc50():
-    # URLs and paths
-    github_url = "https://github.com/karolpiczak/ESC-50/archive/master.zip"
-    download_dir = os.path.dirname(os.path.abspath(__file__))
-    zip_path = os.path.join(download_dir, "ESC-50-master.zip")
-    extract_dir = os.path.join(download_dir, "temp")
-    dataset_dir = os.path.join(download_dir, "ESC-50")
+def download_file(url: str, destination: str) -> None:
+    """Download a file from URL with progress bar."""
+    response = requests.get(url, stream=True)
+    response.raise_for_status()
     
-    # Check if dataset already exists
-    if os.path.exists(dataset_dir) and os.path.exists(os.path.join(dataset_dir, "meta", "esc50.csv")):
-        print(f"ESC-50 dataset already exists at {dataset_dir}")
-        return dataset_dir
+    total_size = int(response.headers.get('content-length', 0))
     
-    print("ESC-50 dataset not found or incomplete, downloading...")
-    
-    # Create temporary directory if it doesn't exist
-    os.makedirs(extract_dir, exist_ok=True)
-    
-    print(f"Downloading ESC-50 dataset from {github_url}...")
-    
-    # Download the zip file
-    urllib.request.urlretrieve(github_url, zip_path)
-    
-    print(f"Download complete. Extracting files to {extract_dir}...")
-    
-    # Extract the zip file
+    with open(destination, 'wb') as file, tqdm(
+        desc=os.path.basename(destination),
+        total=total_size,
+        unit='B',
+        unit_scale=True,
+        unit_divisor=1024,
+    ) as progress_bar:
+        for chunk in response.iter_content(chunk_size=8192):
+            if chunk:
+                file.write(chunk)
+                progress_bar.update(len(chunk))
+
+def extract_zip(zip_path: str, extract_to: str) -> None:
+    """Extract a zip file to the specified directory."""
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-        zip_ref.extractall(extract_dir)
+        zip_ref.extractall(extract_to)
+
+def organize_esc50_dataset(base_path: str) -> None:
+    """Organize ESC-50 dataset into class-based directory structure."""
+    base_path_obj = Path(base_path)
+    audio_dir = base_path_obj / "audio"
+    meta_dir = base_path_obj / "meta"
     
-    # Source directory after extraction
-    source_dir = os.path.join(extract_dir, "ESC-50-master")
+    # Read the metadata CSV
+    meta_csv = meta_dir / "esc50.csv"
+    if not meta_csv.exists():
+        raise FileNotFoundError(f"Metadata file not found: {meta_csv}")
     
-    # Create dataset directory if it doesn't exist
-    os.makedirs(dataset_dir, exist_ok=True)
+    df = pd.read_csv(meta_csv)
     
-    # Instead of using shutil, manually move files
-    print(f"Moving files to {dataset_dir}...")
+    # Create class directories
+    classes_dir = base_path_obj / "classes"
+    classes_dir.mkdir(exist_ok=True)
     
-    # If destination exists, remove it first
-    if os.path.exists(dataset_dir):
-        # Remove all files and subdirectories in dataset_dir
-        for item in os.listdir(dataset_dir):
-            item_path = os.path.join(dataset_dir, item)
-            if os.path.isfile(item_path):
-                os.remove(item_path)
-            elif os.path.isdir(item_path):
-                for root, dirs, files in os.walk(item_path, topdown=False):
-                    for file in files:
-                        os.remove(os.path.join(root, file))
-                    for dir in dirs:
-                        os.rmdir(os.path.join(root, dir))
-                os.rmdir(item_path)
-    else:
-        os.makedirs(dataset_dir)
-    
-    # Copy all files from source to destination
-    for root, dirs, files in os.walk(source_dir):
-        # Get the relative path from source_dir
-        rel_path = os.path.relpath(root, source_dir)
-        # Create the corresponding directory in dataset_dir
-        if rel_path != '.':
-            os.makedirs(os.path.join(dataset_dir, rel_path), exist_ok=True)
+    print("Organizing files into class directories...")
+    for _, row in tqdm(df.iterrows(), total=len(df), desc="Organizing files"):
+        category = row['category']
+        filename = row['filename']
         
-        # Copy all files in this directory
-        for file in files:
-            src_file = os.path.join(root, file)
-            if rel_path == '.':
-                dst_file = os.path.join(dataset_dir, file)
-            else:
-                dst_file = os.path.join(dataset_dir, rel_path, file)
-            
-            # Copy the file
-            with open(src_file, 'rb') as f_src:
-                with open(dst_file, 'wb') as f_dst:
-                    f_dst.write(f_src.read())
+        # Create category directory if it doesn't exist
+        category_dir = classes_dir / category
+        category_dir.mkdir(exist_ok=True)
+        
+        # Source and destination paths
+        src_file = audio_dir / filename
+        dst_file = category_dir / filename
+        
+        # Copy file if it exists and destination doesn't exist
+        if src_file.exists() and not dst_file.exists():
+            import shutil
+            shutil.copy2(src_file, dst_file)
+
+def download_esc50(data_dir: Optional[str] = None) -> str:
+    """
+    Download and organize the ESC-50 dataset.
     
-    print(f"Dataset extracted to {dataset_dir}")
+    Args:
+        data_dir: Directory to download the dataset to. If None, uses current directory.
+        
+    Returns:
+        Path to the organized dataset directory.
+    """
+    if data_dir is None:
+        data_dir = os.getcwd()
     
-    # Clean up
-    print("Cleaning up temporary files...")
-    if os.path.exists(zip_path):
+    data_dir_obj = Path(data_dir)
+    data_dir_obj.mkdir(parents=True, exist_ok=True)
+    
+    # ESC-50 dataset URL
+    dataset_url = "https://github.com/karoldvl/ESC-50/archive/master.zip"
+    zip_filename = "ESC-50-master.zip"
+    zip_path = data_dir_obj / zip_filename
+    
+    print(f"Downloading ESC-50 dataset to {data_dir_obj}")
+    
+    # Download the dataset
+    if not zip_path.exists():
+        print("Downloading ESC-50 dataset...")
+        download_file(dataset_url, str(zip_path))
+    else:
+        print("Dataset zip file already exists, skipping download.")
+    
+    # Extract the dataset
+    extract_dir = data_dir_obj / "ESC-50-master"
+    if not extract_dir.exists():
+        print("Extracting dataset...")
+        extract_zip(str(zip_path), str(data_dir_obj))
+    else:
+        print("Dataset already extracted, skipping extraction.")
+    
+    # Organize into class-based structure
+    organize_esc50_dataset(str(extract_dir))
+    
+    # Clean up zip file
+    if zip_path.exists():
         os.remove(zip_path)
+        print("Cleaned up zip file.")
     
-    # Remove temp directory recursively
-    if os.path.exists(extract_dir):
-        for root, dirs, files in os.walk(extract_dir, topdown=False):
-            for file in files:
-                os.remove(os.path.join(root, file))
-            for dir in dirs:
-                os.rmdir(os.path.join(root, dir))
-        os.rmdir(extract_dir)
+    organized_path = extract_dir / "classes"
+    print(f"ESC-50 dataset downloaded and organized at: {organized_path}")
     
-    print("ESC-50 dataset download and extraction complete!")
-    return dataset_dir
+    return str(organized_path)
+
+def main():
+    """Main function to download ESC-50 dataset."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Download and organize ESC-50 dataset")
+    parser.add_argument(
+        "--data-dir", 
+        type=str, 
+        default=".",
+        help="Directory to download the dataset to (default: current directory)"
+    )
+    
+    args = parser.parse_args()
+    
+    try:
+        dataset_path = download_esc50(args.data_dir)
+        print(f"\nESC-50 dataset successfully downloaded and organized!")
+        print(f"Dataset location: {dataset_path}")
+        print(f"\nTo use this dataset, point your data_path to: {dataset_path}")
+        
+    except Exception as e:
+        print(f"Error downloading ESC-50 dataset: {e}")
+        return 1
+    
+    return 0
 
 if __name__ == "__main__":
-    download_esc50()
-
+    exit(main()) 

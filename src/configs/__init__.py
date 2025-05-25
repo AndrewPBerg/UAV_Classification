@@ -19,6 +19,15 @@ from .augmentation_config import (
     TanhDistortionConfig
 )
 
+# Import dataset configurations
+from .dataset_config import (
+    DatasetConfig,
+    ESC50Config,
+    UAVConfig,
+    create_dataset_config,
+    get_dataset_config
+)
+
 # Import PEFT configurations
 from .peft_config import (
     get_peft_config,
@@ -60,6 +69,13 @@ __all__ = [
     'AugConfig',
     'SinDistortionConfig',
     'TanhDistortionConfig',
+    
+    # dataset_config exports
+    'DatasetConfig',
+    'ESC50Config',
+    'UAVConfig',
+    'create_dataset_config',
+    'get_dataset_config',
     
     # peft_config exports
     'LoraConfig',
