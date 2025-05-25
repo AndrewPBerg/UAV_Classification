@@ -22,8 +22,8 @@ general:
   save_dataloader: false
 
 dataset:
-  dataset_type: uav
-  data_path: ./datasets/UAV_Dataset_9
+  dataset_type: esc50
+  data_path: ./esc50_data/ESC-50-master
   # data_path: ./datasets/UAV_Dataset_9
   num_classes: 31
   target_sr: 16000

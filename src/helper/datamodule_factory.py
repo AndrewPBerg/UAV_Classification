@@ -22,7 +22,7 @@ from .UAV_datamodule import UAVDataModule, create_uav_datamodule
 
 # Try to import ESC50 datamodule with error handling
 try:
-    from esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
+    from src.esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
 except ImportError as e:
     ic(f"Warning: Could not import ESC50DataModule: {e}")
     raise ImportError(f"Could not import ESC50DataModule: {e}")

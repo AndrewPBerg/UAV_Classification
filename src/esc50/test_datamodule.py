@@ -7,9 +7,9 @@ import sys
 from pathlib import Path
 
 # Add src to path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent))
 
-from datamodule import ESC50DataModule
+from esc50.esc50_datamodule import ESC50DataModule
 from configs.dataset_config import ESC50Config
 from configs import GeneralConfig, FeatureExtractionConfig, AugConfig
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor
@@ -27,7 +27,7 @@ def test_esc50_datamodule():
     if not Path(data_path).exists():
         print(f"Dataset not found at {data_path}")
         print("Please run the download script first:")
-        print("uv run download.py --data-dir ../esc50_data")
+        print("uv run src/download_esc50.py --data-dir ../esc50_data")
         return False
     
     # Create configurations
