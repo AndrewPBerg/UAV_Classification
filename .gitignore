@@ -21,6 +21,9 @@ lightning_logs/
 checkpoints/
 Drone_Lab_Server_Access.ipynb
 
+# Datasets (too large to upload)
+ESC-50/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
