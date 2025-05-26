@@ -45,7 +45,7 @@ class PTLTrainer:
             peft_config: PEFT configuration
             wandb_config: WandB configuration
             sweep_config: Sweep configuration
-            data_module: Lightning data module (AudioDataModule, UAVDataModule, or ESC50DataModule)
+            data_module: Lightning data module (UAVDataModule or ESC50DataModule)
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
         """

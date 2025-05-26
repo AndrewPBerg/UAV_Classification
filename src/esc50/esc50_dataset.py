@@ -11,14 +11,14 @@ from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, Whisp
 import sys
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from helper.util import AudioDataset, find_classes
+from helper.util import UAVDataset, find_classes
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from configs.dataset_config import ESC50Config
 from configs.augmentation_config import AugmentationConfig, create_augmentation_configs
 
-class ESC50Dataset(AudioDataset):
+class ESC50Dataset(UAVDataset):
     """
-    ESC-50 specific dataset class that extends AudioDataset.
+    ESC-50 specific dataset class that extends UAVDataset.
     
     Handles ESC-50 specific features:
     - Fold-based cross-validation splits
@@ -56,7 +56,7 @@ class ESC50Dataset(AudioDataset):
         else:
             aug_config_dict = aug_config or {}
         
-        # Initialize parent AudioDataset
+        # Initialize parent UAVDataset
         super().__init__(
             data_path=data_path,
             data_paths=data_paths,

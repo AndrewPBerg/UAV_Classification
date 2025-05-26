@@ -8,7 +8,7 @@ from icecream import ic
 
 # Import the PyTorch Lightning implementation
 from helper.ptl_trainer import PTLTrainer
-from helper.datamodule import AudioDataModule
+from helper.UAV_datamodule import UAVDataModule
 from models.model_factory import ModelFactory
 from configs import (
     load_configs,
@@ -75,7 +75,7 @@ def model_pipeline(sweep_config=None):
              wandb.config.update({"augmentations": augmentation_config.dict()}, allow_val_change=True)
 
         # Create data module
-        data_module = AudioDataModule(
+        data_module = UAVDataModule(
             general_config=general_config,
             feature_extraction_config=feature_extraction_config,
             augmentation_config=augmentation_config,

@@ -5,7 +5,7 @@ from icecream import ic
 
 # Import the rest of the modules
 from helper.ptl_trainer import PTLTrainer
-from helper.datamodule import AudioDataModule
+from helper.UAV_datamodule import UAVDataModule
 from models.model_factory import ModelFactory
 from configs import (
     load_configs,

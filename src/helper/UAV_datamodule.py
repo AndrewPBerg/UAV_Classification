@@ -14,7 +14,7 @@ import wandb
 import yaml
 
 # Import from existing code
-from .util import AudioDataset, wandb_login
+from .util import UAVDataset, wandb_login
 from .cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 
@@ -226,7 +226,7 @@ class UAVDataModule(pl.LightningDataModule):
         # Create datasets
         start_time = timer()
         
-        self.train_dataset = AudioDataset(
+        self.train_dataset = UAVDataset(
             data_path=self.data_path,
             data_paths=train_paths,
             feature_extractor=self.feature_extractor,
@@ -238,7 +238,7 @@ class UAVDataModule(pl.LightningDataModule):
             config=self.augmentation_config.aug_configs or {}
         )
         
-        self.val_dataset = AudioDataset(
+        self.val_dataset = UAVDataset(
             data_path=self.data_path,
             data_paths=val_paths,
             feature_extractor=self.feature_extractor,
@@ -250,7 +250,7 @@ class UAVDataModule(pl.LightningDataModule):
             config=self.augmentation_config.aug_configs or {}
         )
         
-        self.test_dataset = AudioDataset(
+        self.test_dataset = UAVDataset(
             data_path=self.data_path,
             data_paths=test_paths,
             feature_extractor=self.feature_extractor,
@@ -259,7 +259,7 @@ class UAVDataModule(pl.LightningDataModule):
             num_channels=self.num_channels
         )
         
-        self.inference_dataset = AudioDataset(
+        self.inference_dataset = UAVDataset(
             data_path=self.data_path,
             data_paths=inference_paths,
             feature_extractor=self.feature_extractor,
@@ -305,7 +305,7 @@ class UAVDataModule(pl.LightningDataModule):
             fold_val_paths = [str(all_paths[i]) for i in train_val_indices[val_idx]]
             
             # Create datasets
-            train_dataset = AudioDataset(
+            train_dataset = UAVDataset(
                 data_path=self.data_path,
                 data_paths=fold_train_paths,
                 feature_extractor=self.feature_extractor,
@@ -317,7 +317,7 @@ class UAVDataModule(pl.LightningDataModule):
                 config=self.augmentation_config.aug_configs or {}
             )
             
-            val_dataset = AudioDataset(
+            val_dataset = UAVDataset(
                 data_path=self.data_path,
                 data_paths=fold_val_paths,
                 feature_extractor=self.feature_extractor,
@@ -331,7 +331,7 @@ class UAVDataModule(pl.LightningDataModule):
         
         # Create inference dataset
         inference_paths = [str(all_paths[i]) for i in inference_indices]
-        self.inference_dataset = AudioDataset(
+        self.inference_dataset = UAVDataset(
             data_path=self.data_path,
             data_paths=inference_paths,
             feature_extractor=self.feature_extractor,

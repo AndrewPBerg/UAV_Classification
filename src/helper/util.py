@@ -90,7 +90,7 @@ def count_classes(dataset):
     return class_counts
 
 
-class AudioDataset(Dataset):
+class UAVDataset(Dataset):
 
     def __init__(self,
                  data_path: str, 
@@ -432,7 +432,7 @@ class AudioDataset(Dataset):
         plt.title('Mel-Spectrogram')
         plt.show()
 
-def display_random_images(dataset: AudioDataset,
+def display_random_images(dataset: UAVDataset,
                           n: int = 9,  # Set n to 9 for a 3x3 grid layout
                           display_shape: bool = False,
                           seed: Optional[int] = None):
@@ -545,26 +545,26 @@ def train_test_split_custom(
     test_paths = [all_paths[i] for i in test_indices]
     inference_paths = [all_paths[i] for i in inference_indices]
 
-    # Create AudioDataset instances with proper config handling
+    # Create UAVDataset instances with proper config handling
     augmentations = augmentations or []
     config_dict = config.aug_configs if isinstance(config, AugmentationConfig) else {}
     
-    train_dataset = AudioDataset(data_path,
+    train_dataset = UAVDataset(data_path,
                                 train_paths,
                                 feature_extractor,
                                 augmentations_per_sample=augmentations_per_sample,
                                 augmentations=augmentations,
                                 config=config_dict)
     
-    val_dataset = AudioDataset(data_path, 
+    val_dataset = UAVDataset(data_path, 
                                val_paths, 
                                feature_extractor,
                                augmentations_per_sample=augmentations_per_sample,
                                augmentations=augmentations,
                                config=config_dict)
     
-    test_dataset = AudioDataset(data_path, test_paths, feature_extractor, config=config_dict)
-    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config_dict)
+    test_dataset = UAVDataset(data_path, test_paths, feature_extractor, config=config_dict)
+    inference_dataset = UAVDataset(data_path, inference_paths, feature_extractor, config=config_dict)
     
     print(f"Lengths: Train: {len(train_dataset)}, Validation: {len(val_dataset)}, "
           f"Test: {len(test_dataset)}, Inference: {len(inference_dataset)}")
@@ -649,7 +649,7 @@ def k_fold_split_custom(
         fold_val_paths = [all_paths[i] for i in train_val_indices[val_idx]]
         
         # Create datasets
-        train_dataset = AudioDataset(
+        train_dataset = UAVDataset(
             data_path,
             fold_train_paths,
             feature_extractor,
@@ -658,7 +658,7 @@ def k_fold_split_custom(
             config=config.aug_configs if isinstance(config, AugmentationConfig) else {}
         )
         
-        val_dataset = AudioDataset(
+        val_dataset = UAVDataset(
             data_path,
             fold_val_paths,
             feature_extractor,
@@ -670,7 +670,7 @@ def k_fold_split_custom(
     
     # Create inference dataset
     inference_paths = [all_paths[i] for i in inference_indices]
-    inference_dataset = AudioDataset(data_path, inference_paths, feature_extractor, config=config.aug_configs if isinstance(config, AugmentationConfig) else {})
+    inference_dataset = UAVDataset(data_path, inference_paths, feature_extractor, config=config.aug_configs if isinstance(config, AugmentationConfig) else {})
     
     end_time = timer()  # End timer for dataset initialization
     dataset_init_time = end_time - start_time

@@ -14,7 +14,7 @@ import json
 # Import from the main codebase
 sys.path.append(str(Path(__file__).parent.parent / "src"))
 
-from helper.util import AudioDataset, wandb_login
+from helper.util import UAVDataset, wandb_login
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
 from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, WhisperProcessor, Wav2Vec2FeatureExtractor, BitImageProcessor
 
