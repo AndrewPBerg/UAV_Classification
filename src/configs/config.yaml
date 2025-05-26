@@ -20,12 +20,14 @@ general:
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
+  monitor: val_loss # Different for ESC50 and UAV. ESC50 uses val_loss and UAV test_loss. Semantics mainly
+  mode: min
 
 dataset:
   dataset_type: esc50
   data_path: ./esc50/ESC-50-master
   # data_path: ./datasets/UAV_Dataset_9
-  num_classes: 31
+  num_classes: 50 # make sure this is correct
   target_sr: 16000
   target_duration: 5
   file_extension: .wav

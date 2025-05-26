@@ -98,6 +98,9 @@ class ESC50DataModule(pl.LightningDataModule):
         
         # Get number of classes
         self.num_classes = esc50_config.get_num_classes()
+        viable_classes = [50,10]
+        if self.num_classes not in viable_classes:
+            raise ValueError(f"Number of classes must be one of {viable_classes}")
         if self.use_esc10_subset:
             self.num_classes = 10  # ESC-10 subset has 10 classes
         
