@@ -65,18 +65,17 @@ def organize_esc50_dataset(base_path: str) -> None:
             import shutil
             shutil.copy2(src_file, dst_file)
 
-def download_esc50(data_dir: Optional[str] = None) -> str:
+def download_esc50() -> str:
     """
-    Download and organize the ESC-50 dataset.
-    
-    Args:
-        data_dir: Directory to download the dataset to. If None, uses current directory.
+    Download and organize the ESC-50 dataset to src/datasets/esc50_dataset.
         
     Returns:
         Path to the organized dataset directory.
     """
-    if data_dir is None:
-        data_dir = os.getcwd()
+    # Get the repository root (assumes this script is in src/esc50/)
+    script_dir = Path(__file__).parent
+    repo_root = script_dir.parent.parent
+    data_dir = repo_root / "src" / "datasets" / "esc50_dataset"
     
     data_dir_obj = Path(data_dir)
     data_dir_obj.mkdir(parents=True, exist_ok=True)
@@ -118,20 +117,8 @@ def download_esc50(data_dir: Optional[str] = None) -> str:
 
 def main():
     """Main function to download ESC-50 dataset."""
-    import argparse
-    
-    parser = argparse.ArgumentParser(description="Download and organize ESC-50 dataset")
-    parser.add_argument(
-        "--data-dir", 
-        type=str, 
-        default=".",
-        help="Directory to download the dataset to (default: current directory)"
-    )
-    
-    args = parser.parse_args()
-    
     try:
-        dataset_path = download_esc50(args.data_dir)
+        dataset_path = download_esc50()
         print(f"\nESC-50 dataset successfully downloaded and organized!")
         print(f"Dataset location: {dataset_path}")
         print(f"\nTo use this dataset, point your data_path to: {dataset_path}")
