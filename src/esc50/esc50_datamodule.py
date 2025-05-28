@@ -24,7 +24,7 @@ from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepCo
 from configs.dataset_config import ESC50Config
 
 # Import ESC-50 specific dataset and functions
-from .esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits
+from .esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits, create_esc50_fold_splits_filename_based, create_esc50_kfold_splits_filename_based
 
 
 class ESC50DataModule(pl.LightningDataModule):
@@ -47,7 +47,8 @@ class ESC50DataModule(pl.LightningDataModule):
         feature_extractor: Optional[Any] = None,
         num_channels: int = 1,
         wandb_config: Optional[WandbConfig] = None,
-        sweep_config: Optional[SweepConfig] = None
+        sweep_config: Optional[SweepConfig] = None,
+        use_filename_based_splits: bool = True
     ):
         """
         Initialize the ESC50DataModule using Pydantic config models.
@@ -61,6 +62,7 @@ class ESC50DataModule(pl.LightningDataModule):
             num_channels: Number of audio channels
             wandb_config: Optional WandB configuration for logging
             sweep_config: Optional sweep configuration for hyperparameter tuning
+            use_filename_based_splits: Whether to use filename-based (faster) or metadata-based fold splitting
         """
         super().__init__()
         
@@ -75,6 +77,7 @@ class ESC50DataModule(pl.LightningDataModule):
         )
         self.wandb_config = wandb_config
         self.sweep_config = sweep_config
+        self.use_filename_based_splits = use_filename_based_splits
         
         # Unpack general config
         self.data_path = esc50_config.data_path
@@ -168,23 +171,29 @@ class ESC50DataModule(pl.LightningDataModule):
         if len(all_paths) == 0:
             raise ValueError(f"No .wav files found in {self.data_path}")
         
-        # Check if metadata exists
-        data_path_obj = Path(self.data_path)
-        possible_roots = [data_path_obj, data_path_obj.parent, data_path_obj.parent.parent]
+        # Check if metadata exists only if not using filename-based splits or if ESC-10 subset is requested
+        need_metadata = not self.use_filename_based_splits or self.use_esc10_subset
         
-        meta_file_found = False
-        for root in possible_roots:
-            meta_file = root / "meta" / "esc50.csv"
-            if meta_file.exists():
-                meta_file_found = True
-                break
-        
-        if not meta_file_found:
-            raise FileNotFoundError(
-                f"ESC-50 metadata file (esc50.csv) not found in any of the expected locations: "
-                f"{[str(root / 'meta' / 'esc50.csv') for root in possible_roots]}"
-            )
+        if need_metadata:
+            data_path_obj = Path(self.data_path)
+            possible_roots = [data_path_obj, data_path_obj.parent, data_path_obj.parent.parent]
             
+            meta_file_found = False
+            for root in possible_roots:
+                meta_file = root / "meta" / "esc50.csv"
+                if meta_file.exists():
+                    meta_file_found = True
+                    break
+            
+            if not meta_file_found:
+                raise FileNotFoundError(
+                    f"ESC-50 metadata file (esc50.csv) not found in any of the expected locations: "
+                    f"{[str(root / 'meta' / 'esc50.csv') for root in possible_roots]}. "
+                    f"Metadata is required when use_filename_based_splits=False or when using ESC-10 subset."
+                )
+        else:
+            ic("Using filename-based splits - metadata CSV not required")
+        
     def setup(self, stage: Optional[str] = None):
         """
         Setup datasets for training and validation using ESC-50 fold-based splits.
@@ -214,20 +223,38 @@ class ESC50DataModule(pl.LightningDataModule):
         """
         ic(f"Setting up ESC-50 single fold split with validation fold {val_fold}")
         
-        train_dataset, val_dataset = create_esc50_fold_splits(
-            data_path=self.data_path,
-            feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            val_fold=val_fold,
-            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-            augmentations=self.augmentation_config.augmentations,
-            aug_config=self.augmentation_config
-        )
+        if self.use_filename_based_splits:
+            ic("Using filename-based fold splitting (faster, no CSV required)")
+            train_dataset, val_dataset = create_esc50_fold_splits_filename_based(
+                data_path=self.data_path,
+                feature_extractor=self.feature_extractor,
+                config=self.esc50_config,
+                val_fold=val_fold,
+                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+                augmentations=self.augmentation_config.augmentations,
+                aug_config=self.augmentation_config
+            )
+        else:
+            ic("Using metadata-based fold splitting (requires CSV)")
+            train_dataset, val_dataset = create_esc50_fold_splits(
+                data_path=self.data_path,
+                feature_extractor=self.feature_extractor,
+                config=self.esc50_config,
+                val_fold=val_fold,
+                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+                augmentations=self.augmentation_config.augmentations,
+                aug_config=self.augmentation_config
+            )
         
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
         
         ic(f"Single fold setup complete - Train: {len(self.train_dataset)}, Val: {len(self.val_dataset)}")
+        
+        # Print fold statistics if using filename-based approach
+        if self.use_filename_based_splits:
+            ic(f"Train fold distribution: {self.train_dataset.get_fold_statistics()}")
+            ic(f"Val fold distribution: {self.val_dataset.get_fold_statistics()}")
         
     def _setup_kfold(self):
         """
@@ -235,17 +262,38 @@ class ESC50DataModule(pl.LightningDataModule):
         """
         ic("Setting up ESC-50 k-fold cross-validation")
         
-        self.fold_datasets = create_esc50_kfold_splits(
-            data_path=self.data_path,
-            feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            k_folds=self.k_folds,
-            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-            augmentations=self.augmentation_config.augmentations,
-            aug_config=self.augmentation_config
-        )
+        if self.use_filename_based_splits:
+            ic("Using filename-based k-fold splitting (faster, no CSV required)")
+            self.fold_datasets = create_esc50_kfold_splits_filename_based(
+                data_path=self.data_path,
+                feature_extractor=self.feature_extractor,
+                config=self.esc50_config,
+                k_folds=self.k_folds,
+                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+                augmentations=self.augmentation_config.augmentations,
+                aug_config=self.augmentation_config
+            )
+        else:
+            ic("Using metadata-based k-fold splitting (requires CSV)")
+            self.fold_datasets = create_esc50_kfold_splits(
+                data_path=self.data_path,
+                feature_extractor=self.feature_extractor,
+                config=self.esc50_config,
+                k_folds=self.k_folds,
+                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+                augmentations=self.augmentation_config.augmentations,
+                aug_config=self.augmentation_config
+            )
         
         ic(f"K-fold setup complete - {len(self.fold_datasets)} folds created")
+        
+        # Print fold statistics if using filename-based approach
+        if self.use_filename_based_splits:
+            for i, (train_dataset, val_dataset) in enumerate(self.fold_datasets):
+                fold_num = i + 1
+                ic(f"Fold {fold_num}: Train={len(train_dataset.file_names)}, Val={len(val_dataset.file_names)}")
+                ic(f"  Train folds: {train_dataset.get_fold_statistics()}")
+                ic(f"  Val folds: {val_dataset.get_fold_statistics()}")
         
         # Set the first fold as default
         self.set_fold(0)
@@ -463,6 +511,7 @@ def create_esc50_datamodule(
     feature_extraction_config: FeatureExtractionConfig,
     esc50_config: ESC50Config,
     augmentation_config: Optional[AugmentationConfig] = None,
+    use_filename_based_splits: bool = True,
     **kwargs
 ) -> ESC50DataModule:
     """
@@ -473,6 +522,7 @@ def create_esc50_datamodule(
         feature_extraction_config: Feature extraction configuration
         esc50_config: ESC-50 specific configuration
         augmentation_config: Augmentation configuration
+        use_filename_based_splits: Whether to use filename-based (faster) or metadata-based fold splitting
         **kwargs: Additional arguments
         
     Returns:
@@ -483,6 +533,7 @@ def create_esc50_datamodule(
         feature_extraction_config=feature_extraction_config,
         esc50_config=esc50_config,
         augmentation_config=augmentation_config,
+        use_filename_based_splits=use_filename_based_splits,
         **kwargs
     )
 
@@ -512,27 +563,77 @@ def example_usage():
     print("ESC-50 DataModule Example")
     print("="*50)
     
-    # Create data module
-    data_module = ESC50DataModule(
+    # Create data module with filename-based splits (default, faster)
+    print("\n1️⃣ Testing filename-based splits (faster, no CSV required)")
+    data_module_filename = ESC50DataModule(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
         esc50_config=esc50_config,
-        augmentation_config=augmentation_config
+        augmentation_config=augmentation_config,
+        use_filename_based_splits=True
     )
-    ic("Created ESC-50 data module")
+    ic("Created ESC-50 data module with filename-based splits")
     
     # Setup data module
-    data_module.setup()
-    ic("Setup ESC-50 data module")
+    data_module_filename.setup()
+    ic("Setup ESC-50 data module with filename-based splits")
     
-    # Get metadata and fold information
-    metadata_info = data_module.get_metadata_info()
-    fold_info = data_module.get_fold_info()
+    # Get fold information
+    fold_info_filename = data_module_filename.get_fold_info()
+    print(f"Filename-based fold info: {fold_info_filename}")
     
-    print(f"Metadata info: {metadata_info}")
-    print(f"Fold info: {fold_info}")
+    # Test a single batch
+    if general_config.use_kfold:
+        train_loader = data_module_filename.train_dataloader()
+        val_loader = data_module_filename.val_dataloader()
+        
+        train_batch = next(iter(train_loader))
+        val_batch = next(iter(val_loader))
+        
+        ic(f"Filename-based - Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
+        ic(f"Filename-based - Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
+    
+    # Test metadata-based splits for comparison (if metadata is available)
+    print("\n2️⃣ Testing metadata-based splits (traditional, requires CSV)")
+    try:
+        data_module_metadata = ESC50DataModule(
+            general_config=general_config,
+            feature_extraction_config=feature_extraction_config,
+            esc50_config=esc50_config,
+            augmentation_config=augmentation_config,
+            use_filename_based_splits=False
+        )
+        ic("Created ESC-50 data module with metadata-based splits")
+        
+        # Setup data module
+        data_module_metadata.setup()
+        ic("Setup ESC-50 data module with metadata-based splits")
+        
+        # Get metadata and fold information
+        metadata_info = data_module_metadata.get_metadata_info()
+        fold_info_metadata = data_module_metadata.get_fold_info()
+        
+        print(f"Metadata info: {metadata_info}")
+        print(f"Metadata-based fold info: {fold_info_metadata}")
+        
+        if general_config.use_kfold:
+            train_loader = data_module_metadata.train_dataloader()
+            val_loader = data_module_metadata.val_dataloader()
+            
+            train_batch = next(iter(train_loader))
+            val_batch = next(iter(val_loader))
+            
+            ic(f"Metadata-based - Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
+            ic(f"Metadata-based - Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
+            
+    except Exception as e:
+        ic(f"Metadata-based approach failed (expected if no CSV): {str(e)}")
+    
+    # Use the filename-based module for remaining tests
+    data_module = data_module_filename
     
     # Test dataloaders
+    print("\n3️⃣ Testing full k-fold functionality")
     try:
         if general_config.use_kfold:
             ic("Testing k-fold cross-validation")
@@ -549,7 +650,7 @@ def example_usage():
                 val_batch = next(iter(val_loader))
                 
                 ic(f"Fold {fold_idx+1}: Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-                ic(f"Fold {fold_idx+1}: Train samples: {getattr(train_loader.dataset, '__len__', lambda: 'unknown')()}, Val samples: {getattr(val_loader.dataset, '__len__', lambda: 'unknown')()}")
+                ic(f"Fold {fold_idx+1}: Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
         else:
             ic("Testing single fold setup")
             
@@ -561,7 +662,7 @@ def example_usage():
             val_batch = next(iter(val_loader))
             
             ic(f"Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-            ic(f"Train samples: {getattr(train_loader.dataset, '__len__', lambda: 'unknown')()}, Val samples: {getattr(val_loader.dataset, '__len__', lambda: 'unknown')()}")
+            ic(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
         
         # Get class information
         classes, class_to_idx, idx_to_class = data_module.get_class_info()
