@@ -9,7 +9,7 @@ from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, Whisp
 
 # Import from the main codebase
 import sys
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from helper.util import UAVDataset, find_classes
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor

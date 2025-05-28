@@ -75,7 +75,7 @@ def download_esc50() -> str:
     # Get the repository root (assumes this script is in src/esc50/)
     script_dir = Path(__file__).parent
     repo_root = script_dir.parent.parent
-    data_dir = repo_root / "src" / "datasets" / "esc50_dataset"
+    data_dir = repo_root / "src" / "datasets"
     
     data_dir_obj = Path(data_dir)
     data_dir_obj.mkdir(parents=True, exist_ok=True)
