@@ -76,23 +76,26 @@ class AudioClassifier(pl.LightningModule):
         self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        if self.general_config.val_size > 0:
+            self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Test metrics
-        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        if self.general_config.test_size > 0:
+            self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Prediction metrics - these will be re-initialized in on_predict_start
         # but we initialize them here as well for completeness
-        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        if self.general_config.inference_size > 0:
+            self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize prediction metrics storage
         self.predict_batch_preds = []
@@ -206,28 +209,6 @@ class AudioClassifier(pl.LightningModule):
             return outputs.logits
         else:
             return outputs
-        
-    def on_predict_start(self):
-        """Called at the beginning of the prediction stage.
-        Initialize metrics for prediction.
-        """
-        # Get the current device
-        device = self.device
-        
-        # Initialize metrics for prediction and move them to the correct device
-        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        
-        # Initialize storage for predictions and targets
-        self.predict_batch_preds = []
-        self.predict_batch_targets = []
-        
-        # Initialize metrics dictionary
-        self.predict_metrics = {}
-        
-        print("Prediction metrics initialized")
 
     def predict_step(self, batch, batch_idx):
         """Prediction step.
@@ -252,48 +233,17 @@ class AudioClassifier(pl.LightningModule):
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
         # Update metrics
-        self.predict_accuracy(y_pred_class, y)
-        self.predict_precision(y_pred_class, y)
-        self.predict_recall(y_pred_class, y)
-        
-        # Store predictions and targets for later use
-        self.predict_batch_preds.append(y_pred_class)
-        self.predict_batch_targets.append(y)
+        if self.general_config.inference_size > 0:
+            self.predict_accuracy(y_pred_class, y)
+            self.predict_precision(y_pred_class, y)
+            self.predict_recall(y_pred_class, y)
+            
+            # Store predictions and targets for later use
+            self.predict_batch_preds.append(y_pred_class)
+            self.predict_batch_targets.append(y)
         
         # Return predicted classes and targets
         return y_pred_class, y
-    
-    def on_predict_epoch_end(self):
-        """Called at the end of the prediction epoch.
-        Compute final metrics.
-        """
-        # Compute final metrics
-        predict_acc = self.predict_accuracy.compute()
-        predict_precision = self.predict_precision.compute()
-        predict_recall = self.predict_recall.compute()
-        predict_f1 = self.predict_f1.compute()
-        
-        # Store metrics in a dictionary
-        self.predict_metrics = {
-            "predict_acc": predict_acc.item(),
-            "predict_precision": predict_precision.item(),
-            "predict_recall": predict_recall.item(),
-            "predict_f1": predict_f1.item()
-        }
-        
-        # Print metrics in a concise format
-        print("\nPrediction Metrics:")
-        print(f"Accuracy: {predict_acc:.4f} | Precision: {predict_precision:.4f} | Recall: {predict_recall:.4f} | F1: {predict_f1:.4f}")
-        
-        # Reset metrics for next prediction
-        self.predict_accuracy.reset()
-        self.predict_precision.reset()
-        self.predict_recall.reset()
-        self.predict_f1.reset()
-        
-        # Clear storage
-        self.predict_batch_preds = []
-        self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
         """Training step."""
@@ -351,7 +301,7 @@ class AudioClassifier(pl.LightningModule):
         # Log metrics - ensure they appear in progress bar and are formatted consistently
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
 
@@ -382,17 +332,18 @@ class AudioClassifier(pl.LightningModule):
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
         # Update metrics
-        self.val_accuracy(y_pred_class, y)
-        self.val_precision(y_pred_class, y)
-        self.val_recall(y_pred_class, y)
-        self.val_f1(y_pred_class, y)
+        if self.general_config.val_size > 0:
+            self.val_accuracy(y_pred_class, y)
+            self.val_precision(y_pred_class, y)
+            self.val_recall(y_pred_class, y)
+            self.val_f1(y_pred_class, y)
         
-        # Log metrics - ensure they appear in progress bar and are formatted consistently
-        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            # Log metrics - ensure they appear in progress bar and are formatted consistently
+            self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
     
@@ -419,65 +370,20 @@ class AudioClassifier(pl.LightningModule):
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
         # Update metrics
-        self.test_accuracy(y_pred_class, y)
-        self.test_precision(y_pred_class, y)
-        self.test_recall(y_pred_class, y)
-        self.test_f1(y_pred_class, y)
-        
-        # Log metrics - changed to only log at epoch level
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        if self.general_config.test_size > 0:
+            self.test_accuracy(y_pred_class, y)
+            self.test_precision(y_pred_class, y)
+            self.test_recall(y_pred_class, y)
+            self.test_f1(y_pred_class, y)
+            
+            # Log metrics - changed to only log at epoch level
+            self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
-
-    def on_train_epoch_end(self):
-        """Called at the end of the training epoch.
-        Track and log epoch-level metrics.
-        """
-        # Get current metrics
-        try:
-            train_acc = self.train_accuracy.compute()
-            train_f1 = self.train_f1.compute() 
-            train_precision = self.train_precision.compute()
-            train_recall = self.train_recall.compute()
-            
-            # Log epoch-level metrics
-            # self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            
-            # Also log train loss at epoch level if available
-            if hasattr(self, 'current_train_loss'):
-                self.log('train_loss_epoch', self.current_train_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            
-            # Track validation metrics if available
-            if hasattr(self, 'val_accuracy'):
-                val_acc = self.val_accuracy.compute()
-                val_f1 = self.val_f1.compute()
-                val_precision = self.val_precision.compute()
-                val_recall = self.val_recall.compute()
-                
-                if val_acc is not None:
-                    # Store best validation accuracy and related metrics
-                    if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
-                        self.best_val_accuracy = val_acc.item()
-                        self.best_val_f1 = val_f1.item()
-                        self.best_val_precision = val_precision.item()
-                        self.best_val_recall = val_recall.item()
-                        
-                        # Log best validation metrics
-                        # self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        except Exception as e:
-            print(f"Warning: Error in on_train_epoch_end: {str(e)}")
-            # Don't let this error stop training
-            pass
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""

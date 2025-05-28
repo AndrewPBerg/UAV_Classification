@@ -242,12 +242,9 @@ class UAVDataModule(pl.LightningDataModule):
             data_path=self.data_path,
             data_paths=val_paths,
             feature_extractor=self.feature_extractor,
-            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-            augmentations=self.augmentation_config.augmentations,
             target_sr=self.target_sr,
             target_duration=self.target_duration,
             num_channels=self.num_channels,
-            config=self.augmentation_config.aug_configs or {}
         )
         
         self.test_dataset = UAVDataset(
@@ -282,15 +279,21 @@ class UAVDataModule(pl.LightningDataModule):
             all_paths: List of paths to all audio files
         """
         n_samples = len(all_paths)
-        n_inference = int(n_samples * self.inference_size)
-        
         # Create random state for reproducibility
         rng = np.random.RandomState(self.seed)
         indices = rng.permutation(n_samples)
         
-        # Split off inference set
-        train_val_indices = indices[:-n_inference]
-        inference_indices = indices[-n_inference:]
+        if self.general_config.inference_size > 0:
+            n_inference = int(n_samples * self.inference_size)
+            
+            # Split off inference set
+            train_val_indices = indices[:-n_inference]
+            inference_indices = indices[-n_inference:]
+    
+        else:
+            n_inference = 0
+            train_val_indices = indices
+            inference_indices = []
         
         # Create KFold object
         kfold = KFold(n_splits=self.k_folds, shuffle=True, random_state=self.seed)
@@ -330,21 +333,25 @@ class UAVDataModule(pl.LightningDataModule):
             ic(f"UAV Fold {fold+1} datasets loaded")
         
         # Create inference dataset
-        inference_paths = [str(all_paths[i]) for i in inference_indices]
-        self.inference_dataset = UAVDataset(
-            data_path=self.data_path,
-            data_paths=inference_paths,
-            feature_extractor=self.feature_extractor,
-            target_sr=self.target_sr,
-            target_duration=self.target_duration,
-            num_channels=self.num_channels
-        )
+        if inference_indices.any():
+            ic(f"Creating UAV Inference dataset with {len(inference_indices)} samples")
+            inference_paths = [str(all_paths[i]) for i in inference_indices]
+            self.inference_dataset = UAVDataset(
+                data_path=self.data_path,
+                data_paths=inference_paths,
+                feature_extractor=self.feature_extractor,
+                target_sr=self.target_sr,
+                target_duration=self.target_duration,
+                num_channels=self.num_channels
+            )
+            ic(f"UAV Inference dataset loaded - {len(self.inference_dataset)} samples")
+        else:
+            ic("No inference dataset created as inference_size is 0")
         
         end_time = timer()
         dataset_init_time = end_time - start_time
         
         ic(f"UAV K-fold datasets created in {dataset_init_time:.2f} seconds")
-        ic(f"UAV Inference dataset loaded - {len(self.inference_dataset)} samples")
         
     def train_dataloader(self):
         """

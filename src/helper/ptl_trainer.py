@@ -102,8 +102,53 @@ class PTLTrainer:
         """
         callbacks = []
         
-        # Add progress bar
-        callbacks.append(TQDMProgressBar(refresh_rate=10))
+        # Create custom progress bar that shows both training and validation metrics
+        class CustomProgressBar(TQDMProgressBar):
+            def get_metrics(self, trainer, model):
+                # Get metrics from parent class
+                items = super().get_metrics(trainer, model)
+                
+                # Format all metrics to 2 decimal places
+                for key in list(items.keys()):
+                    if key in ['v_num', 'epoch', 'step']:
+                        continue
+                    if isinstance(items[key], (float, int, torch.Tensor)):
+                        try:
+                            # Convert to float first to handle tensor values
+                            value = float(items[key])
+                            items[key] = f"{value:.2f}"
+                        except (ValueError, TypeError):
+                            # If conversion fails, keep the original value
+                            pass
+                
+                # Reorder metrics to show in desired order
+                ordered_items = {}
+                
+                # First show epoch and step
+                if 'epoch' in items:
+                    ordered_items['epoch'] = items['epoch']
+                if 'step' in items:
+                    ordered_items['step'] = items['step']
+                
+                # Then show train metrics
+                for metric in ['train_loss', 'train_acc', 'train_f1']:
+                    if metric in items:
+                        ordered_items[metric] = items[metric]
+                
+                # Then show validation metrics
+                for metric in ['val_loss', 'val_acc', 'val_f1']:
+                    if metric in items:
+                        ordered_items[metric] = items[metric]
+                
+                # Add any remaining metrics
+                for key, val in items.items():
+                    if key not in ordered_items:
+                        ordered_items[key] = val
+                
+                return ordered_items
+        
+        # Add custom progress bar
+        callbacks.append(CustomProgressBar(refresh_rate=10))
         
         # Add learning rate monitor
         callbacks.append(LearningRateMonitor(logging_interval='epoch'))
@@ -236,47 +281,44 @@ class PTLTrainer:
             })
         
         # Run test evaluation after training
-        print("\n" + "="*80)
-        print("RUNNING TEST EVALUATION")
-        print("="*80 + "\n")
-        
-        test_results = trainer.test(
-            model=lightning_module,
-            datamodule=self.data_module
-        )
-        
-        # Print test results in a nice table
-        if test_results:
+
+        if self.general_config.test_size > 0:
+            
             print("\n" + "="*80)
-            print("TEST RESULTS")
-            print("="*80)
-            
-            print(f"{'Metric':<20} {'Value':<10}")
-            print("-"*30)
-            
-            # Print test metrics in a specific order
-            test_metric_order = [
-                'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
-            ]
-            
-            for metric_name in test_metric_order:
-                if metric_name in test_results[0]:
-                    value = test_results[0][metric_name]
-                    if isinstance(value, torch.Tensor):
-                        value = value.item()
-                    print(f"{metric_name:<20} {value:.2f}")
-            
+            print("RUNNING TEST EVALUATION")
             print("="*80 + "\n")
             
-            # Log final test metrics to wandb summary
-            # if self.wandb_logger:
-            #     for metric_name in test_metric_order:
-            #         if metric_name in test_results[0]:
-            #             value = test_results[0][metric_name]
-            #             if isinstance(value, torch.Tensor):
-            #                 value = value.item()
-            #             # Add to wandb summary
-            #             self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
+            test_results = trainer.test(
+                model=lightning_module,
+                datamodule=self.data_module
+            )
+            
+            # Print test results in a nice table
+            if test_results:
+                print("\n" + "="*80)
+                print("TEST RESULTS")
+                print("="*80)
+                
+                print(f"{'Metric':<20} {'Value':<10}")
+                print("-"*30)
+                
+                # Print test metrics in a specific order
+                test_metric_order = [
+                    'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
+                ]
+                
+                for metric_name in test_metric_order:
+                    if metric_name in test_results[0]:
+                        value = test_results[0][metric_name]
+                        if isinstance(value, torch.Tensor):
+                            value = value.item()
+                        print(f"{metric_name:<20} {value:.2f}")
+                
+                print("="*80 + "\n")
+                
+        else:
+            print("No test split available, skipping test evaluation.")
+            test_results = []
         
         # Run inference on the inference split if available
         inference_results = {}
@@ -352,35 +394,6 @@ class PTLTrainer:
         if inference_results:
             for key, value in inference_results.items():
                 results_dict[key] = value
-        
-        # Log best validation metrics to wandb summary
-        # if self.wandb_logger and hasattr(lightning_module, 'best_val_accuracy'):
-        #     self.wandb_logger.experiment.summary['final_best_val_acc'] = lightning_module.best_val_accuracy
-            
-        #     # Log other best validation metrics if available
-        #     if hasattr(lightning_module, 'best_val_f1'):
-        #         self.wandb_logger.experiment.summary['final_best_val_f1'] = lightning_module.best_val_f1
-            
-        #     if hasattr(lightning_module, 'best_val_precision'):
-        #         self.wandb_logger.experiment.summary['final_best_val_precision'] = lightning_module.best_val_precision
-                
-        #     if hasattr(lightning_module, 'best_val_recall'):
-        #         self.wandb_logger.experiment.summary['final_best_val_recall'] = lightning_module.best_val_recall
-        
-        # Print a summary of all metrics at the end
-        print("\n" + "="*80)
-        print("TRAINING SUMMARY")
-        print("="*80)
-        print(f"Model: {self.general_config.model_type}")
-        print(f"Total training time: {formatted_end_time}")
-        
-        # Get validation accuracy
-        val_acc = None
-        if 'val_acc' in trainer.callback_metrics:
-            val_acc = trainer.callback_metrics['val_acc']
-            if isinstance(val_acc, torch.Tensor):
-                val_acc = val_acc.item()
-        
         # Get test accuracy
         test_acc = None
         if 'test_acc_epoch' in results_dict:
@@ -396,11 +409,9 @@ class PTLTrainer:
                 inf_acc = inf_acc.item()
         
         # Format metrics safely, handling None values
-        val_acc_str = f"{val_acc:.2f}" if val_acc is not None else "N/A"
         test_acc_str = f"{test_acc:.2f}" if test_acc is not None else "N/A"
         inf_acc_str = f"{inf_acc:.2f}" if inf_acc is not None else "N/A"
         
-        print(f"Final validation accuracy: {val_acc_str}")
         print(f"Test accuracy: {test_acc_str}")
         print(f"Inference accuracy: {inf_acc_str}")
         
@@ -642,7 +653,7 @@ class PTLTrainer:
                         ordered_items['step'] = items['step']
                     
                     # Then show train metrics
-                    for metric in ['train_loss', 'train_acc']:
+                    for metric in ['train_loss', 'train_acc', 'train_f1']:
                         if metric in items:
                             ordered_items[metric] = items[metric]
                     
