@@ -42,6 +42,8 @@ class ESC50Dataset(UAVDataset):
         self.esc50_config = config
         self.metadata_df = None
         self.esc50_root = None
+        self.data_path = data_path
+        self.data_paths = data_paths
         
         # Load ESC-50 metadata if available
         self._load_metadata(data_path)
