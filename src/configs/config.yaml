@@ -2,7 +2,7 @@ general:
   data_path: /app/src/datasets/UAV_Dataset_31
   num_classes: 31
   save_dataloader: false
-  model_type: efficientnet_b7
+  model_type: vit-large
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -21,7 +21,7 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: batchnorm
+  adapter_type: ia3
 augmentations:
   augmentations_per_sample: 3
   augmentations:
@@ -118,15 +118,15 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: EfficientNet-B0-to-B7
-  name: efficientnet_b7-batchnorm-3-augs
+  project: ViT-UAV-31
+  name: vit-large-ia3-3-augs
   reinit: true
   notes: null
   tags:
   - 31-class
   - kfold
-  - efficientnet_b7
-  - batchnorm
+  - vit-large
+  - ia3
   - 3-augs
   dir: wandb
 sweep:
