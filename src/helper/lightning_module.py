@@ -389,7 +389,7 @@ class AudioClassifier(pl.LightningModule):
         """Configure optimizers and learning rate schedulers."""
         # Choose optimizer based on model type
         if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
+            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.05) # TODO imp a config feature for optimizer choices
         else:
             optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
         

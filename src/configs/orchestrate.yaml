@@ -14,9 +14,9 @@ runs:
         use_kfold: true
         adapter_type: none-classifier
         k_folds: 5
-        learning_rate: 0.001
         batch_size: 8
         epochs: 20
+        learning_rate: 0.0001
         accumulation_steps: 2
         patience: 3
         seed: 42
@@ -37,14 +37,14 @@ runs:
         hop_length: 200
         power: 2
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 3
       wandb:
-        project: 31-class-kfold
-        name: ast-bitfit-0-augs
+        project: testing-esc-overfitting
+        name: ast-classifier-esc50-3-augs
         reinit: true
         tags:
-          - 31-class
+          - 50-class
           - kfold
           - ast
-          - bitfit
-          - 0-augs
+          - none-classifier
+          - 3-augs

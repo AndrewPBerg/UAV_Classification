@@ -11,7 +11,7 @@ general:
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 2
-  learning_rate: 0.001
+  learning_rate: 0.0001
   patience: 3
   use_wandb: true
   use_sweep: false
@@ -30,7 +30,7 @@ dataset:
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 3
   augmentations:
   - time_stretch
   - sin_distortion
@@ -125,16 +125,16 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: 31-class-kfold
-  name: ast-bitfit-0-augs
+  project: testing-esc-overfitting
+  name: ast-classifier-esc50-3-augs
   reinit: true
   notes: null
   tags:
-  - 31-class
+  - 50-class
   - kfold
   - ast
-  - bitfit
-  - 0-augs
+  - none-classifier
+  - 3-augs
   dir: wandb
 sweep:
   project: ast-experiments
