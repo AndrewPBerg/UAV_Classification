@@ -50,39 +50,40 @@ class ESC50Dataset(UAVDataset):
         self.filename_to_fold = {}  # Dict[str, int] - mapping for quick lookup
         self.fold_to_files = {}  # Dict[int, List[str]] - reverse mapping
         
-        # Extract fold information from filenames in data_paths
-        for path_str in data_paths:
-            path = Path(path_str)
-            filename = path.name
-            
-            # ESC-50 files have fold number as first character (1-5)
-            try:
-                fold_num = int(filename[0])
-                if fold_num < 1 or fold_num > 5:
-                    raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
-            except (ValueError, IndexError) as e:
-                raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
-            
-            self.file_names.append(filename)
-            self.assigned_fold.append(fold_num)
-            self.filename_to_fold[filename] = fold_num
-            
-            # Build reverse mapping
-            if fold_num not in self.fold_to_files:
-                self.fold_to_files[fold_num] = []
-            self.fold_to_files[fold_num].append(path_str)
         
-        print(f"Found {len(self.file_names)} files across folds: {sorted(self.fold_to_files.keys())}")
-        for fold, files in self.fold_to_files.items():
-            print(f"  Fold {fold}: {len(files)} files")
-
-        # Load ESC-50 metadata only if requested (for ESC-10 filtering)
-        if load_metadata or (self.esc50_config and self.esc50_config.use_esc10_subset):
-            self._load_metadata(data_path)
+        # Extract fold information from filenames in data_paths
+        # for path_str in data_paths:
+        #     path = Path(path_str)
+        #     filename = path.name
             
-            # Filter for ESC-10 subset if requested
-            if self.esc50_config and self.esc50_config.use_esc10_subset:
-                data_paths = self._filter_esc10_subset(data_paths)
+        #     # ESC-50 files have fold number as first character (1-5)
+        #     try:
+        #         fold_num = int(filename[0])
+        #         if fold_num < 1 or fold_num > 5:
+        #             raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
+        #     except (ValueError, IndexError) as e:
+        #         raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
+            
+        #     self.file_names.append(filename)
+        #     self.assigned_fold.append(fold_num)
+        #     self.filename_to_fold[filename] = fold_num
+            
+        #     # Build reverse mapping
+        #     if fold_num not in self.fold_to_files:
+        #         self.fold_to_files[fold_num] = []
+        #     self.fold_to_files[fold_num].append(path_str)
+        
+        # print(f"Found {len(self.file_names)} files across folds: {sorted(self.fold_to_files.keys())}")
+        # for fold, files in self.fold_to_files.items():
+        #     print(f"  Fold {fold}: {len(files)} files")
+
+        # # Load ESC-50 metadata only if requested (for ESC-10 filtering)
+        # if load_metadata or (self.esc50_config and self.esc50_config.use_esc10_subset):
+        #     self._load_metadata(data_path)
+            
+        #     # Filter for ESC-10 subset if requested
+        #     if self.esc50_config and self.esc50_config.use_esc10_subset:
+        #         data_paths = self._filter_esc10_subset(data_paths)
         
         # Convert AugmentationConfig to dict if needed
         if isinstance(aug_config, AugmentationConfig):

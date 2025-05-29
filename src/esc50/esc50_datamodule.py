@@ -12,7 +12,7 @@ import json
 # import pandas as pd
 
 # Import from the main codebase
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent))
 
 from helper.util import UAVDataset, wandb_login
 from helper.cnn_feature_extractor import MelSpectrogramFeatureExtractor, MFCCFeatureExtractor
@@ -24,7 +24,7 @@ from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepCo
 from configs.dataset_config import ESC50Config
 
 # Import ESC-50 specific dataset and functions
-from .esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits, create_esc50_fold_splits_filename_based, create_esc50_kfold_splits_filename_based
+from esc50.esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits, create_esc50_fold_splits_filename_based, create_esc50_kfold_splits_filename_based
 
 
 class ESC50DataModule(pl.LightningDataModule):
@@ -205,56 +205,12 @@ class ESC50DataModule(pl.LightningDataModule):
         
         if self.use_kfold:
             self._setup_kfold()
-        else:
-            # Single fold setup (use fold 5 as validation by default)
-            self._setup_single_fold(val_fold=5)
+
             
         end_time = timer()
         dataset_init_time = end_time - start_time
         
         ic(f"ESC-50 datasets created in {dataset_init_time:.2f} seconds")
-        
-    def _setup_single_fold(self, val_fold: int = 5):
-        """
-        Setup datasets for single fold split.
-        
-        Args:
-            val_fold: Fold number to use for validation (1-5)
-        """
-        ic(f"Setting up ESC-50 single fold split with validation fold {val_fold}")
-        
-        if self.use_filename_based_splits:
-            ic("Using filename-based fold splitting (faster, no CSV required)")
-            train_dataset, val_dataset = create_esc50_fold_splits_filename_based(
-                data_path=self.data_path,
-                feature_extractor=self.feature_extractor,
-                config=self.esc50_config,
-                val_fold=val_fold,
-                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-                augmentations=self.augmentation_config.augmentations,
-                aug_config=self.augmentation_config
-            )
-        else:
-            ic("Using metadata-based fold splitting (requires CSV)")
-            train_dataset, val_dataset = create_esc50_fold_splits(
-                data_path=self.data_path,
-                feature_extractor=self.feature_extractor,
-                config=self.esc50_config,
-                val_fold=val_fold,
-                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-                augmentations=self.augmentation_config.augmentations,
-                aug_config=self.augmentation_config
-            )
-        
-        self.train_dataset = train_dataset
-        self.val_dataset = val_dataset
-        
-        ic(f"Single fold setup complete - Train: {len(self.train_dataset)}, Val: {len(self.val_dataset)}")
-        
-        # Print fold statistics if using filename-based approach
-        if self.use_filename_based_splits:
-            ic(f"Train fold distribution: {self.train_dataset.get_fold_statistics()}")
-            ic(f"Val fold distribution: {self.val_dataset.get_fold_statistics()}")
         
     def _setup_kfold(self):
         """
@@ -262,63 +218,147 @@ class ESC50DataModule(pl.LightningDataModule):
         """
         ic("Setting up ESC-50 k-fold cross-validation")
         
-        if self.use_filename_based_splits:
-            ic("Using filename-based k-fold splitting (faster, no CSV required)")
-            self.fold_datasets = create_esc50_kfold_splits_filename_based(
-                data_path=self.data_path,
-                feature_extractor=self.feature_extractor,
-                config=self.esc50_config,
-                k_folds=self.k_folds,
-                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-                augmentations=self.augmentation_config.augmentations,
-                aug_config=self.augmentation_config
-            )
-        else:
-            ic("Using metadata-based k-fold splitting (requires CSV)")
-            self.fold_datasets = create_esc50_kfold_splits(
-                data_path=self.data_path,
-                feature_extractor=self.feature_extractor,
-                config=self.esc50_config,
-                k_folds=self.k_folds,
-                augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
-                augmentations=self.augmentation_config.augmentations,
-                aug_config=self.augmentation_config
-            )
+        # Get all audio file paths
+        data_path = self.data_path
+        all_paths = list(Path(data_path).glob("*/*.wav"))
+        if not all_paths:
+            raise FileNotFoundError(f"No .wav files found in {data_path}")
+
+        fold_1 = []
+        fold_2 = []
+        fold_3 = []
+        fold_4 = []
+        fold_5 = []
         
-        ic(f"K-fold setup complete - {len(self.fold_datasets)} folds created")
+        # Process each file and sort into folds based on filename
+        for path in all_paths:
+            filename = path.name
+            
+            # ESC-50 files have fold number as first character (1-5)
+            try:
+                fold_num = int(filename[0])
+                if fold_num < 1 or fold_num > 5:
+                    raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
+            except (ValueError, IndexError) as e:
+                raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
+            
+            # Add complete path to appropriate fold
+            if fold_num == 1:
+                fold_1.append(path)
+            elif fold_num == 2:
+                fold_2.append(path)
+            elif fold_num == 3:
+                fold_3.append(path)
+            elif fold_num == 4:
+                fold_4.append(path)
+            elif fold_num == 5:
+                fold_5.append(path)
+                
+        print(f"Total files in fold_1: {len(fold_1)}")  # should be an even 400 per
+        print(f"Total files in fold_2: {len(fold_2)}")
+        print(f"Total files in fold_3: {len(fold_3)}")
+        print(f"Total files in fold_4: {len(fold_4)}")
+        print(f"Total files in fold_5: {len(fold_5)}")
         
-        # Print fold statistics if using filename-based approach
-        if self.use_filename_based_splits:
-            for i, (train_dataset, val_dataset) in enumerate(self.fold_datasets):
-                fold_num = i + 1
-                ic(f"Fold {fold_num}: Train={len(train_dataset.file_names)}, Val={len(val_dataset.file_names)}")
-                ic(f"  Train folds: {train_dataset.get_fold_statistics()}")
-                ic(f"  Val folds: {val_dataset.get_fold_statistics()}")
+        # create a list of the folds
+        fold_data_paths = [fold_1, fold_2, fold_3, fold_4, fold_5]
+
+        self.fold_splits = []  # List[Dict[list[str], list[str]]]
+
+        # create a map of the fold splits
+        for i in range(5):  # should always be 5 folds
+            fold_copy = fold_data_paths.copy()
+
+            val_paths = fold_copy.pop(i)
+            # need to break down the rest of fold_copy's iterations into a single list
+            train_paths = []
+            for fold in fold_copy:
+                train_paths.extend(fold)
+
+            # simple validation specific to esc50
+            if len(val_paths) == 400:
+                pass
+            else:
+                ic(f"Val paths for fold {i} are len {len(val_paths)}")
+                raise ValueError(f"Val paths for fold {i} are not 400")
+
+            if len(train_paths) == 1600:
+                pass
+            else:
+                ic(f"Train paths for fold {i} are len {len(train_paths)}")
+                raise ValueError(f"Train paths for fold {i} are not 1600")
+            
+            self.fold_splits.append({"train_paths": train_paths, "val_paths": val_paths})
+
+        # ic(f"Fold splits list created: {self.fold_splits}")
         
-        # Set the first fold as default
-        self.set_fold(0)
-        
-    def set_fold(self, fold_idx: int):
+    def get_fold_dataloaders(self, fold_idx: int):
         """
-        Set the current fold for training and validation.
+        Get dataloaders for a specific fold.
         
         Args:
             fold_idx: Index of the fold (0-based)
+            
+        Returns:
+            Tuple of (train dataloader, validation dataloader)
         """
-        if not self.use_kfold:
-            raise ValueError("set_fold() can only be used when use_kfold=True")
-            
-        if self.fold_datasets is None:
-            raise ValueError("Fold datasets are not initialized. Call setup() first.")
-            
-        if fold_idx < 0 or fold_idx >= len(self.fold_datasets):
-            raise ValueError(f"Fold index {fold_idx} out of range (0-{len(self.fold_datasets)-1})")
-            
-        self.current_fold = fold_idx
-        self.train_dataset, self.val_dataset = self.fold_datasets[fold_idx]
         
-        ic(f"Set to fold {fold_idx+1}: Train: {len(self.train_dataset)}, Val: {len(self.val_dataset)}")
+        paths_obj = self.fold_splits[fold_idx]
+        # ic(f"Got Paths obj: {paths_obj}")
+        train_paths = paths_obj["train_paths"]
+        val_paths = paths_obj["val_paths"]
+
+        train_dataset = ESC50Dataset(
+            data_path=self.data_path,
+            data_paths=train_paths,
+            feature_extractor=self.feature_extractor,
+            config=self.esc50_config,
+            target_sr=self.esc50_config.target_sr,
+            target_duration=self.esc50_config.target_duration,
+            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+            augmentations=self.augmentation_config.augmentations,
+            aug_config=self.augmentation_config,
+            
+        )
+
+        val_dataset = ESC50Dataset(
+            data_path=self.data_path,
+            data_paths=val_paths,
+            feature_extractor=self.feature_extractor,
+            config=self.esc50_config,
+            target_sr=self.esc50_config.target_sr,
+            target_duration=self.esc50_config.target_duration,
+            augmentations_per_sample=0,  # No augmentations for validation
+            augmentations=[],  # No augmentations for validation
+            aug_config=self.augmentation_config,
+            
+        )
+        self.train_dataset = train_dataset
+        self.val_dataset = val_dataset
+
+        # ic(f"Train dataset: {len(self.train_dataset)}")
+        # ic(f"Val dataset: {len(self.val_dataset)}")
+        # sys.exit()
         
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=self.batch_size,
+            shuffle=True,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            persistent_workers=True if self.num_workers > 0 else False
+        )
+        
+        val_loader = DataLoader(
+            val_dataset,
+            batch_size=self.batch_size,
+            shuffle=False,
+            num_workers=self.num_workers,
+            pin_memory=self.pin_memory,
+            persistent_workers=True if self.num_workers > 0 else False
+        )
+        
+        return train_loader, val_loader
     def train_dataloader(self):
         """
         Get training dataloader.
@@ -373,46 +413,6 @@ class ESC50DataModule(pl.LightningDataModule):
         ic("Warning: ESC-50 uses k-fold cross-validation. Returning validation dataloader.")
         return self.val_dataloader()
         
-    def get_fold_dataloaders(self, fold_idx: int):
-        """
-        Get dataloaders for a specific fold.
-        
-        Args:
-            fold_idx: Index of the fold (0-based)
-            
-        Returns:
-            Tuple of (train dataloader, validation dataloader)
-        """
-        if not self.use_kfold:
-            raise ValueError("get_fold_dataloaders() can only be used when use_kfold=True")
-            
-        if self.fold_datasets is None:
-            raise ValueError("Fold datasets are not initialized. Call setup() first.")
-            
-        if fold_idx < 0 or fold_idx >= len(self.fold_datasets):
-            raise ValueError(f"Fold index {fold_idx} out of range (0-{len(self.fold_datasets)-1})")
-            
-        train_dataset, val_dataset = self.fold_datasets[fold_idx]
-        
-        train_loader = DataLoader(
-            train_dataset,
-            batch_size=self.batch_size,
-            shuffle=True,
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            persistent_workers=True if self.num_workers > 0 else False
-        )
-        
-        val_loader = DataLoader(
-            val_dataset,
-            batch_size=self.batch_size,
-            shuffle=False,
-            num_workers=self.num_workers,
-            pin_memory=self.pin_memory,
-            persistent_workers=True if self.num_workers > 0 else False
-        )
-        
-        return train_loader, val_loader
         
     def get_all_fold_dataloaders(self):
         """
@@ -540,136 +540,50 @@ def create_esc50_datamodule(
 
 # Example usage
 def example_usage():
-    """Example of how to use the ESC50DataModule"""
-    from configs import load_configs
-    from configs.dataset_config import ESC50Config
+
+    from configs.configs_aggregate import load_configs
     import yaml
-    
-    # Load configuration
-    config_path = 'config_esc50_example.yaml'
-    with open(config_path, 'r') as file:
-        config = yaml.safe_load(file)
-    
-    # Load configs (assuming load_configs is updated to handle dataset config)
-    general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config = load_configs(config)
-    
-    # Ensure we have ESC50Config
-    if not isinstance(dataset_config, ESC50Config):
-        esc50_config = ESC50Config(**config['dataset'])
-    else:
-        esc50_config = dataset_config
-    
-    print("="*50)
-    print("ESC-50 DataModule Example")
-    print("="*50)
-    
-    # Create data module with filename-based splits (default, faster)
-    print("\n1️⃣ Testing filename-based splits (faster, no CSV required)")
-    data_module_filename = ESC50DataModule(
-        general_config=general_config,
-        feature_extraction_config=feature_extraction_config,
-        esc50_config=esc50_config,
-        augmentation_config=augmentation_config,
-        use_filename_based_splits=True
-    )
-    ic("Created ESC-50 data module with filename-based splits")
-    
-    # Setup data module
-    data_module_filename.setup()
-    ic("Setup ESC-50 data module with filename-based splits")
-    
-    # Get fold information
-    fold_info_filename = data_module_filename.get_fold_info()
-    print(f"Filename-based fold info: {fold_info_filename}")
-    
-    # Test a single batch
-    if general_config.use_kfold:
-        train_loader = data_module_filename.train_dataloader()
-        val_loader = data_module_filename.val_dataloader()
-        
-        train_batch = next(iter(train_loader))
-        val_batch = next(iter(val_loader))
-        
-        ic(f"Filename-based - Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-        ic(f"Filename-based - Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
-    
-    # Test metadata-based splits for comparison (if metadata is available)
-    print("\n2️⃣ Testing metadata-based splits (traditional, requires CSV)")
     try:
-        data_module_metadata = ESC50DataModule(
+        # Load configs from config.yaml
+        print("Loading configs from config.yaml")
+        with open('../configs/config.yaml', 'r') as file:
+            config = yaml.safe_load(file)
+        
+        
+        # Change datapath for the sake of the ipynb's pathing
+        config['dataset']['data_path'] = "../datasets/ESC-50-master/classes"
+        print("Loading all configs using the configs_aggregate function")
+        # Load all configs using the configs_aggregate function
+        (
+            general_config,
+            feature_extraction_config,
+            dataset_config,
+            peft_config,
+            wandb_config,
+            sweep_config,
+            augmentation_config
+        ) = load_configs(config)
+        print("successfully loaded all configs")
+        # Create data module
+        data_module = create_esc50_datamodule(
             general_config=general_config,
             feature_extraction_config=feature_extraction_config,
-            esc50_config=esc50_config,
+            esc50_config=dataset_config,  # dataset_config contains ESC50Config
             augmentation_config=augmentation_config,
-            use_filename_based_splits=False
+            use_filename_based_splits=True
         )
-        ic("Created ESC-50 data module with metadata-based splits")
-        
+        print("successfully created the data module")
         # Setup data module
-        data_module_metadata.setup()
-        ic("Setup ESC-50 data module with metadata-based splits")
+        data_module.setup()
+        print("successfully setup the data module")
+        # Example of getting dataloaders for first fold
+        train_loader, val_loader = data_module.get_fold_dataloaders(0)
+        ic(f"First fold - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
         
-        # Get metadata and fold information
-        metadata_info = data_module_metadata.get_metadata_info()
-        fold_info_metadata = data_module_metadata.get_fold_info()
+        # Print dataset info after getting the fold_dataloaders
+        info = data_module.get_class_info()
+        ic("Dataset Info:", info)
         
-        print(f"Metadata info: {metadata_info}")
-        print(f"Metadata-based fold info: {fold_info_metadata}")
-        
-        if general_config.use_kfold:
-            train_loader = data_module_metadata.train_dataloader()
-            val_loader = data_module_metadata.val_dataloader()
-            
-            train_batch = next(iter(train_loader))
-            val_batch = next(iter(val_loader))
-            
-            ic(f"Metadata-based - Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-            ic(f"Metadata-based - Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
-            
-    except Exception as e:
-        ic(f"Metadata-based approach failed (expected if no CSV): {str(e)}")
-    
-    # Use the filename-based module for remaining tests
-    data_module = data_module_filename
-    
-    # Test dataloaders
-    print("\n3️⃣ Testing full k-fold functionality")
-    try:
-        if general_config.use_kfold:
-            ic("Testing k-fold cross-validation")
-            
-            # Test all folds
-            for fold_idx in range(data_module.k_folds):
-                data_module.set_fold(fold_idx)
-                
-                train_loader = data_module.train_dataloader()
-                val_loader = data_module.val_dataloader()
-                
-                # Get a sample batch
-                train_batch = next(iter(train_loader))
-                val_batch = next(iter(val_loader))
-                
-                ic(f"Fold {fold_idx+1}: Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-                ic(f"Fold {fold_idx+1}: Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
-        else:
-            ic("Testing single fold setup")
-            
-            train_loader = data_module.train_dataloader()
-            val_loader = data_module.val_dataloader()
-            
-            # Get a sample batch
-            train_batch = next(iter(train_loader))
-            val_batch = next(iter(val_loader))
-            
-            ic(f"Train batch shape: {train_batch[0].shape}, Val batch shape: {val_batch[0].shape}")
-            ic(f"Train samples: {len(train_loader.dataset)}, Val samples: {len(val_loader.dataset)}")
-        
-        # Get class information
-        classes, class_to_idx, idx_to_class = data_module.get_class_info()
-        print(f"Classes: {classes[:10]}...")  # Show first 10 classes
-        print(f"Number of classes: {len(classes)}")
-        
-        print("✅ ESC-50 DataModule test completed successfully!")
         
     except Exception as e:
         ic(f"Error: {str(e)}")

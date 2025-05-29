@@ -105,11 +105,25 @@ class ESC50Config(DatasetConfig):
     target_duration: int = 5
     file_extension: str = ".wav"
     
+    @field_validator('target_duration')
+    @classmethod
+    def validate_target_duration(cls, v):
+        if v != 5:
+            raise ValueError("target_duration must be 5 for ESC50Config")
+        return v
+    
+    
     # ESC-50 specific parameters
     use_esc10_subset: bool = Field(
         default=False,
         description="Whether to use only the ESC-10 subset (10 classes)"
     )
+    @field_validator('use_esc10_subset')
+    @classmethod
+    def validate_use_esc10_subset(cls, v):
+        if v:
+            raise ValueError("Note implemented, use_esc10_subset must be false for ESC50Config")
+        return v
     
     fold_based_split: bool = Field(
         default=True,

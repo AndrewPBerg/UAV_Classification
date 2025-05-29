@@ -13,7 +13,7 @@ general:
   accumulation_steps: 2
   learning_rate: 0.001
   patience: 3
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: true

@@ -11,7 +11,9 @@ This package contains ESC-50 specific dataset handling components including:
 from .esc50_dataset import (
     ESC50Dataset,
     create_esc50_fold_splits,
-    create_esc50_kfold_splits
+    create_esc50_kfold_splits,
+    create_esc50_fold_splits_filename_based,
+    create_esc50_kfold_splits_filename_based
 )
 
 # Import data module
@@ -25,6 +27,8 @@ __all__ = [
     'ESC50Dataset',
     'create_esc50_fold_splits', 
     'create_esc50_kfold_splits',
+    'create_esc50_fold_splits_filename_based',
+    'create_esc50_kfold_splits_filename_based',
     
     # Data module
     'ESC50DataModule',
