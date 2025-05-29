@@ -426,7 +426,7 @@ class UAVDataset(Dataset):
             sr = self.sampling_rate
         
         # Plot the spectrogram
-        plt.figure(figsize=(12, 20))
+        plt.figure(figsize=(20, 10))
         librosa.display.specshow(spectrogram, sr=sr, x_axis='time', y_axis='mel')
         plt.colorbar(format='%+2.0f dB')
         plt.title('Mel-Spectrogram')
