@@ -397,8 +397,8 @@ class AudioClassifier(pl.LightningModule):
         scheduler = ReduceLROnPlateau(
             optimizer, 
             mode='min', 
-            factor=0.1, 
-            patience=2,
+            factor=0.85, 
+            patience=5,
         )
         
         # Store scheduler as an attribute so we can access it in on_epoch_end

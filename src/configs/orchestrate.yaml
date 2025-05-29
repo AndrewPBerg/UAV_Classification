@@ -16,7 +16,7 @@ runs:
         k_folds: 5
         batch_size: 8
         epochs: 20
-        learning_rate: 0.0001
+        learning_rate: 0.00005
         accumulation_steps: 2
         patience: 3
         seed: 42
@@ -37,10 +37,10 @@ runs:
         hop_length: 200
         power: 2
       augmentations:
-        augmentations_per_sample: 3
+        augmentations_per_sample: 1
       wandb:
         project: testing-esc-overfitting
-        name: ast-classifier-esc50-3-augs
+        name: ast-classifier-esc50-3-augs-optimer-configs
         reinit: true
         tags:
           - 50-class
