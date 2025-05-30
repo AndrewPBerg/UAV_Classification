@@ -330,10 +330,11 @@ class UAVDataModule(pl.LightningDataModule):
             )
             
             self.fold_datasets.append((train_dataset, val_dataset))
-            ic(f"UAV Fold {fold+1} datasets loaded")
+            ic(f"UAV Fold {fold+1}/{self.k_folds} datasets loaded - Train: {len(train_dataset)}, Val: {len(val_dataset)}")
         
         # Create inference dataset
-        if inference_indices.any():
+
+        if self.general_config.inference_size > 0:
             ic(f"Creating UAV Inference dataset with {len(inference_indices)} samples")
             inference_paths = [str(all_paths[i]) for i in inference_indices]
             self.inference_dataset = UAVDataset(
@@ -351,8 +352,22 @@ class UAVDataModule(pl.LightningDataModule):
         end_time = timer()
         dataset_init_time = end_time - start_time
         
-        ic(f"UAV K-fold datasets created in {dataset_init_time:.2f} seconds")
+        # Print summary of all folds
+        total_train_samples = sum(len(fold[0]) for fold in self.fold_datasets)
+        total_val_samples = sum(len(fold[1]) for fold in self.fold_datasets)
+        avg_train_size = total_train_samples // self.k_folds
+        avg_val_size = total_val_samples // self.k_folds
         
+        ic(f"UAV K-fold datasets created in {dataset_init_time:.2f} seconds")
+        ic(f"UAV K-fold Summary:")
+        ic(f"  - Total samples used for k-fold: {len(train_val_indices)}")
+        ic(f"  - Average train size per fold: {avg_train_size}")
+        ic(f"  - Average val size per fold: {avg_val_size}")
+        ic(f"  - Inference samples: {len(inference_indices) if inference_indices else 0}")
+        ic(f"  - Total samples in dataset: {len(all_paths)}")
+        
+        # sys.exit(0)
+
     def train_dataloader(self):
         """
         Get training dataloader.

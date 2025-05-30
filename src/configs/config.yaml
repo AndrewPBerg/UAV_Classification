@@ -6,9 +6,9 @@ general:
   pinned_memory: true
   epochs: 20
   save_model: false
-  test_size: 0.2
-  inference_size: 0.1
-  val_size: 0.1
+  test_size: 0
+  inference_size: 0
+  val_size: 0.2
   sweep_count: 50
   accumulation_steps: 1
   patience: 3
@@ -40,16 +40,19 @@ optimizer:
   gradient_clip_algorithm: norm
 dataset:
   dataset_type: esc50
+  # dataset_type: uav
   # data_path: /app/src/datasets/ESC-50-master/classes
   data_path: ./datasets/ESC-50-master/classes
+  # data_path: ./datasets/UAV_Dataset_31
   num_classes: 50
   target_sr: 16000
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 2
   augmentations:
-  - add_noise
+  - sin_distortion
+  - gaussian_noise
   gaussian_noise_min_amplitude: 0.1
   gaussian_noise_max_amplitude: 0.15
 feature_extraction:

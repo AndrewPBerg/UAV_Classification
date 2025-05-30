@@ -77,7 +77,7 @@ def create_augmentation_pipeline(augmentations: list[str], config: Dict[str, Any
                         # Use default values
                         transforms.append(SinDistortion(min_distortion=0.01, max_distortion=0.7, p=1.0))
                         
-                case "add_noise":
+                case "gaussian_noise":
                     if aug_config:
                         transforms.append(AddGaussianNoise(
                             min_amplitude=aug_config.min_amplitude,
