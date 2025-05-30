@@ -1,5 +1,5 @@
 general:
-  model_type: ast
+  model_type: efficientnet_b1
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -10,15 +10,15 @@ general:
   inference_size: 0.1
   val_size: 0.1
   sweep_count: 50
-  accumulation_steps: 2
-  learning_rate: 5.0e-05
+  accumulation_steps: 3
+  learning_rate: 0.0001
   patience: 3
   use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_loss
   mode: min
@@ -122,7 +122,7 @@ bitfit:
   - bias
 wandb:
   project: testing-esc-overfitting
-  name: ast-classifier-esc50-3-augs
+  name: ast-classifier-esc50-3-augs-optimer-configs
   reinit: true
   notes: null
   tags:
