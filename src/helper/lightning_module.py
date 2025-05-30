@@ -3,11 +3,12 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, SequentialLR, LambdaLR
 from torch.optim import AdamW, Adam
 from icecream import ic
 import os
 import re
+import math
 
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
@@ -389,48 +390,106 @@ class AudioClassifier(pl.LightningModule):
         
         return loss
     
+    def _create_warmup_scheduler(self, optimizer, target_lr: float):
+        """Create a warmup scheduler based on configuration."""
+        warmup_config = self.optimizer_config.warmup
+        
+        if warmup_config.warmup_method == "linear":
+            # Linear warmup: lr multiplier increases linearly from start_lr/target_lr to 1.0
+            def lr_lambda(step):
+                if step < warmup_config.warmup_steps:
+                    start_factor = warmup_config.warmup_start_lr / target_lr
+                    lr_multiplier = start_factor + (1.0 - start_factor) * step / warmup_config.warmup_steps
+                    return lr_multiplier
+                return 1.0
+        else:  # cosine
+            # Cosine warmup: lr multiplier increases following cosine curve
+            def lr_lambda(step):
+                if step < warmup_config.warmup_steps:
+                    start_factor = warmup_config.warmup_start_lr / target_lr
+                    warmup_progress = step / warmup_config.warmup_steps
+                    cosine_factor = 0.5 * (1 + math.cos(math.pi * (1 - warmup_progress)))
+                    lr_multiplier = start_factor + (1.0 - start_factor) * (1 - cosine_factor)
+                    return lr_multiplier
+                return 1.0
+        
+        return LambdaLR(optimizer, lr_lambda)
+
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
         # Get optimizer configuration based on type
         if self.optimizer_config.optimizer_type == "adamw":
             optimizer_params = dict(self.optimizer_config.adamw)
+            target_lr = optimizer_params['lr']
             optimizer = AdamW(self.model.parameters(), **optimizer_params)
         elif self.optimizer_config.optimizer_type == "adam":
             optimizer_params = dict(self.optimizer_config.adam)
+            target_lr = optimizer_params['lr']
             optimizer = Adam(self.model.parameters(), **optimizer_params)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
         
-        # Configure scheduler if specified
-        scheduler = None
-        if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
-            scheduler_params = dict(self.optimizer_config.reduce_lr_on_plateau)
-            scheduler = ReduceLROnPlateau(optimizer, **scheduler_params)
-        elif self.optimizer_config.scheduler_type == "step_lr":
-            from torch.optim.lr_scheduler import StepLR
-            scheduler_params = dict(self.optimizer_config.step_lr)
-            scheduler = StepLR(optimizer, **scheduler_params)
-        elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
-            from torch.optim.lr_scheduler import CosineAnnealingLR
-            scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
-            scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
+        # Handle warmup + scheduler combinations
+        final_scheduler = None
+        
+        if self.optimizer_config.warmup.enabled:
+            warmup_scheduler = self._create_warmup_scheduler(optimizer, target_lr)
+            
+            # Check if we have a base scheduler that's compatible with SequentialLR
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                # ReduceLROnPlateau is not compatible with SequentialLR
+                # We'll use only warmup for now and handle ReduceLROnPlateau manually
+                final_scheduler = warmup_scheduler
+                # Store the base scheduler config for manual handling later
+                self.base_scheduler_config = {
+                    "type": "reduce_lr_on_plateau",
+                    "params": dict(self.optimizer_config.reduce_lr_on_plateau)
+                }
+                self.warmup_steps = self.optimizer_config.warmup.warmup_steps
+                self.post_warmup_scheduler = None
+            elif self.optimizer_config.scheduler_type == "step_lr":
+                from torch.optim.lr_scheduler import StepLR
+                scheduler_params = dict(self.optimizer_config.step_lr)
+                base_scheduler = StepLR(optimizer, **scheduler_params)
+                final_scheduler = SequentialLR(optimizer, [warmup_scheduler, base_scheduler], [self.optimizer_config.warmup.warmup_steps])
+            elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
+                from torch.optim.lr_scheduler import CosineAnnealingLR
+                scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
+                base_scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
+                final_scheduler = SequentialLR(optimizer, [warmup_scheduler, base_scheduler], [self.optimizer_config.warmup.warmup_steps])
+            else:
+                # Only warmup, no base scheduler
+                final_scheduler = warmup_scheduler
+        else:
+            # No warmup, just use base scheduler if specified
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                scheduler_params = dict(self.optimizer_config.reduce_lr_on_plateau)
+                final_scheduler = ReduceLROnPlateau(optimizer, **scheduler_params)
+            elif self.optimizer_config.scheduler_type == "step_lr":
+                from torch.optim.lr_scheduler import StepLR
+                scheduler_params = dict(self.optimizer_config.step_lr)
+                final_scheduler = StepLR(optimizer, **scheduler_params)
+            elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
+                from torch.optim.lr_scheduler import CosineAnnealingLR
+                scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
+                final_scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
         
         # Store scheduler as an attribute so we can access it in on_epoch_end
-        self.lr_scheduler = scheduler
+        self.lr_scheduler = final_scheduler
         
         # For manual optimization, just return the optimizer
         if not self.automatic_optimization:
             return optimizer
         
         # For automatic optimization, return with scheduler config if scheduler exists
-        if scheduler is not None:
+        if final_scheduler is not None:
             if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
                 return {
                     "optimizer": optimizer,
                     "lr_scheduler": {
-                        "scheduler": scheduler,
+                        "scheduler": final_scheduler,
                         "monitor": "val_loss",
-                        "interval": "epoch",
+                        "interval": "step" if self.optimizer_config.warmup.enabled else "epoch",
                         "frequency": 1
                     }
                 }
@@ -438,8 +497,8 @@ class AudioClassifier(pl.LightningModule):
                 return {
                     "optimizer": optimizer,
                     "lr_scheduler": {
-                        "scheduler": scheduler,
-                        "interval": "epoch",
+                        "scheduler": final_scheduler,
+                        "interval": "step" if self.optimizer_config.warmup.enabled else "epoch",
                         "frequency": 1
                     }
                 }
@@ -500,10 +559,33 @@ class AudioClassifier(pl.LightningModule):
     def on_validation_epoch_end(self):
         """Called at the end of the validation epoch.
         If using manual optimization, manually step the learning rate scheduler.
+        Also handle transition from warmup to ReduceLROnPlateau when needed.
         """
         if not self.automatic_optimization and hasattr(self, 'lr_scheduler'):
-            # Get the current validation loss
-            val_loss = self.trainer.callback_metrics.get('val_loss')
-            if val_loss is not None:
-                # Step the scheduler with the validation loss
-                self.lr_scheduler.step(val_loss)
+            # Handle warmup + ReduceLROnPlateau combination
+            if (hasattr(self, 'base_scheduler_config') and 
+                self.base_scheduler_config["type"] == "reduce_lr_on_plateau" and
+                hasattr(self, 'warmup_steps')):
+                
+                # Check if we've finished warmup and need to initialize ReduceLROnPlateau
+                current_step = self.global_step
+                if current_step >= self.warmup_steps and self.post_warmup_scheduler is None:
+                    # Initialize ReduceLROnPlateau after warmup
+                    opt = self.optimizers()
+                    self.post_warmup_scheduler = ReduceLROnPlateau(opt, **self.base_scheduler_config["params"])
+                    print(f"Warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
+                
+                # Use ReduceLROnPlateau if warmup is done
+                if self.post_warmup_scheduler is not None:
+                    val_loss = self.trainer.callback_metrics.get('val_loss')
+                    if val_loss is not None:
+                        self.post_warmup_scheduler.step(val_loss)
+            else:
+                # Standard scheduler stepping
+                if isinstance(self.lr_scheduler, ReduceLROnPlateau):
+                    val_loss = self.trainer.callback_metrics.get('val_loss')
+                    if val_loss is not None:
+                        self.lr_scheduler.step(val_loss)
+                else:
+                    # For other schedulers, step without arguments
+                    self.lr_scheduler.step()
