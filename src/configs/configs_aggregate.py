@@ -81,7 +81,6 @@ class GeneralConfig(BaseModel):
     # Hyperparameter and experiment configuration
     sweep_count: int = 200
     accumulation_steps: int = 2
-    learning_rate: float = 0.001
     patience: int = 10
     use_wandb: bool = False
     use_sweep: bool = False

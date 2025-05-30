@@ -1,5 +1,5 @@
 general:
-  model_type: custom_cnn
+  model_type: efficientnet_b0
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -11,7 +11,6 @@ general:
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 1
-  learning_rate: 0.0001
   patience: 3
   use_wandb: false
   use_sweep: false
@@ -23,7 +22,11 @@ general:
   monitor: val_loss
   mode: min
 optimizer:
-  optimizer_type: adamw
+  optimizer_type: adam
+  adam:
+    lr: 0.0001
+    # betas: [0.9, 0.999]
+    betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
   adamw:
     lr: 0.0001
     weight_decay: 0.01
