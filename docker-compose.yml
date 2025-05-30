@@ -14,7 +14,13 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
-      - CUDA_VISIBLE_DEVICES=0  # Single GPU only
+      - CUDA_VISIBLE_DEVICES=0,1  # Both GPUs for distributed training
+      # NCCL configuration for distributed training
+      - NCCL_DEBUG=INFO           # Enable NCCL debugging
+      - NCCL_SHM_DISABLE=1        # Disable shared memory to avoid /dev/shm issues
+      - NCCL_P2P_DISABLE=1        # Disable P2P if needed for stability
+      - NCCL_IB_DISABLE=1         # Disable InfiniBand
+      - TORCH_NCCL_BLOCKING_WAIT=1 # Enable blocking wait for better error reporting
 
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
@@ -25,7 +31,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: 2  # Use both GPUs
               capabilities: [gpu]  # Simplified capabilities
     # command: python3 script.py
     command: python3 main.py
@@ -36,6 +42,9 @@ services:
     working_dir: /app/src  # Change this to /app/src
     # user: "appuser"
     user: root
+    # Shared memory configuration for distributed training
+    shm_size: 2gb  # Increase shared memory for NCCL
+    ipc: host      # Use host IPC namespace for better GPU communication
     networks:
       - app_network
 

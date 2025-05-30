@@ -20,6 +20,14 @@ class AdamWConfig(BaseModel):
     amsgrad: bool = False
 
 
+class WarmupConfig(BaseModel):
+    """Learning rate warmup configuration"""
+    enabled: bool = False
+    warmup_steps: int = 1000
+    warmup_start_lr: float = 1e-6
+    warmup_method: Literal["linear", "cosine"] = "linear"
+
+
 class ReduceLROnPlateauConfig(BaseModel):
     """ReduceLROnPlateau scheduler configuration"""
     mode: Literal["min", "max"] = "min"
@@ -57,6 +65,9 @@ class OptimizerConfig(BaseModel):
     # Optimizer configurations
     adam: AdamConfig = Field(default_factory=AdamConfig)
     adamw: AdamWConfig = Field(default_factory=AdamWConfig)
+    
+    # Warmup configuration
+    warmup: WarmupConfig = Field(default_factory=WarmupConfig)
     
     # Scheduler selection and configurations
     scheduler_type: Optional[Literal["reduce_lr_on_plateau", "step_lr", "cosine_annealing_lr"]] = "reduce_lr_on_plateau"
