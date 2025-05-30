@@ -121,7 +121,7 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: testing-esc-overfitting
+  project: efficientnet_b1-none-full-esc50-1augs
   name: ast-classifier-esc50-3-augs-optimer-configs
   reinit: true
   notes: null

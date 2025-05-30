@@ -5,50 +5,49 @@ SEND_MESSAGE: true
 
 
 runs:
-  - id: 0
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        use_wandb: true
-        use_kfold: true
-        adapter_type: ssf
-        k_folds: 5
-        batch_size: 8
-        epochs: 20
-        learning_rate: 0.0001
-        accumulation_steps: 3
-        patience: 3
-        seed: 42
-        test_size: 0.2
-        inference_size: 0.1
-        val_size: 0.1
-      dataset:
-        dataset_type: esc50
-        # data_path: /app/src/datasets/UAV_Dataset_31
-        data_path: /app/src/datasets/ESC-50-master/classes
-        num_classes: 50 # make sure this is correct
-      feature_extraction:
-        type: melspectrogram
-        sampling_rate: 16000
-        n_mfcc: 40
-        n_mels: 128
-        n_fft: 2048
-        hop_length: 200
-        power: 2
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: testing-esc-overfitting
-        name: ast-classifier-esc50-3-augs-optimer-configs
-        reinit: true
-        tags:
-          - 50-class
-          - kfold
-          - ast
-          - none-classifier
-          - 3-augs
-runs:
+  # - id: 0
+  #   type: script
+  #   changes:
+  #     general:
+  #       model_type: efficientnet_b1
+  #       use_wandb: true
+  #       use_kfold: true
+  #       adapter_type: ssf
+  #       k_folds: 5
+  #       batch_size: 8
+  #       epochs: 20
+  #       learning_rate: 0.0001
+  #       accumulation_steps: 3
+  #       patience: 3
+  #       seed: 42
+  #       test_size: 0.2
+  #       inference_size: 0.1
+  #       val_size: 0.1
+  #     dataset:
+  #       dataset_type: esc50
+  #       # data_path: /app/src/datasets/UAV_Dataset_31
+  #       data_path: /app/src/datasets/ESC-50-master/classes
+  #       num_classes: 50 # make sure this is correct
+  #     feature_extraction:
+  #       type: melspectrogram
+  #       sampling_rate: 16000
+  #       n_mfcc: 40
+  #       n_mels: 128
+  #       n_fft: 2048
+  #       hop_length: 200
+  #       power: 2
+  #     augmentations:
+  #       augmentations_per_sample: 1
+  #     wandb:
+  #       project: testing-esc-overfitting
+  #       name: ast-classifier-esc50-3-augs-optimer-configs
+  #       reinit: true
+  #       tags:
+  #         - 50-class
+  #         - kfold
+  #         - ast
+  #         - none-classifier
+  #         - 3-augs
   - id: 1
     type: script
     changes:
@@ -83,7 +82,7 @@ runs:
       augmentations:
         augmentations_per_sample: 0
       wandb:
-        project: testing-esc-overfitting
+        project: efficientnet_b1-ssf-esc50-0augs
         name: ast-classifier-esc50-3-augs-optimer-configs
         reinit: true
         tags:
@@ -92,7 +91,6 @@ runs:
           - ast
           - none-classifier
           - 3-augs
-runs:
   - id: 2
     type: script
     changes:
@@ -127,7 +125,7 @@ runs:
       augmentations:
         augmentations_per_sample: 0
       wandb:
-        project: testing-esc-overfitting
+        project: efficientnet_b1-none-full-esc50-0augs
         name: ast-classifier-esc50-3-augs-optimer-configs
         reinit: true
         tags:
@@ -136,7 +134,6 @@ runs:
           - ast
           - none-classifier
           - 3-augs
-runs:
   - id: 3
     type: script
     changes:
@@ -171,7 +168,7 @@ runs:
       augmentations:
         augmentations_per_sample: 1
       wandb:
-        project: testing-esc-overfitting
+        project: efficientnet_b1-none-full-esc50-1augs
         name: ast-classifier-esc50-3-augs-optimer-configs
         reinit: true
         tags:
