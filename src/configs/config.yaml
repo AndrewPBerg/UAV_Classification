@@ -1,13 +1,13 @@
 general:
   model_type: ast
-  batch_size: 8
+  batch_size: 64
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
   epochs: 20
   save_model: false
   test_size: 0.2
-  inference_size: 0.1
+  inference_size: 0
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 1
@@ -21,22 +21,24 @@ general:
   save_dataloader: false
   monitor: val_loss
   mode: min
-  # Distributed training configuration
-  distributed_training: false
-  num_gpus: 1
+  distributed_training: true
+  num_gpus: 2
   strategy: ddp
 optimizer:
-  optimizer_type: adam
+  optimizer_type: adamw
   adam:
     lr: 1e-4
-    # betas: [0.9, 0.999]
-    betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
+    betas:
+    - 0.99
+    - 0.999
   adamw:
     lr: 0.0001
     weight_decay: 0.01
-    betas: [0.9, 0.999]
+    betas:
+    - 0.9
+    - 0.999
   warmup:
-    enabled: true
+    enabled: false
     warmup_steps: 1000
     warmup_start_lr: 1e-6
     warmup_method: linear
@@ -45,18 +47,17 @@ optimizer:
     mode: min
     factor: 0.85
     patience: 5
-  gradient_clip_val: 1.0
+  gradient_clip_val: 10.0
   gradient_clip_algorithm: norm
 dataset:
   dataset_type: esc50
-  # data_path: /app/src/datasets/ESC-50-master/classes
   data_path: ./datasets/ESC-50-master/classes
   num_classes: 50
   target_sr: 16000
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 5
   augmentations:
   - add_noise
   gaussian_noise_min_amplitude: 0.1
