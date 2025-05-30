@@ -9,12 +9,14 @@ try:
     from .wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
     from .dataset_config import get_dataset_config, DatasetConfig
+    from .optim_config import get_optimizer_config, OptimizerConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
     from peft_config import PEFTConfig, get_peft_config  # Import the PEFTConfig type alias and get_peft_config function explicitly
     from wandb_config import get_wandb_config, WandbConfig, SweepConfig
     from augmentation_config import create_augmentation_configs, AugmentationConfig
     from dataset_config import get_dataset_config, DatasetConfig
+    from optim_config import get_optimizer_config, OptimizerConfig
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Custom exception handler that terminates the script on any exception"""
@@ -132,13 +134,13 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig, OptimizerConfig]: # noqa: F405
     """
     Load and validate all configuration objects from the config dictionary.
     
     Returns:
         Tuple containing all configuration objects in order:
-        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config)
+        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config)
     """
 
     # Create configuration instances from the dictionary
@@ -162,7 +164,10 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         augmentation_config = create_augmentation_configs(config)
         ic("AugmentationConfig instance created successfully:")
 
-        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config
+        optimizer_config = get_optimizer_config(config)
+        ic("OptimizerConfig instance created successfully:")
+
+        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config
         
     except ValidationError as e:
         ic("Validation error occurred: ")
@@ -197,13 +202,16 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
             augmentation_config = create_augmentation_configs(config)
             ic("AugmentationConfig instance created successfully (fallback):")
 
-            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config
+            optimizer_config = get_optimizer_config(config)
+            ic("OptimizerConfig instance created successfully (fallback):")
+
+            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config
             
         except Exception as fallback_error:
             ic("Fallback also failed:", fallback_error)
             raise e  # Raise the original KeyError
 
-def wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config):
+def wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config, optimizer_config):
     """
     What dis do:
     - takes in all the configs and returns a correctly formatted
@@ -217,6 +225,7 @@ def wandb_config_dict(general_config, feature_extraction_config, dataset_config,
     res['peft_config'] = dict(peft_config.to_dict())
     res['feature_extraction_config'] = dict(feature_extraction_config)
     res['augmentation_config'] = dict(augmentation_config)
+    res['optimizer_config'] = dict(optimizer_config)
     
     return res
 
@@ -231,10 +240,11 @@ def main():
         peft_config,
         wandb_config,
         sweep_config,
-        augmentation_config
+        augmentation_config,
+        optimizer_config
     ) = load_configs(config)
 
-    ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config))
+    ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config, optimizer_config))
 
 if __name__ == '__main__':
     main() 

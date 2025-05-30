@@ -1,5 +1,5 @@
 general:
-  model_type: efficientnet_b1
+  model_type: custom_cnn
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -10,10 +10,10 @@ general:
   inference_size: 0.1
   val_size: 0.1
   sweep_count: 50
-  accumulation_steps: 3
+  accumulation_steps: 1
   learning_rate: 0.0001
   patience: 3
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: true
@@ -22,15 +22,29 @@ general:
   save_dataloader: false
   monitor: val_loss
   mode: min
+optimizer:
+  optimizer_type: adamw
+  adamw:
+    lr: 0.0001
+    weight_decay: 0.01
+    betas: [0.9, 0.999]
+  scheduler_type: reduce_lr_on_plateau
+  reduce_lr_on_plateau:
+    mode: min
+    factor: 0.85
+    patience: 5
+  gradient_clip_val: 1.0
+  gradient_clip_algorithm: norm
 dataset:
   dataset_type: esc50
-  data_path: /app/src/datasets/ESC-50-master/classes
+  # data_path: /app/src/datasets/ESC-50-master/classes
+  data_path: ./datasets/ESC-50-master/classes
   num_classes: 50
   target_sr: 16000
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 1
+  augmentations_per_sample: 0
   augmentations:
   - add_noise
   gaussian_noise_min_amplitude: 0.1

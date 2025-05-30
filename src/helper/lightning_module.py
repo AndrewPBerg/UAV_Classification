@@ -13,6 +13,7 @@ import re
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
+from configs.optim_config import OptimizerConfig
 
 
 class AudioClassifier(pl.LightningModule):
@@ -26,6 +27,7 @@ class AudioClassifier(pl.LightningModule):
         general_config: GeneralConfig,
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
+        optimizer_config: Optional[OptimizerConfig] = None,
     ):
         """Initialize the classifier.
         
@@ -34,11 +36,13 @@ class AudioClassifier(pl.LightningModule):
             general_config: General configuration
             peft_config: PEFT configuration (optional)
             num_classes: Number of classes (optional)
+            optimizer_config: Optimizer configuration (optional)
         """
         super().__init__()
         self.model = model
         self.general_config = general_config
         self.peft_config = peft_config
+        self.optimizer_config = optimizer_config or OptimizerConfig()  # Use default if not provided
         
         # Set number of classes
         self.num_classes = num_classes if num_classes is not None else general_config.num_classes
@@ -387,19 +391,29 @@ class AudioClassifier(pl.LightningModule):
     
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
-        # Choose optimizer based on model type
-        if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.05) # TODO imp a config feature for optimizer choices
+        # Get optimizer configuration based on type
+        if self.optimizer_config.optimizer_type == "adamw":
+            optimizer_params = dict(self.optimizer_config.adamw)
+            optimizer = AdamW(self.model.parameters(), **optimizer_params)
+        elif self.optimizer_config.optimizer_type == "adam":
+            optimizer_params = dict(self.optimizer_config.adam)
+            optimizer = Adam(self.model.parameters(), **optimizer_params)
         else:
-            optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
         
-        # Configure scheduler
-        scheduler = ReduceLROnPlateau(
-            optimizer, 
-            mode='min', 
-            factor=0.85, 
-            patience=5,
-        )
+        # Configure scheduler if specified
+        scheduler = None
+        if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+            scheduler_params = dict(self.optimizer_config.reduce_lr_on_plateau)
+            scheduler = ReduceLROnPlateau(optimizer, **scheduler_params)
+        elif self.optimizer_config.scheduler_type == "step_lr":
+            from torch.optim.lr_scheduler import StepLR
+            scheduler_params = dict(self.optimizer_config.step_lr)
+            scheduler = StepLR(optimizer, **scheduler_params)
+        elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
+            from torch.optim.lr_scheduler import CosineAnnealingLR
+            scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
+            scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
         
         # Store scheduler as an attribute so we can access it in on_epoch_end
         self.lr_scheduler = scheduler
@@ -408,16 +422,29 @@ class AudioClassifier(pl.LightningModule):
         if not self.automatic_optimization:
             return optimizer
         
-        # For automatic optimization, return with scheduler config
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val_loss",
-                "interval": "epoch",
-                "frequency": 1
-            }
-        }
+        # For automatic optimization, return with scheduler config if scheduler exists
+        if scheduler is not None:
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                return {
+                    "optimizer": optimizer,
+                    "lr_scheduler": {
+                        "scheduler": scheduler,
+                        "monitor": "val_loss",
+                        "interval": "epoch",
+                        "frequency": 1
+                    }
+                }
+            else:
+                return {
+                    "optimizer": optimizer,
+                    "lr_scheduler": {
+                        "scheduler": scheduler,
+                        "interval": "epoch",
+                        "frequency": 1
+                    }
+                }
+        else:
+            return optimizer
 
     def optimizer_step(
         self,
@@ -443,10 +470,14 @@ class AudioClassifier(pl.LightningModule):
         loss = optimizer_closure()
         
         # Apply gradient clipping if configured
-        if hasattr(self.general_config, 'gradient_clip_val') and self.general_config.gradient_clip_val > 0:
-            clip_val = self.general_config.gradient_clip_val
-            # Clip gradients by value
-            torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
+        if self.optimizer_config.gradient_clip_val is not None and self.optimizer_config.gradient_clip_val > 0:
+            clip_val = self.optimizer_config.gradient_clip_val
+            if self.optimizer_config.gradient_clip_algorithm == "value":
+                # Clip gradients by value
+                torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
+            elif self.optimizer_config.gradient_clip_algorithm == "norm":
+                # Clip gradients by norm
+                torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=clip_val)
         
         # Skip optimizer step if any gradients are invalid (infinity/NaN)
         valid_gradients = True
