@@ -63,8 +63,19 @@ class PTLTrainer:
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
         
-        # Single GPU configuration
+        # GPU configuration
         self.gpu_available = torch.cuda.is_available()
+        self.num_gpus = general_config.num_gpus if general_config.distributed_training else 1
+        self.distributed_strategy = general_config.strategy if general_config.distributed_training else None
+        
+        # Validate GPU configuration
+        if general_config.distributed_training:
+            if not self.gpu_available:
+                raise ValueError("Distributed training requires CUDA to be available")
+            available_gpus = torch.cuda.device_count()
+            if self.num_gpus > available_gpus:
+                print(f"Warning: Requested {self.num_gpus} GPUs but only {available_gpus} available. Using {available_gpus} GPUs.")
+                self.num_gpus = available_gpus
         
         # Set up wandb logger
         self.wandb_logger = None
@@ -218,7 +229,8 @@ class PTLTrainer:
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,
+            devices=self.num_gpus if self.gpu_available else "auto",
+            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
             callbacks=callbacks,
             logger=self.wandb_logger,
             deterministic=False,
@@ -708,7 +720,8 @@ class PTLTrainer:
             trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,
+            devices=self.num_gpus if self.gpu_available else "auto",
+            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
             callbacks=fold_callbacks,
             logger=self.wandb_logger,
             deterministic=False,

@@ -14,7 +14,7 @@ services:
       - WANDB_API_KEY=${WANDB_API_KEY}
       - BOT_TOKEN=${BOT_TOKEN}
       - CHAT_ID=${CHAT_ID}
-      - CUDA_VISIBLE_DEVICES=0  # Single GPU only
+      - CUDA_VISIBLE_DEVICES=0,1  # Both GPUs for distributed training
 
     volumes:
       - ./src:/app/src  # Only mount the src directory as read-only
@@ -25,7 +25,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: 1
+              count: 2  # Use both GPUs
               capabilities: [gpu]  # Simplified capabilities
     # command: python3 script.py
     command: python3 main.py

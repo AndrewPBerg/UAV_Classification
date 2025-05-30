@@ -101,6 +101,26 @@ class GeneralConfig(BaseModel):
     save_top_k: int = 1
     test_during_training: bool = True
     test_during_training_freq: int = 1  # Run test evaluation every N epochs
+    
+    # Distributed training configuration
+    distributed_training: bool = False
+    num_gpus: int = 1
+    strategy: str = "ddp"
+    
+    @field_validator('num_gpus')
+    @classmethod
+    def num_gpus_must_be_positive(cls, v):
+        if v < 1:
+            raise ValueError('num_gpus must be at least 1')
+        return v
+    
+    @field_validator('strategy')
+    @classmethod
+    def strategy_must_be_valid(cls, v):
+        valid_strategies = ["ddp", "ddp_spawn", "ddp2", "dp", "fsdp"]
+        if v not in valid_strategies:
+            raise ValueError(f'strategy must be one of {valid_strategies}')
+        return v
 
 class _FeatureExtractionType(BaseModel):
     type: List[str] = ['melspectrogram','mfcc'] 

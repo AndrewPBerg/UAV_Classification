@@ -1,5 +1,5 @@
 general:
-  model_type: custom_cnn
+  model_type: ast
   batch_size: 8
   seed: 42
   num_cuda_workers: 10
@@ -17,14 +17,18 @@ general:
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: none-classifier
   save_dataloader: false
   monitor: val_loss
   mode: min
+  # Distributed training configuration
+  distributed_training: false
+  num_gpus: 1
+  strategy: ddp
 optimizer:
   optimizer_type: adam
   adam:
-    lr: 0.0001
+    lr: 1e-4
     # betas: [0.9, 0.999]
     betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
   adamw:
