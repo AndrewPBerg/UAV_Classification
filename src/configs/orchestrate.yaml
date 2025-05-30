@@ -5,67 +5,19 @@ SEND_MESSAGE: true
 
 
 runs:
-  # - id: 0
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b1
-  #       use_wandb: true
-  #       use_kfold: true
-  #       adapter_type: ssf
-  #       k_folds: 5
-  #       batch_size: 8
-  #       epochs: 20
-  #       learning_rate: 0.0001
-  #       accumulation_steps: 3
-  #       patience: 3
-  #       seed: 42
-  #       test_size: 0.2
-  #       inference_size: 0.1
-  #       val_size: 0.1
-  #     dataset:
-  #       dataset_type: esc50
-  #       # data_path: /app/src/datasets/UAV_Dataset_31
-  #       data_path: /app/src/datasets/ESC-50-master/classes
-  #       num_classes: 50 # make sure this is correct
-  #     feature_extraction:
-  #       type: melspectrogram
-  #       sampling_rate: 16000
-  #       n_mfcc: 40
-  #       n_mels: 128
-  #       n_fft: 2048
-  #       hop_length: 200
-  #       power: 2
-  #     augmentations:
-  #       augmentations_per_sample: 1
-  #     wandb:
-  #       project: testing-esc-overfitting
-  #       name: ast-classifier-esc50-3-augs-optimer-configs
-  #       reinit: true
-  #       tags:
-  #         - 50-class
-  #         - kfold
-  #         - ast
-  #         - none-classifier
-  #         - 3-augs
-  - id: 1
+  - id: 0
     type: script
     changes:
       general:
-        model_type: efficientnet_b1
+        model_type: ast
         use_wandb: true
         use_kfold: true
         adapter_type: ssf
         k_folds: 5
         batch_size: 8
-        epochs: 20
-        learning_rate: 0.0001
-        accumulation_steps: 3
-        patience: 3
-        seed: 42
-        test_size: 0.2
-        inference_size: 0.1
-        val_size: 0.1
+        epochs: 30
+        accumulation_steps: 2
+        patience: 5
       dataset:
         dataset_type: esc50
         # data_path: /app/src/datasets/UAV_Dataset_31
@@ -79,36 +31,87 @@ runs:
         n_fft: 2048
         hop_length: 200
         power: 2
+      optimizer:
+        optimizer_type: adam
+        adam:
+          lr: 0.0001
+          betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
+        scheduler_type: cosine_annealing_lr
+        cosine_annealing_lr:
+          T_max: 20
+          eta_min: 0.00001
+        reduce_lr_on_plateau:
+          mode: min
+          factor: 0.85
+          patience: 5
+        gradient_clip_val: 5.0
+        gradient_clip_algorithm: norm
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 1
       wandb:
-        project: efficientnet_b1-ssf-esc50-0augs
-        name: ast-classifier-esc50-3-augs-optimer-configs
+        project: optim-testing-esc-overfitting
+        name: ast-ssf-esc50-1-augs-beta-configs
         reinit: true
-        tags:
-          - 50-class
-          - kfold
-          - ast
-          - none-classifier
-          - 3-augs
+  - id: 1
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: true
+        adapter_type: none-full
+        k_folds: 5
+        batch_size: 8
+        epochs: 30
+        accumulation_steps: 2
+        patience: 5
+      dataset:
+        dataset_type: esc50
+        # data_path: /app/src/datasets/UAV_Dataset_31
+        data_path: /app/src/datasets/ESC-50-master/classes
+        num_classes: 50 # make sure this is correct
+      feature_extraction:
+        type: melspectrogram
+        sampling_rate: 16000
+        n_mfcc: 40
+        n_mels: 128
+        n_fft: 2048
+        hop_length: 200
+        power: 2
+      optimizer:
+        optimizer_type: adam
+        adam:
+          lr: 0.0001
+          betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
+        scheduler_type: cosine_annealing_lr
+        cosine_annealing_lr:
+          T_max: 20
+          eta_min: 0.00001
+        reduce_lr_on_plateau:
+          mode: min
+          factor: 0.85
+          patience: 5
+        gradient_clip_val: 5.0
+        gradient_clip_algorithm: norm
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: optim-testing-esc-overfitting
+        name: ast-none-full-esc50-1-augs-beta-configs
+        reinit: true
   - id: 2
     type: script
     changes:
       general:
-        model_type: efficientnet_b1
+        model_type: ast
         use_wandb: true
         use_kfold: true
         adapter_type: none-full
         k_folds: 5
         batch_size: 8
-        epochs: 20
-        learning_rate: 0.00001
-        accumulation_steps: 3
-        patience: 3
-        seed: 42
-        test_size: 0.2
-        inference_size: 0.1
-        val_size: 0.1
+        epochs: 30
+        accumulation_steps: 2
+        patience: 5
       dataset:
         dataset_type: esc50
         # data_path: /app/src/datasets/UAV_Dataset_31
@@ -122,58 +125,25 @@ runs:
         n_fft: 2048
         hop_length: 200
         power: 2
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: efficientnet_b1-none-full-esc50-0augs
-        name: ast-classifier-esc50-3-augs-optimer-configs
-        reinit: true
-        tags:
-          - 50-class
-          - kfold
-          - ast
-          - none-classifier
-          - 3-augs
-  - id: 3
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        use_wandb: true
-        use_kfold: true
-        adapter_type: none-full
-        k_folds: 5
-        batch_size: 8
-        epochs: 20
-        learning_rate: 0.0001
-        accumulation_steps: 3
-        patience: 3
-        seed: 42
-        test_size: 0.2
-        inference_size: 0.1
-        val_size: 0.1
-      dataset:
-        dataset_type: esc50
-        # data_path: /app/src/datasets/UAV_Dataset_31
-        data_path: /app/src/datasets/ESC-50-master/classes
-        num_classes: 50 # make sure this is correct
-      feature_extraction:
-        type: melspectrogram
-        sampling_rate: 16000
-        n_mfcc: 40
-        n_mels: 128
-        n_fft: 2048
-        hop_length: 200
-        power: 2
+      optimizer:
+        optimizer_type: adamw
+        adamw:
+          weight_decay: 0.01
+          lr: 0.0001
+          betas: [0.8, 0.98] # beta1:= momentum, beta2:= variance adaptation
+        scheduler_type: cosine_annealing_lr
+        cosine_annealing_lr:
+          T_max: 20
+          eta_min: 0.00001
+        reduce_lr_on_plateau:
+          mode: min
+          factor: 0.85
+          patience: 5
+        gradient_clip_val: 5.0
+        gradient_clip_algorithm: norm
       augmentations:
         augmentations_per_sample: 1
       wandb:
-        project: efficientnet_b1-none-full-esc50-1augs
-        name: ast-classifier-esc50-3-augs-optimer-configs
+        project: optim-testing-esc-overfitting
+        name: ast-none-full-esc50-1-augs-adamw
         reinit: true
-        tags:
-          - 50-class
-          - kfold
-          - ast
-          - none-classifier
-          - 3-augs
