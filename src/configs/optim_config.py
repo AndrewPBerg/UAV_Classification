@@ -41,7 +41,7 @@ class StepLRConfig(BaseModel):
 class CosineAnnealingLRConfig(BaseModel):
     """CosineAnnealingLR scheduler configuration"""
     T_max: int = 50
-    eta_min: float = 0.0
+    eta_min: float = 0.0s
 
 
 class OptimizerConfig(BaseModel):
@@ -52,7 +52,7 @@ class OptimizerConfig(BaseModel):
         strict = True
 
     # Optimizer selection
-    optimizer_type: Literal["adam", "adamw"] = "adamw"
+    optimizer_type: Literal["adam", "adamw"] = "adamw" # default to adamw
     
     # Optimizer configurations
     adam: AdamConfig = Field(default_factory=AdamConfig)
