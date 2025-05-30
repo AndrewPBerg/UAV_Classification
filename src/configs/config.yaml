@@ -1,6 +1,6 @@
 general:
   model_type: ast
-  batch_size: 64
+  batch_size: 48
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
@@ -11,16 +11,16 @@ general:
   val_size: 0.1
   sweep_count: 50
   accumulation_steps: 1
-  patience: 3
-  use_wandb: false
+  patience: 5
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
   adapter_type: none-classifier
   save_dataloader: false
-  monitor: val_loss
-  mode: min
+  monitor: val_acc
+  mode: max
   distributed_training: true
   num_gpus: 2
   strategy: ddp
@@ -42,14 +42,14 @@ optimizer:
     warmup_steps: 1000
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: cosine_annealing_lr
+  scheduler_type: reduce_lr_on_plateau
   cosine_annealing_lr:
     T_max: 50
     eta_min: 0.0
   reduce_lr_on_plateau:
-    mode: min
+    mode: max
     factor: 0.85
-    patience: 5
+    patience: 3
   gradient_clip_val: 10.0
   gradient_clip_algorithm: norm
 dataset:
@@ -60,27 +60,22 @@ dataset:
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 5
+  augmentations_per_sample: 3
   augmentations:
-  - sin_distortion
-  - polarity_inversion
   - gaussian_noise
   - time_mask
-  # Sin distortion parameters
+  - polarity_inversion
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
   sin_distortion_p: 0.9
-  # Polarity inversion parameters
-  polarity_inversion_p: 0.9
-  # Gaussian noise parameters
+  polarity_inversion_p: 0.8
   gaussian_noise_min_amplitude: 0.1
   gaussian_noise_max_amplitude: 0.15
-  gaussian_noise_p: 0.9
-  # Time mask parameters
+  gaussian_noise_p: 0.8
   time_mask_min_band_part: 0.01
   time_mask_max_band_part: 0.15
   time_mask_fade_duration: 0.01
-  time_mask_p: 0.9
+  time_mask_p: 0.8
 feature_extraction:
   type: melspectrogram
   sampling_rate: 16000
@@ -167,16 +162,19 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: efficientnet_b1-none-full-esc50-1augs
-  name: ast-classifier-esc50-3-augs-optimer-configs
+  project: ast-esc50-optimization
+  name: ast-baseline-conservative-b48-lr1e4
   reinit: true
   notes: null
   tags:
-  - 50-class
-  - kfold
   - ast
+  - esc50
+  - baseline
+  - conservative
+  - kfold
   - none-classifier
-  - 3-augs
+  - batch48
+  - lr1e-4
   dir: wandb
 sweep:
   project: ast-experiments
