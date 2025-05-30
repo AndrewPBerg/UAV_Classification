@@ -14,6 +14,7 @@ from datetime import datetime
 from .lightning_module import AudioClassifier
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from configs.dataset_config import DatasetConfig
+from configs.optim_config import OptimizerConfig
 from .util import wandb_login
 import time
 
@@ -34,6 +35,7 @@ class PTLTrainer:
         data_module: pl.LightningDataModule,
         model_factory: Callable,
         augmentation_config: AugmentationConfig,
+        optimizer_config: OptimizerConfig,
     ):
         """
         Initialize the PTLTrainer.
@@ -48,6 +50,7 @@ class PTLTrainer:
             data_module: Lightning data module (UAVDataModule or ESC50DataModule)
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
+            optimizer_config: Optimizer configuration
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -58,6 +61,7 @@ class PTLTrainer:
         self.data_module = data_module
         self.model_factory = model_factory
         self.augmentation_config = augmentation_config
+        self.optimizer_config = optimizer_config
         
         # Single GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -79,7 +83,8 @@ class PTLTrainer:
                     self.dataset_config,
                     self.peft_config, 
                     self.wandb_config, 
-                    self.augmentation_config
+                    self.augmentation_config,
+                    self.optimizer_config
                 ),
                 reinit=True  # Force reinitialize a new wandb run
             )
@@ -92,6 +97,15 @@ class PTLTrainer:
         torch.manual_seed(general_config.seed)
         torch.cuda.manual_seed(general_config.seed)
         np.random.seed(general_config.seed)
+    
+    def _get_current_lr(self) -> float:
+        """Get the current learning rate from optimizer config."""
+        if self.optimizer_config.optimizer_type == "adamw":
+            return self.optimizer_config.adamw.lr
+        elif self.optimizer_config.optimizer_type == "adam":
+            return self.optimizer_config.adam.lr
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
     
     def _get_callbacks(self) -> List[pl.Callback]:
         """
@@ -235,13 +249,14 @@ class PTLTrainer:
             model=model,
             general_config=self.general_config,
             peft_config=self.peft_config,
-            num_classes=num_classes
+            num_classes=num_classes,
+            optimizer_config=self.optimizer_config
         )
         
         # Print training start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Start timer
@@ -589,7 +604,7 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config, self.optimizer_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
                 reinit=True  # Force reinitialize a new wandb run
             )
@@ -597,7 +612,7 @@ class PTLTrainer:
         # Print k-fold start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING {self.general_config.k_folds}-FOLD CROSS-VALIDATION: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Train on each fold
@@ -617,7 +632,8 @@ class PTLTrainer:
                 model=model,
                 general_config=self.general_config,
                 peft_config=self.peft_config,
-                num_classes=self.data_module.num_classes
+                num_classes=self.data_module.num_classes,
+                optimizer_config=self.optimizer_config
             )
             
             # Create checkpoint directory for this fold
