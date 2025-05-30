@@ -60,6 +60,14 @@ class TimeStretchConfig(BaseModel):
     max_rate: float = 1.0
     p: float = 1.0
 
+class TimeMaskConfig(BaseModel):
+    class Config:
+        strict = True
+    min_band_part: float = 0.01
+    max_band_part: float = 0.2
+    fade_duration: float = 0.01
+    p: float = 1.0
+
 
 def create_augmentation_configs(config: dict) -> AugmentationConfig:
     """
@@ -116,6 +124,15 @@ def create_augmentation_configs(config: dict) -> AugmentationConfig:
                     'max_distortion': config.get('tanh_distortion_max_rate'),
                     'p': config.get('tanh_distortion_p')
                 }
+            },
+            'time_mask': {
+                'class': TimeMaskConfig,
+                'params': {
+                    'min_band_part': config.get('time_mask_min_band_part'),
+                    'max_band_part': config.get('time_mask_max_band_part'),
+                    'fade_duration': config.get('time_mask_fade_duration'),
+                    'p': config.get('time_mask_p')
+                }
             }
         }
     except UnboundLocalError as e:
@@ -167,6 +184,15 @@ def create_augmentation_configs(config: dict) -> AugmentationConfig:
                     'min_distortion': config.get('tanh_distortion_min_rate'),
                     'max_distortion': config.get('tanh_distortion_max_rate'),
                     'p': config.get('tanh_distortion_p')
+                }
+            },
+            'time_mask': {
+                'class': TimeMaskConfig,
+                'params': {
+                    'min_band_part': config.get('time_mask_min_band_part'),
+                    'max_band_part': config.get('time_mask_max_band_part'),
+                    'fade_duration': config.get('time_mask_fade_duration'),
+                    'p': config.get('time_mask_p')
                 }
             }
         }

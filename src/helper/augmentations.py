@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, PolarityInversion, TanhDistortion)
+from audiomentations import (Compose, PitchShift, TimeStretch, AddGaussianNoise, PolarityInversion, TanhDistortion, TimeMask)
 import random
 from numpy.typing import NDArray
 from audiomentations.core.transforms_interface import BaseWaveformTransform
@@ -77,7 +77,7 @@ def create_augmentation_pipeline(augmentations: list[str], config: Dict[str, Any
                         # Use default values
                         transforms.append(SinDistortion(min_distortion=0.01, max_distortion=0.7, p=1.0))
                         
-                case "add_noise":
+                case "gaussian_noise":
                     if aug_config:
                         transforms.append(AddGaussianNoise(
                             min_amplitude=aug_config.min_amplitude,
@@ -94,6 +94,18 @@ def create_augmentation_pipeline(augmentations: list[str], config: Dict[str, Any
                     else:
                         # Use default values
                         transforms.append(PolarityInversion(p=1.0))
+                        
+                case "time_mask":
+                    if aug_config:
+                        transforms.append(TimeMask(
+                            min_band_part=aug_config.min_band_part,
+                            max_band_part=aug_config.max_band_part,
+                            fade_duration=aug_config.fade_duration,
+                            p=aug_config.p
+                        ))
+                    else:
+                        # Use default values
+                        transforms.append(TimeMask(min_band_part=0.01, max_band_part=0.2, fade_duration=0.01, p=1.0))
                         
                 case _:
                     print(f"Unknown augmentation: {aug}. Skipping.")

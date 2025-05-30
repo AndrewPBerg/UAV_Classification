@@ -42,7 +42,10 @@ optimizer:
     warmup_steps: 1000
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: reduce_lr_on_plateau
+  scheduler_type: cosine_annealing_lr
+  cosine_annealing_lr:
+    T_max: 50
+    eta_min: 0.0
   reduce_lr_on_plateau:
     mode: min
     factor: 0.85
@@ -60,9 +63,24 @@ augmentations:
   augmentations_per_sample: 5
   augmentations:
   - sin_distortion
-  - inverse_polarity
+  - polarity_inversion
+  - gaussian_noise
+  - time_mask
+  # Sin distortion parameters
+  sin_distortion_min_rate: 0.1
+  sin_distortion_max_rate: 0.6
+  sin_distortion_p: 0.9
+  # Polarity inversion parameters
+  polarity_inversion_p: 0.9
+  # Gaussian noise parameters
   gaussian_noise_min_amplitude: 0.1
   gaussian_noise_max_amplitude: 0.15
+  gaussian_noise_p: 0.9
+  # Time mask parameters
+  time_mask_min_band_part: 0.01
+  time_mask_max_band_part: 0.15
+  time_mask_fade_duration: 0.01
+  time_mask_p: 0.9
 feature_extraction:
   type: melspectrogram
   sampling_rate: 16000
