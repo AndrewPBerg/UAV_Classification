@@ -59,7 +59,8 @@ dataset:
 augmentations:
   augmentations_per_sample: 5
   augmentations:
-  - add_noise
+  - sin_distortion
+  - inverse_polarity
   gaussian_noise_min_amplitude: 0.1
   gaussian_noise_max_amplitude: 0.15
 feature_extraction:
