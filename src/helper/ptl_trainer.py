@@ -98,6 +98,15 @@ class PTLTrainer:
         torch.cuda.manual_seed(general_config.seed)
         np.random.seed(general_config.seed)
     
+    def _get_current_lr(self) -> float:
+        """Get the current learning rate from optimizer config."""
+        if self.optimizer_config.optimizer_type == "adamw":
+            return self.optimizer_config.adamw.lr
+        elif self.optimizer_config.optimizer_type == "adam":
+            return self.optimizer_config.adam.lr
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
+    
     def _get_callbacks(self) -> List[pl.Callback]:
         """
         Get PyTorch Lightning callbacks.
@@ -247,7 +256,7 @@ class PTLTrainer:
         # Print training start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Start timer
@@ -603,7 +612,7 @@ class PTLTrainer:
         # Print k-fold start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING {self.general_config.k_folds}-FOLD CROSS-VALIDATION: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Train on each fold

@@ -41,7 +41,7 @@ class StepLRConfig(BaseModel):
 class CosineAnnealingLRConfig(BaseModel):
     """CosineAnnealingLR scheduler configuration"""
     T_max: int = 50
-    eta_min: float = 0.0s
+    eta_min: float = 0.0
 
 
 class OptimizerConfig(BaseModel):
