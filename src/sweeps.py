@@ -42,6 +42,19 @@ def model_pipeline(sweep_config=None):
     # Enable WandB service for better distributed training reliability
     wandb.require("service")
     
+    # Ensure any existing wandb run is finished before starting
+    try:
+        if wandb.run is not None:
+            print(f"Warning: Finishing existing wandb run: {wandb.run.name}")
+            wandb.finish()
+    except Exception as e:
+        print(f"Warning: Error finishing existing wandb run: {e}")
+        # Force finish any lingering runs
+        try:
+            wandb.finish()
+        except:
+            pass
+    
     # Initialize wandb run with error handling
     try:
         with wandb.init(config=sweep_config):
@@ -175,16 +188,42 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
         ic("the adapter type is not included in the sweep config, defaulting to general config's: ", e)
         peft_name = str(general_config['general']['adapter_type']) 
    
+    # Handle optimizer parameters specially since they were flattened in the sweep config
+    optimizer_params = {}
+    
     # Update general section with sweep config values
     for key, value in sweep_config.items():
-        if key in mixed_params['general']:
+        # Handle flattened optimizer parameters
+        if key in ['optimizer_type', 'learning_rate', 'weight_decay', 'gradient_clipping_enabled']:
+            if key == 'optimizer_type':
+                optimizer_params['optimizer_type'] = value
+            elif key == 'learning_rate':
+                # Map learning_rate to the appropriate optimizer section
+                optimizer_type = sweep_config.get('optimizer_type', mixed_params['optimizer']['optimizer_type'])
+                if optimizer_type == 'adamw':
+                    if 'adamw' not in optimizer_params:
+                        optimizer_params['adamw'] = mixed_params['optimizer']['adamw'].copy()
+                    optimizer_params['adamw']['lr'] = value
+                elif optimizer_type == 'adam':
+                    if 'adam' not in optimizer_params:
+                        optimizer_params['adam'] = mixed_params['optimizer']['adam'].copy()
+                    optimizer_params['adam']['lr'] = value
+            elif key == 'weight_decay':
+                # Map weight_decay to the appropriate optimizer section
+                optimizer_type = sweep_config.get('optimizer_type', mixed_params['optimizer']['optimizer_type'])
+                if optimizer_type == 'adamw':
+                    if 'adamw' not in optimizer_params:
+                        optimizer_params['adamw'] = mixed_params['optimizer']['adamw'].copy()
+                    optimizer_params['adamw']['weight_decay'] = value
+                # Note: Adam doesn't typically use weight_decay in the same way
+            elif key == 'gradient_clipping_enabled':
+                optimizer_params['gradient_clipping_enabled'] = value
+        elif key in mixed_params['general']:
             mixed_params['general'][key] = value
         elif key in mixed_params.get('dataset', {}):
             mixed_params['dataset'][key] = value
         elif key in mixed_params.get('feature_extraction', {}):
             mixed_params['feature_extraction'][key] = value
-        elif key in mixed_params.get('optimizer', {}):
-            mixed_params['optimizer'][key] = value
         elif key in mixed_params.get('augmentations', {}):
             mixed_params['augmentations'][key] = value
         elif key in mixed_params.get(peft_name, {}):
@@ -192,6 +231,10 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
         else:
             # If key doesn't exist in any section, add it to general
             mixed_params['general'][key] = value
+    
+    # Update optimizer config with the processed parameters
+    if optimizer_params:
+        mixed_params['optimizer'].update(optimizer_params)
     
     # Ensure inference_size is properly set if not in sweep_config
     if 'inference_size' not in sweep_config and 'inference_size' in general_config['general']:

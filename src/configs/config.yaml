@@ -4,7 +4,7 @@ general:
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
-  epochs: 20
+  epochs: 10
   save_model: false
   test_size: 0.2
   inference_size: 0
@@ -42,7 +42,7 @@ optimizer:
     warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: reduce_lr_on_plateau
+  scheduler_type: cosine_annealing_lr
   cosine_annealing_lr:
     T_max: 50
     eta_min: 0.0
@@ -51,7 +51,7 @@ optimizer:
     factor: 0.85
     patience: 3
   gradient_clipping_enabled: false
-  gradient_clip_val: 10.0
+  gradient_clip_val: 5.0
   gradient_clip_algorithm: norm
 dataset:
   dataset_type: esc50
@@ -61,7 +61,7 @@ dataset:
   target_duration: 5
   file_extension: .wav
 augmentations:
-  augmentations_per_sample: 3
+  augmentations_per_sample: 1
   augmentations:
   - gaussian_noise
   - time_mask
@@ -163,7 +163,7 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ast-esc50-optimization
+  project: ast-eesc50-sweeps-baseline
   name: ast-baseline-conservative-b48-lr1e4
   reinit: true
   notes: null
@@ -178,11 +178,11 @@ wandb:
   - lr1e-4
   dir: wandb
 sweep:
-  project: new-sweeps-test-5-31
-  name: nothing-burder
-  method: random
+  project: ast-eesc50-sweeps-baseline
+  name: ast-esc50-batch-optimizer
+  method: bayes
   metric:
-    name: val_acc
+    name: test_acc
     goal: maximize
   parameters:
     batch_size:
@@ -191,3 +191,21 @@ sweep:
       - 32
       - 48
       - 64
+    optimizer_type:
+      values:
+      - adamw
+      - adam
+    learning_rate:
+      values:
+      - 1e-4
+      - 5e-4
+      - 1e-3
+    weight_decay:
+      values:
+      - 0.0
+      - 0.01
+      - 0.1
+    gradient_clipping_enabled:
+      values:
+      - true
+      - false
