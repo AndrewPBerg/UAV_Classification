@@ -50,6 +50,7 @@ optimizer:
     mode: max
     factor: 0.85
     patience: 3
+  gradient_clipping_enabled: true
   gradient_clip_val: 10.0
   gradient_clip_algorithm: norm
 dataset:

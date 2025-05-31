@@ -530,7 +530,9 @@ class AudioClassifier(pl.LightningModule):
         loss = optimizer_closure()
         
         # Apply gradient clipping if configured
-        if self.optimizer_config.gradient_clip_val is not None and self.optimizer_config.gradient_clip_val > 0:
+        if (self.optimizer_config.gradient_clipping_enabled and 
+            self.optimizer_config.gradient_clip_val is not None and 
+            self.optimizer_config.gradient_clip_val > 0):
             clip_val = self.optimizer_config.gradient_clip_val
             if self.optimizer_config.gradient_clip_algorithm == "value":
                 # Clip gradients by value
