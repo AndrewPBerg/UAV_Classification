@@ -433,6 +433,7 @@ class AudioClassifier(pl.LightningModule):
         final_scheduler = None
         
         if self.optimizer_config.warmup.enabled:
+            print(f"LR warmup enabled: {self.optimizer_config.warmup.warmup_steps} steps, method: {self.optimizer_config.warmup.warmup_method}")
             warmup_scheduler = self._create_warmup_scheduler(optimizer, target_lr)
             
             # Check if we have a base scheduler that's compatible with SequentialLR
@@ -573,7 +574,7 @@ class AudioClassifier(pl.LightningModule):
                     # Initialize ReduceLROnPlateau after warmup
                     opt = self.optimizers()
                     self.post_warmup_scheduler = ReduceLROnPlateau(opt, **self.base_scheduler_config["params"])
-                    print(f"Warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
+                    print(f"LR warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
                 
                 # Use ReduceLROnPlateau if warmup is done
                 if self.post_warmup_scheduler is not None:
