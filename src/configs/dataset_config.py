@@ -122,7 +122,7 @@ class ESC50Config(DatasetConfig):
     @classmethod
     def validate_use_esc10_subset(cls, v):
         if v:
-            raise ValueError("Note implemented, use_esc10_subset must be false for ESC50Config")
+            raise ValueError("Not implemented, use_esc10_subset must be false for ESC50Config")
         return v
     
     fold_based_split: bool = Field(

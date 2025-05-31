@@ -204,14 +204,17 @@ class ESC50DataModule(pl.LightningDataModule):
         start_time = timer()
         
         if self.use_kfold:
+            # Setup for k-fold cross-validation
             self._setup_kfold()
-
+        else:
+            # Setup for single fold training using fold 1 as validation, rest as training
+            self._setup_single_fold()
             
         end_time = timer()
         dataset_init_time = end_time - start_time
         
         ic(f"ESC-50 datasets created in {dataset_init_time:.2f} seconds")
-        
+    
     def _setup_kfold(self):
         """
         Setup datasets for k-fold cross validation using ESC-50 predefined folds.
@@ -292,6 +295,80 @@ class ESC50DataModule(pl.LightningDataModule):
 
         # ic(f"Fold splits list created: {self.fold_splits}")
         
+    def _setup_single_fold(self):
+        """
+        Setup datasets for single fold training using ESC-50 predefined folds.
+        Uses fold 1 as validation set and folds 2-5 as training set.
+        """
+        ic("Setting up ESC-50 single fold training")
+        
+        # Reuse the fold splitting logic from _setup_kfold
+        data_path = self.data_path
+        all_paths = list(Path(data_path).glob("*/*.wav"))
+        if not all_paths:
+            raise FileNotFoundError(f"No .wav files found in {data_path}")
+
+        fold_1 = []
+        fold_2 = []
+        fold_3 = []
+        fold_4 = []
+        fold_5 = []
+        
+        # Process each file and sort into folds based on filename
+        for path in all_paths:
+            filename = path.name
+            
+            # ESC-50 files have fold number as first character (1-5)
+            try:
+                fold_num = int(filename[0])
+                if fold_num < 1 or fold_num > 5:
+                    raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
+            except (ValueError, IndexError) as e:
+                raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
+            
+            # Add complete path to appropriate fold
+            if fold_num == 1:
+                fold_1.append(path)
+            elif fold_num == 2:
+                fold_2.append(path)
+            elif fold_num == 3:
+                fold_3.append(path)
+            elif fold_num == 4:
+                fold_4.append(path)
+            elif fold_num == 5:
+                fold_5.append(path)
+        
+        # Use fold 1 as validation, folds 2-5 as training
+        val_paths = fold_1
+        train_paths = fold_2 + fold_3 + fold_4 + fold_5
+        
+        
+        # Create datasets
+        self.train_dataset = ESC50Dataset(
+            data_path=self.data_path,
+            data_paths=train_paths,
+            feature_extractor=self.feature_extractor,
+            config=self.esc50_config,
+            target_sr=self.esc50_config.target_sr,
+            target_duration=self.esc50_config.target_duration,
+            augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
+            augmentations=self.augmentation_config.augmentations,
+            aug_config=self.augmentation_config,
+        )
+
+        self.val_dataset = ESC50Dataset(
+            data_path=self.data_path,
+            data_paths=val_paths,
+            feature_extractor=self.feature_extractor,
+            config=self.esc50_config,
+            target_sr=self.esc50_config.target_sr,
+            target_duration=self.esc50_config.target_duration,
+            augmentations_per_sample=0,  # No augmentations for validation
+            augmentations=[],  # No augmentations for validation
+            aug_config=self.augmentation_config,
+        )
+        print(f"Single fold setup - Train files: {len(self.train_dataset)}, Val files: {len(self.val_dataset)}")
+
     def get_fold_dataloaders(self, fold_idx: int):
         """
         Get dataloaders for a specific fold.

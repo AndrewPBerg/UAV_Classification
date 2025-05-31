@@ -8,11 +8,9 @@ from icecream import ic
 
 # Import the PyTorch Lightning implementation
 from helper.ptl_trainer import PTLTrainer
-from helper.UAV_datamodule import UAVDataModule
+from esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
 from models.model_factory import ModelFactory
-from configs import (
-    load_configs,
-)
+from configs.configs_aggregate import load_configs
 
 from helper.util import wandb_login
 
@@ -52,35 +50,29 @@ def model_pipeline(sweep_config=None):
         # Combine sweep config with general config
         mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
         
-        # mixed_params_table = wandb.Table(data=[mixed_params])
-        # broken code for adding the mixed params to a wandb table
-        # columns = [f"col_{i}" for i in range(54)]
-        # mixed_params_table = wandb.Table(data=[mixed_params], columns=columns)
-        
-        # # Update wandb config with the mixed parameters
-        # wandb.log({"mixed_params_table": mixed_params_table})
-
-        # load into pydantic models w/ load_configs()
+        # Load into pydantic models w/ load_configs()
         (
-        general_config,
-        feature_extraction_config,
-        peft_config,
-        wandb_config,
-        sweep_config,
-        augmentation_config
-         ) = load_configs(mixed_params)
+            general_config,
+            feature_extraction_config,
+            dataset_config,
+            peft_config,
+            wandb_config,
+            sweep_config_obj,
+            augmentation_config,
+            optimizer_config
+        ) = load_configs(mixed_params)
         
         # Log the augmentation config to the W&B run
         if augmentation_config:
-             wandb.config.update({"augmentations": augmentation_config.dict()}, allow_val_change=True)
+            wandb.config.update({"augmentations": augmentation_config.dict()}, allow_val_change=True)
 
-        # Create data module
-        data_module = UAVDataModule(
+        # Create ESC50 data module
+        data_module = create_esc50_datamodule(
             general_config=general_config,
             feature_extraction_config=feature_extraction_config,
+            esc50_config=dataset_config,  # dataset_config contains ESC50Config
             augmentation_config=augmentation_config,
-            wandb_config=wandb_config,
-            sweep_config=sweep_config
+            use_filename_based_splits=True
         )
         
         # Get model factory function
@@ -94,11 +86,14 @@ def model_pipeline(sweep_config=None):
         trainer = PTLTrainer(
             general_config=general_config,
             feature_extraction_config=feature_extraction_config,
+            dataset_config=dataset_config,
             peft_config=peft_config,
             wandb_config=wandb_config,
-            sweep_config=None,  # We're not using a separate sweep config object here
+            sweep_config=sweep_config_obj,
             data_module=data_module,
-            model_factory=model_factory
+            model_factory=model_factory,
+            augmentation_config=augmentation_config,
+            optimizer_config=optimizer_config
         )
         
         # Train model
@@ -141,10 +136,14 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     
     # general
     mixed_params.update(general_config['general'])
+    # dataset (ESC50 specific)
+    mixed_params.update(general_config['dataset'])
     # augmentations
     mixed_params.update(general_config['augmentations'])
     # feature extraction
     mixed_params.update(general_config['feature_extraction'])
+    # optimizer
+    mixed_params.update(general_config['optimizer'])
     # wandb
     mixed_params.update(general_config['wandb'])
     # sweep
