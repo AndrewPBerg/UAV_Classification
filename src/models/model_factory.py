@@ -157,12 +157,12 @@ class ModelFactory:
             model = model.to(device)
 
             
-        summary(model,
-                col_names=["num_params","trainable"],
-                col_width=20,
-                row_settings=["var_names"])
+        # summary(model,
+        #         col_names=["num_params","trainable"],
+        #         col_width=20,
+        #         row_settings=["var_names"])
 
-        print(model)
+        # print(model)
         
         # Log model parameter metrics
         ModelFactory.log_model_parameters(model)

@@ -624,8 +624,8 @@ class TransformerModel:
             print("Processor downloaded successfully and configured for 224x224 images.")
 
         # Debugging model architecture
-        print("Model architecture:")
-        print(model)
+        # print("Model architecture:")
+        # print(model)
         
         # Update model configuration to accept inputs of any size
         print("Updating model configuration to handle dynamic input sizes...")
@@ -871,8 +871,8 @@ class TransformerModel:
             print("Processor downloaded successfully and configured for 224x224 images.")
 
         # Debugging model architecture
-        print("Model architecture:")
-        print(model)
+        # print("Model architecture:")
+        # print(model)
         
         # Update model configuration to accept inputs of any size
         print("Updating model configuration to handle dynamic input sizes...")
