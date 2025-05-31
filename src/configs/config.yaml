@@ -1,5 +1,5 @@
 general:
-  model_type: efficientnet_b0
+  model_type: efficientnet_b7
   batch_size: 48
   seed: 42
   num_cuda_workers: 10
@@ -191,10 +191,6 @@ sweep:
       - 32
       - 48
       - 64
-    optimizer_type:
-      values:
-      - adamw
-      - adam
     learning_rate:
       values:
       - 1e-4
