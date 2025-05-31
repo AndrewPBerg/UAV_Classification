@@ -1,5 +1,5 @@
 general:
-  model_type: ast
+  model_type: efficientnet_b0
   batch_size: 48
   seed: 42
   num_cuda_workers: 10
@@ -13,11 +13,11 @@ general:
   accumulation_steps: 1
   patience: 5
   use_wandb: true
-  use_sweep: false
+  use_sweep: true
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -39,7 +39,7 @@ optimizer:
     - 0.999
   warmup:
     enabled: false
-    warmup_steps: 1000
+    warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
   scheduler_type: reduce_lr_on_plateau
@@ -177,19 +177,16 @@ wandb:
   - lr1e-4
   dir: wandb
 sweep:
-  project: ast-experiments
-  name: ast-none-full-3-augs
+  project: new-sweeps-test-5-31
+  name: nothing-burder
   method: random
   metric:
-    name: test_acc
+    name: val_acc
     goal: maximize
   parameters:
-    learning_rate:
+    batch_size:
       values:
-      - 0.1
-      - 0.01
-      - 0.001
-    seed:
-      distribution: int_uniform
-      min: 0
-      max: 1000
+      - 16
+      - 32
+      - 48
+      - 64

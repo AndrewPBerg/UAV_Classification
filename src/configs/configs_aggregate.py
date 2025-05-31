@@ -238,13 +238,59 @@ def wandb_config_dict(general_config, feature_extraction_config, dataset_config,
     
     """
     res = {}
-    res['wandb_config'] = dict(wandb_config)
-    res['general_config'] = dict(general_config)
-    res['dataset_config'] = dict(dataset_config)
-    res['peft_config'] = dict(peft_config.to_dict())
-    res['feature_extraction_config'] = dict(feature_extraction_config)
-    res['augmentation_config'] = dict(augmentation_config)
-    res['optimizer_config'] = dict(optimizer_config)
+    
+    try:
+        res['wandb_config'] = wandb_config.model_dump() if hasattr(wandb_config, 'model_dump') else dict(wandb_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize wandb_config: {e}")
+        res['wandb_config'] = {}
+    
+    try:
+        res['general_config'] = general_config.model_dump() if hasattr(general_config, 'model_dump') else dict(general_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize general_config: {e}")
+        res['general_config'] = {}
+    
+    try:
+        res['dataset_config'] = dataset_config.model_dump() if hasattr(dataset_config, 'model_dump') else dict(dataset_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize dataset_config: {e}")
+        res['dataset_config'] = {}
+    
+    try:
+        if hasattr(peft_config, 'to_dict'):
+            res['peft_config'] = peft_config.to_dict()
+        elif hasattr(peft_config, 'model_dump'):
+            res['peft_config'] = peft_config.model_dump()
+        elif hasattr(peft_config, '__dict__'):
+            res['peft_config'] = dict(peft_config.__dict__)
+        else:
+            res['peft_config'] = str(peft_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize peft_config: {e}")
+        res['peft_config'] = {}
+    
+    try:
+        res['feature_extraction_config'] = feature_extraction_config.model_dump() if hasattr(feature_extraction_config, 'model_dump') else dict(feature_extraction_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize feature_extraction_config: {e}")
+        res['feature_extraction_config'] = {}
+    
+    try:
+        aug_dict = augmentation_config.model_dump() if hasattr(augmentation_config, 'model_dump') else dict(augmentation_config)
+        # Remove complex nested objects that might cause WandB serialization issues
+        if 'aug_configs' in aug_dict:
+            del aug_dict['aug_configs']
+        res['augmentation_config'] = aug_dict
+    except Exception as e:
+        print(f"Warning: Could not serialize augmentation_config: {e}")
+        res['augmentation_config'] = {}
+    
+    try:
+        res['optimizer_config'] = optimizer_config.model_dump() if hasattr(optimizer_config, 'model_dump') else dict(optimizer_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize optimizer_config: {e}")
+        res['optimizer_config'] = {}
     
     return res
 
