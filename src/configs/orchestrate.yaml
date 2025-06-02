@@ -10,8 +10,8 @@ runs:
     type: sweep
     changes:
       general:
-        model_type: efficientnet_b0  # EfficientNet-B0 is a good baseline for ESC-50
-        epochs: 10      # ESC-50 needs more epochs than AudioSet
+        model_type: ast  # EfficientNet-B0 is a good baseline for ESC-50
+        epochs: 20      # ESC-50 needs more epochs than AudioSet
         patience: 5     # Early stopping for small dataset
         use_kfold: false
         use_wandb: true
@@ -41,8 +41,8 @@ runs:
         project: ast-eesc50-sweeps-baseline
         name: ast-baseline-conservative-b48-lr1e4
       sweep:
-        project: ast-eesc50-sweeps-baseline
-        name: ast-esc50-batch-optimizer
+        project: ast-esc50-sweeps-baseline
+        name: ast-esc50-batch-optimizer-adapter
         method: bayes
         metric:
           name: test_acc
