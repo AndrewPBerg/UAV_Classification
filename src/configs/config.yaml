@@ -1,6 +1,6 @@
 general:
   model_type: ast
-  batch_size: 48
+  batch_size: 16
   seed: 42
   num_cuda_workers: 10
   pinned_memory: true
@@ -10,7 +10,7 @@ general:
   inference_size: 0
   val_size: 0.1
   sweep_count: 200
-  accumulation_steps: 2
+  accumulation_steps: 1
   patience: 5
   use_wandb: true
   use_sweep: true
@@ -188,7 +188,6 @@ sweep:
     batch_size:
       values:
       - 8
-      - 16
     learning_rate:
       values:
       - 1e-4
