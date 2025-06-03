@@ -7,45 +7,9 @@ SEND_MESSAGE: true
 runs:
   # Run 1: Conservative AST baseline - proven configuration from paper
   - id: 1
-    type: sweep
+    type: script
     changes:
       general:
         model_type: ast  # EfficientNet-B0 is a good baseline for ESC-50
-        epochs: 20      # ESC-50 needs more epochs than AudioSet
-        patience: 5     # Early stopping for small dataset
-        use_kfold: false
-        use_wandb: true
-        use_sweep: true
-        k_folds: 5      # Standard ESC-50 evaluation
-        adapter_type: none-full
-        monitor: val_acc
-        mode: max
-      optimizer:
-        scheduler_type: cosine_annealing_lr
-        cosine_annealing_lr:
-          T_max: 50
-          eta_min: 0.0
-        gradient_clipping_enabled: false
-        gradient_clip_val: 5.0
-        gradient_clip_algorithm: norm
-      augmentations:
-        augmentations_per_sample: 1
-        augmentations:
-          - gaussian_noise
-          - time_mask
-          - polarity_inversion
-        gaussian_noise_p: 0.8
-        time_mask_p: 0.8
-        polarity_inversion_p: 0.8
-      wandb:
-        project: ast-eesc50-sweeps-baseline
-        name: ast-baseline-conservative-b48-lr1e4
-      sweep:
-        project: ast-esc50-sweeps-baseline
-        name: ast-esc50-batch-optimizer-adapter
-        method: bayes
-        metric:
-          name: test_acc
-          goal: maximize
-
+        
 

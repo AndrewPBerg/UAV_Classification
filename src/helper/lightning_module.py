@@ -671,11 +671,13 @@ class AudioClassifier(pl.LightningModule):
                 
                 # Log the change to wandb if available - use proper PyTorch Lightning logging
                 if self.logger is not None:
-                    # Use the Lightning logger's log_metrics method
+                    # Only log numeric values to metrics - remove the string value
                     self.logger.log_metrics({
                         "peft_method_epoch": current_epoch,
-                        "peft_method_name": required_method
                     }, step=self.global_step)
                     
-                    # Also log as a string metric using self.log
-                    self.log("peft_method", current_epoch, on_step=False, on_epoch=True)
+                    # Log the epoch number as a metric
+                    self.log("peft_method_epoch", current_epoch, on_step=False, on_epoch=True)
+                    
+                # Print the method name instead of logging it as a metric
+                print(f"PEFT method changed to: {required_method} at epoch {current_epoch}")
