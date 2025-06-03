@@ -8,6 +8,7 @@ dependencies = [
     "audiomentations>=0.35.0",
     "dotenv>=0.9.9",
     "icecream>=2.1.4",
+    "kaggle>=1.7.4.5",
     "librosa>=0.10.2.post1",
     "matplotlib>=3.10.1",
     "pandas>=2.2.3",
