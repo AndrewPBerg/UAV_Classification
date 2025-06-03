@@ -1,6 +1,6 @@
 # Papers 📜
 
- 1️⃣ 4,500 Seconds [Accepted, Preprint]: Link TBA </br>
+ 1️⃣ 4,500 Seconds [Accepted, Preprint]: [Arxiv 2505.23782](https://arxiv.org/abs/2505.23782) </br>
  2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA </br>
  3️⃣ The Unbearable Weight: TBD </br>
 
