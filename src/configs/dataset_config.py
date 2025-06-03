@@ -11,7 +11,7 @@ class DatasetConfig(BaseModel):
         strict = True
 
     # Dataset type selection
-    dataset_type: Literal["uav", "esc50"] = Field(
+    dataset_type: Literal["uav", "esc50", "esc10"] = Field(
         description="Type of dataset to use"
     )
     
@@ -46,7 +46,7 @@ class DatasetConfig(BaseModel):
     @field_validator('dataset_type')
     @classmethod
     def validate_dataset_type(cls, v):
-        valid_types = ["uav", "esc50"]
+        valid_types = ["uav", "esc50", "esc10"]
         if v not in valid_types:
             raise ValueError(f'dataset_type must be one of {valid_types}')
         return v
@@ -74,6 +74,13 @@ class DatasetConfig(BaseModel):
                 "description": "ESC-50 Environmental Sound Classification Dataset", 
                 "default_duration": 5,
                 "default_sr": 44100  # ESC-50 original sampling rate
+            }
+        elif self.dataset_type == "esc10":
+            return {
+                "expected_classes": 10,
+                "description": "ESC-10 Environmental Sound Classification Dataset (subset of ESC-50)",
+                "default_duration": 5,
+                "default_sr": 44100  # ESC-10 original sampling rate (same as ESC-50)
             }
         else:
             raise ValueError(f"Unknown dataset type: {self.dataset_type}")
@@ -130,6 +137,27 @@ class ESC50Config(DatasetConfig):
         description="Whether to use the predefined fold-based splits from ESC-50"
     )
 
+class ESC10Config(DatasetConfig):
+    """Specific configuration for ESC-10 dataset."""
+    
+    dataset_type: Literal["esc10"] = "esc10"
+    target_sr: int = 16000  # Resample from 44.1kHz to 16kHz for consistency
+    target_duration: int = 5
+    file_extension: str = ".wav"
+    
+    @field_validator('target_duration')
+    @classmethod
+    def validate_target_duration(cls, v):
+        if v != 5:
+            raise ValueError("target_duration must be 5 for ESC10Config")
+        return v
+    
+    # ESC-10 specific parameters
+    fold_based_split: bool = Field(
+        default=True,
+        description="Whether to use the predefined fold-based splits from ESC-10 (inherited from ESC-50)"
+    )
+
 class UAVConfig(DatasetConfig):
     """Specific configuration for UAV dataset."""
     
@@ -152,6 +180,8 @@ def create_dataset_config(config_dict: Dict[str, Any]) -> DatasetConfig:
     
     if dataset_type == "esc50":
         return ESC50Config(**config_dict)
+    elif dataset_type == "esc10":
+        return ESC10Config(**config_dict)
     elif dataset_type == "uav":
         return UAVConfig(**config_dict)
     else:
