@@ -7,31 +7,29 @@ SEND_MESSAGE: true
 runs:
   # Run 1: Conservative AST baseline - proven configuration from paper
   - id: 1
-    type: script
+    type: sweep
     changes:
       general:
-        model_type: ast
-        batch_size: 48  # Optimal for ESC-50 based on research
+        model_type: ast  # EfficientNet-B0 is a good baseline for ESC-50
         epochs: 20      # ESC-50 needs more epochs than AudioSet
         patience: 5     # Early stopping for small dataset
-        use_kfold: true
+        use_kfold: false
+        use_wandb: true
+        use_sweep: true
         k_folds: 5      # Standard ESC-50 evaluation
-        adapter_type: none-classifier
+        adapter_type: none-full
         monitor: val_acc
         mode: max
-        use_wandb: true
       optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.0001    # 1e-4 from paper for ESC-50
-          weight_decay: 0.01
-        scheduler_type: reduce_lr_on_plateau
-        reduce_lr_on_plateau:
-          mode: max
-          factor: 0.85
-          patience: 3
+        scheduler_type: cosine_annealing_lr
+        cosine_annealing_lr:
+          T_max: 50
+          eta_min: 0.0
+        gradient_clipping_enabled: false
+        gradient_clip_val: 5.0
+        gradient_clip_algorithm: norm
       augmentations:
-        augmentations_per_sample: 3
+        augmentations_per_sample: 1
         augmentations:
           - gaussian_noise
           - time_mask
@@ -40,351 +38,14 @@ runs:
         time_mask_p: 0.8
         polarity_inversion_p: 0.8
       wandb:
-        project: ast-esc50-optimization
+        project: ast-eesc50-sweeps-baseline
         name: ast-baseline-conservative-b48-lr1e4
-        tags:
-          - ast
-          - esc50
-          - baseline
-          - conservative
-          - kfold
-          - none-classifier
-          - batch48
-          - lr1e-4
+      sweep:
+        project: ast-esc50-sweeps-baseline
+        name: ast-esc50-batch-optimizer-adapter
+        method: bayes
+        metric:
+          name: test_acc
+          goal: maximize
 
-  # Run 2: Lower learning rate for stability
-  - id: 2
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 32  # Smaller batch for more stable gradients
-        epochs: 25
-        patience: 6
-        use_kfold: true
-        k_folds: 5
-        adapter_type: none-classifier
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.00005   # 5e-5 - more conservative
-          weight_decay: 0.01
-        scheduler_type: cosine_annealing_lr
-        cosine_annealing_lr:
-          T_max: 25
-          eta_min: 0.000001
-      augmentations:
-        augmentations_per_sample: 4
-        augmentations:
-          - gaussian_noise
-          - time_mask
-          - polarity_inversion
-          - sin_distortion
-        gaussian_noise_p: 0.7
-        time_mask_p: 0.7
-        polarity_inversion_p: 0.7
-        sin_distortion_p: 0.5
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-stability-focused-b32-lr5e5-cosine
-        tags:
-          - ast
-          - esc50
-          - stability
-          - low-lr
-          - cosine-scheduler
-          - batch32
-          - lr5e-5
-          - 4-augs
 
-  # Run 3: LoRA fine-tuning for parameter efficiency
-  - id: 3
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 64  # Can use larger batch with LoRA
-        epochs: 30
-        patience: 8
-        use_kfold: true
-        k_folds: 5
-        adapter_type: lora
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.0002    # Higher LR for LoRA
-          weight_decay: 0.01
-        scheduler_type: reduce_lr_on_plateau
-        reduce_lr_on_plateau:
-          mode: max
-          factor: 0.8
-          patience: 4
-      lora:
-        r: 8
-        lora_alpha: 16
-        lora_dropout: 0.1
-        bias: lora_only
-      augmentations:
-        augmentations_per_sample: 2
-        augmentations:
-          - gaussian_noise
-          - time_mask
-        gaussian_noise_p: 0.6
-        time_mask_p: 0.6
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-lora-efficient-b64-lr2e4-r8
-        tags:
-          - ast
-          - esc50
-          - lora
-          - parameter-efficient
-          - batch64
-          - lr2e-4
-          - rank8
-          - efficient
-
-  # Run 4: Minimal augmentation for overfitting-prone small dataset
-  - id: 4
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 24  # Very small batch for careful training
-        epochs: 35
-        patience: 10
-        use_kfold: true
-        k_folds: 5
-        adapter_type: none-classifier
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.00003   # Very conservative LR
-          weight_decay: 0.02  # Higher weight decay for regularization
-        scheduler_type: reduce_lr_on_plateau
-        reduce_lr_on_plateau:
-          mode: max
-          factor: 0.9
-          patience: 5
-      augmentations:
-        augmentations_per_sample: 1
-        augmentations:
-          - gaussian_noise
-        gaussian_noise_p: 0.5
-        gaussian_noise_min_amplitude: 0.05
-        gaussian_noise_max_amplitude: 0.1
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-minimal-overfitting-b24-lr3e5-minimal-aug
-        tags:
-          - ast
-          - esc50
-          - anti-overfitting
-          - minimal-aug
-          - small-batch
-          - batch24
-          - lr3e-5
-          - high-regularization
-
-  # Run 5: AdaLoRA for adaptive parameter efficiency
-  - id: 5
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 40
-        epochs: 25
-        patience: 7
-        use_kfold: true
-        k_folds: 5
-        adapter_type: adalora
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.00015
-          weight_decay: 0.01
-        scheduler_type: cosine_annealing_lr
-        cosine_annealing_lr:
-          T_max: 25
-          eta_min: 0.000005
-      adalora:
-        init_r: 4
-        target_r: 128
-        lora_alpha: 8
-      augmentations:
-        augmentations_per_sample: 3
-        augmentations:
-          - gaussian_noise
-          - time_mask
-          - polarity_inversion
-        gaussian_noise_p: 0.7
-        time_mask_p: 0.7
-        polarity_inversion_p: 0.7
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-adalora-adaptive-b40-lr15e5-r4to128
-        tags:
-          - ast
-          - esc50
-          - adalora
-          - adaptive-rank
-          - parameter-efficient
-          - batch40
-          - lr1.5e-4
-          - adaptive
-
-  # Run 6: Very conservative approach for tiny dataset
-  - id: 6
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 16  # Smallest batch size
-        epochs: 40
-        patience: 12
-        use_kfold: true
-        k_folds: 5
-        adapter_type: none-classifier
-        monitor: val_acc
-        mode: max
-        accumulation_steps: 3  # Effective batch size 48
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.00001   # Very small LR
-          weight_decay: 0.05  # Strong regularization
-        scheduler_type: reduce_lr_on_plateau
-        reduce_lr_on_plateau:
-          mode: max
-          factor: 0.95
-          patience: 6
-      augmentations:
-        augmentations_per_sample: 0  # No augmentation to prevent overfitting
-        augmentations: []
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-ultra-conservative-b16-lr1e5-no-aug
-        tags:
-          - ast
-          - esc50
-          - ultra-conservative
-          - no-augmentation
-          - tiny-batch
-          - batch16
-          - lr1e-5
-          - gradient-accumulation
-          - max-regularization
-
-  # Run 7: Aggressive augmentation test
-  - id: 7
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 32
-        epochs: 20
-        patience: 5
-        use_kfold: true
-        k_folds: 5
-        adapter_type: none-classifier
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.0001
-          weight_decay: 0.01
-        scheduler_type: reduce_lr_on_plateau
-        reduce_lr_on_plateau:
-          mode: max
-          factor: 0.85
-          patience: 3
-      augmentations:
-        augmentations_per_sample: 5
-        augmentations:
-          - gaussian_noise
-          - time_mask
-          - polarity_inversion
-          - sin_distortion
-        gaussian_noise_p: 0.9
-        time_mask_p: 0.9
-        polarity_inversion_p: 0.9
-        sin_distortion_p: 0.8
-        time_mask_min_band_part: 0.05
-        time_mask_max_band_part: 0.2
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-aggressive-aug-b32-lr1e4-5augs
-        tags:
-          - ast
-          - esc50
-          - aggressive-augmentation
-          - heavy-aug
-          - batch32
-          - lr1e-4
-          - 5-augs
-          - augmentation-test
-
-  # Run 8: LoRA with very small rank for extreme parameter efficiency
-  - id: 8
-    type: script
-    changes:
-      general:
-        model_type: ast
-        batch_size: 48
-        epochs: 30
-        patience: 8
-        use_kfold: true
-        k_folds: 5
-        adapter_type: lora
-        monitor: val_acc
-        mode: max
-        use_wandb: true
-      optimizer:
-        optimizer_type: adamw
-        adamw:
-          lr: 0.0003    # Higher LR for small LoRA
-          weight_decay: 0.01
-        scheduler_type: cosine_annealing_lr
-        cosine_annealing_lr:
-          T_max: 30
-          eta_min: 0.00001
-      lora:
-        r: 4          # Very small rank
-        lora_alpha: 8
-        lora_dropout: 0.05
-        bias: lora_only
-      augmentations:
-        augmentations_per_sample: 2
-        augmentations:
-          - gaussian_noise
-          - time_mask
-        gaussian_noise_p: 0.6
-        time_mask_p: 0.6
-      wandb:
-        project: ast-esc50-optimization
-        name: ast-extreme-lora-b48-lr3e4-r4
-        tags:
-          - ast
-          - esc50
-          - extreme-lora
-          - minimal-parameters
-          - rank4
-          - batch48
-          - lr3e-4
-          - ultra-efficient
-       

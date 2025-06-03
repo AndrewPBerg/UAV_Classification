@@ -1,28 +1,29 @@
 general:
-  model_type: ast
-  batch_size: 48
+  model_type: efficientnet_b1
+  from_scratch: true
+  batch_size: 8
   seed: 42
-  num_cuda_workers: 10
+  num_cuda_workers: 2
   pinned_memory: true
-  epochs: 20
+  epochs: 2
   save_model: false
-  test_size: 0.2
-  inference_size: 0
-  val_size: 0.1
-  sweep_count: 50
+  test_size: 0.0
+  inference_size: 0.0
+  val_size: 0.0
+  sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
-  distributed_training: true
-  num_gpus: 2
+  distributed_training: false
+  num_gpus: 1
   strategy: ddp
 optimizer:
   optimizer_type: adamw
@@ -39,10 +40,10 @@ optimizer:
     - 0.999
   warmup:
     enabled: false
-    warmup_steps: 1000
+    warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: reduce_lr_on_plateau
+  scheduler_type: cosine_annealing_lr
   cosine_annealing_lr:
     T_max: 50
     eta_min: 0.0
@@ -50,21 +51,20 @@ optimizer:
     mode: max
     factor: 0.85
     patience: 3
-  gradient_clip_val: 10.0
+  gradient_clipping_enabled: false
+  gradient_clip_val: 5.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: esc50
-  data_path: ./datasets/ESC-50-master/classes
-  num_classes: 50
+  dataset_type: audiomnist
+  data_path: datasets/audiomnist_dataset
+  num_classes: 10
   target_sr: 16000
-  target_duration: 5
+  target_duration: 1
   file_extension: .wav
+  fold_based_split: true
 augmentations:
-  augmentations_per_sample: 3
-  augmentations:
-  - gaussian_noise
-  - time_mask
-  - polarity_inversion
+  augmentations_per_sample: 0
+  augmentations: []
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
   sin_distortion_p: 0.9
@@ -81,8 +81,8 @@ feature_extraction:
   sampling_rate: 16000
   n_mfcc: 40
   n_mels: 128
-  n_fft: 2048
-  hop_length: 200
+  n_fft: 1024
+  hop_length: 128
   power: 2
 none-classifier:
   task_type: AUDIO_CLASSIFICATION
@@ -162,7 +162,7 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ast-esc50-optimization
+  project: ast-eesc50-sweeps-baseline
   name: ast-baseline-conservative-b48-lr1e4
   reinit: true
   notes: null
@@ -177,19 +177,47 @@ wandb:
   - lr1e-4
   dir: wandb
 sweep:
-  project: ast-experiments
-  name: ast-none-full-3-augs
-  method: random
+  project: ast-esc50-sweeps-baseline
+  name: ast-esc50-batch-optimizer-adapter
+  method: bayes
   metric:
     name: test_acc
     goal: maximize
   parameters:
+    batch_size:
+      values:
+      - 8
     learning_rate:
       values:
-      - 0.1
+      - 1e-4
+      - 5e-4
+    weight_decay:
+      values:
+      - 0.0
       - 0.01
-      - 0.001
-    seed:
-      distribution: int_uniform
-      min: 0
-      max: 1000
+      - 0.1
+    betas:
+      values:
+      - - 0.9
+        - 0.999
+      - - 0.99
+        - 0.999
+      - - 0.85
+        - 0.89
+      - - 0.8
+        - 0.85
+    gradient_clipping_enabled:
+      values:
+      - true
+      - false
+    adapter_type:
+      values:
+      - none-classifier
+      - none-full
+      - ssf
+      - layernorm
+      - lora
+      - ia3
+      - adalora
+      - oft
+      - hra

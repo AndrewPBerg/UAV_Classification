@@ -16,7 +16,7 @@ services:
       - CHAT_ID=${CHAT_ID}
       - CUDA_VISIBLE_DEVICES=0,1  # Both GPUs for distributed training
       # NCCL configuration for distributed training
-      - NCCL_DEBUG=INFO           # Enable NCCL debugging
+      # - NCCL_DEBUG=INFO           # Enable NCCL debugging
       - NCCL_SHM_DISABLE=1        # Disable shared memory to avoid /dev/shm issues
       - NCCL_P2P_DISABLE=1        # Disable P2P if needed for stability
       - NCCL_IB_DISABLE=1         # Disable InfiniBand

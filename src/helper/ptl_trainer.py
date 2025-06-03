@@ -19,6 +19,98 @@ from .util import wandb_login
 import time
 
 
+class CustomProgressBar(TQDMProgressBar):
+    """Custom progress bar for training that shows formatted metrics."""
+    def get_metrics(self, trainer, model):
+        # Get metrics from parent class
+        items = super().get_metrics(trainer, model)
+        
+        # Format all metrics to 2 decimal places
+        for key in list(items.keys()):
+            if key in ['v_num', 'epoch', 'step']:
+                continue
+            if isinstance(items[key], (float, int, torch.Tensor)):
+                try:
+                    # Convert to float first to handle tensor values
+                    value = float(items[key])
+                    items[key] = f"{value:.2f}"
+                except (ValueError, TypeError):
+                    # If conversion fails, keep the original value
+                    pass
+        
+        # Reorder metrics to show in desired order
+        ordered_items = {}
+        
+        # First show epoch and step
+        if 'epoch' in items:
+            ordered_items['epoch'] = items['epoch']
+        if 'step' in items:
+            ordered_items['step'] = items['step']
+        
+        # Then show train metrics
+        for metric in ['train_loss', 'train_acc', 'train_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Then show validation metrics
+        for metric in ['val_loss', 'val_acc', 'val_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Add any remaining metrics
+        for key, val in items.items():
+            if key not in ordered_items:
+                ordered_items[key] = val
+        
+        return ordered_items
+
+
+class CustomFoldProgressBar(TQDMProgressBar):
+    """Custom progress bar for k-fold training that shows formatted metrics."""
+    def get_metrics(self, trainer, model):
+        # Get metrics from parent class
+        items = super().get_metrics(trainer, model)
+        
+        # Format all metrics to 2 decimal places
+        for key in list(items.keys()):
+            if key in ['v_num', 'epoch', 'step']:
+                continue
+            if isinstance(items[key], (float, int, torch.Tensor)):
+                try:
+                    # Convert to float first to handle tensor values
+                    value = float(items[key])
+                    items[key] = f"{value:.2f}"
+                except (ValueError, TypeError):
+                    # If conversion fails, keep the original value
+                    pass
+        
+        # Reorder metrics to show in desired order
+        ordered_items = {}
+        
+        # First show epoch and step
+        if 'epoch' in items:
+            ordered_items['epoch'] = items['epoch']
+        if 'step' in items:
+            ordered_items['step'] = items['step']
+        
+        # Then show train metrics
+        for metric in ['train_loss', 'train_acc', 'train_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Then show validation metrics
+        for metric in ['val_loss', 'val_acc']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Add any remaining metrics
+        for key, val in items.items():
+            if key not in ordered_items:
+                ordered_items[key] = val
+        
+        return ordered_items
+
+
 class PTLTrainer:
     """
     PyTorch Lightning trainer that handles training using a single GPU.
@@ -127,65 +219,51 @@ class PTLTrainer:
         """
         callbacks = []
         
-        # Create custom progress bar that shows both training and validation metrics
-        class CustomProgressBar(TQDMProgressBar):
-            def get_metrics(self, trainer, model):
-                # Get metrics from parent class
-                items = super().get_metrics(trainer, model)
-                
-                # Format all metrics to 2 decimal places
-                for key in list(items.keys()):
-                    if key in ['v_num', 'epoch', 'step']:
-                        continue
-                    if isinstance(items[key], (float, int, torch.Tensor)):
-                        try:
-                            # Convert to float first to handle tensor values
-                            value = float(items[key])
-                            items[key] = f"{value:.2f}"
-                        except (ValueError, TypeError):
-                            # If conversion fails, keep the original value
-                            pass
-                
-                # Reorder metrics to show in desired order
-                ordered_items = {}
-                
-                # First show epoch and step
-                if 'epoch' in items:
-                    ordered_items['epoch'] = items['epoch']
-                if 'step' in items:
-                    ordered_items['step'] = items['step']
-                
-                # Then show train metrics
-                for metric in ['train_loss', 'train_acc', 'train_f1']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show validation metrics
-                for metric in ['val_loss', 'val_acc', 'val_f1']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Add any remaining metrics
-                for key, val in items.items():
-                    if key not in ordered_items:
-                        ordered_items[key] = val
-                
-                return ordered_items
-        
         # Add custom progress bar
         callbacks.append(CustomProgressBar(refresh_rate=10))
         
         # Add learning rate monitor
         callbacks.append(LearningRateMonitor(logging_interval='epoch'))
         
+        # Determine if validation metrics will be available
+        # This should match the logic in lightning_module._init_metrics()
+        will_have_val_metrics = (
+            (self.general_config.val_size > 0) or 
+            (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold) or
+            # Also check if datamodule has validation data (for ESC datasets)
+            (hasattr(self.data_module, 'val_dataset') and self.data_module.val_dataset is not None)
+        )
+        
+        # Choose appropriate monitor metric and mode
+        if will_have_val_metrics and self.general_config.monitor.startswith('val_'):
+            monitor_metric = self.general_config.monitor
+            monitor_mode = self.general_config.mode
+        else:
+            # Fallback to training metrics if validation metrics aren't available
+            if self.general_config.monitor == 'val_acc':
+                monitor_metric = 'train_acc'
+                monitor_mode = 'max'
+            elif self.general_config.monitor == 'val_loss':
+                monitor_metric = 'train_loss'
+                monitor_mode = 'min'
+            elif self.general_config.monitor == 'val_f1':
+                monitor_metric = 'train_f1'
+                monitor_mode = 'max'
+            else:
+                # Use the configured monitor if it's already a training metric
+                monitor_metric = self.general_config.monitor
+                monitor_mode = self.general_config.mode
+        
+        print(f"Using monitor metric: {monitor_metric} (mode: {monitor_mode})")
+        
         # Add model checkpoint callback
         if self.general_config.checkpointing:
             checkpoint_callback = ModelCheckpoint(
-                monitor=self.general_config.monitor,
-                mode=self.general_config.mode,
+                monitor=monitor_metric,
+                mode=monitor_mode,
                 save_top_k=self.general_config.save_top_k,
                 save_last=True,
-                filename='{epoch}-{val_loss:.2f}',
+                filename='{epoch}-{' + monitor_metric.replace('_', '-') + ':.2f}',
                 auto_insert_metric_name=False
             )
             callbacks.append(checkpoint_callback)
@@ -193,8 +271,8 @@ class PTLTrainer:
         # Add early stopping callback
         if self.general_config.early_stopping:
             early_stop_callback = EarlyStopping(
-                monitor=self.general_config.monitor,
-                mode=self.general_config.mode,
+                monitor=monitor_metric,
+                mode=monitor_mode,
                 patience=self.general_config.patience,
                 verbose=True
             )
@@ -653,51 +731,6 @@ class PTLTrainer:
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             
             # Create custom progress bar for this fold
-            class CustomFoldProgressBar(TQDMProgressBar):
-                def get_metrics(self, trainer, model):
-                    # Get metrics from parent class
-                    items = super().get_metrics(trainer, model)
-                    
-                    # Format all metrics to 2 decimal places
-                    for key in list(items.keys()):
-                        if key in ['v_num', 'epoch', 'step']:
-                            continue
-                        if isinstance(items[key], (float, int, torch.Tensor)):
-                            try:
-                                # Convert to float first to handle tensor values
-                                value = float(items[key])
-                                items[key] = f"{value:.2f}"
-                            except (ValueError, TypeError):
-                                # If conversion fails, keep the original value
-                                pass
-                    
-                    # Reorder metrics to show in desired order
-                    ordered_items = {}
-                    
-                    # First show epoch and step
-                    if 'epoch' in items:
-                        ordered_items['epoch'] = items['epoch']
-                    if 'step' in items:
-                        ordered_items['step'] = items['step']
-                    
-                    # Then show train metrics
-                    for metric in ['train_loss', 'train_acc', 'train_f1']:
-                        if metric in items:
-                            ordered_items[metric] = items[metric]
-                    
-                    # Then show validation metrics
-                    for metric in ['val_loss', 'val_acc']:
-                        if metric in items:
-                            ordered_items[metric] = items[metric]
-                    
-                    # Add any remaining metrics
-                    for key, val in items.items():
-                        if key not in ordered_items:
-                            ordered_items[key] = val
-                    
-                    return ordered_items
-            
-            # Create callbacks for this fold
             fold_callbacks = [
                 ModelCheckpoint(
                     dirpath=str(checkpoint_dir),

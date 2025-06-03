@@ -36,25 +36,41 @@ class CNNModel:
     
     cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'custom_cnn']
     @staticmethod
-    def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create a ResNet model.
         
         Args:
             model_type: Model type (e.g., 'resnet18')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             ResNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        weights = None if from_scratch else 'DEFAULT'
+        
+        print(f"Creating ResNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "18" in model_type:
-            model = resnet18(weights=ResNet18_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet18(weights=None)
+            else:
+                model = resnet18(weights=ResNet18_Weights.DEFAULT)
         elif "50" in model_type:
-            model = resnet50(weights=ResNet50_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet50(weights=None)
+            else:
+                model = resnet50(weights=ResNet50_Weights.DEFAULT)
         elif "152" in model_type:
-            model = resnet152(weights=ResNet152_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet152(weights=None)
+            else:
+                model = resnet152(weights=ResNet152_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported ResNet model type: {model_type}")
         
@@ -73,7 +89,7 @@ class CNNModel:
         return model
     
     @staticmethod
-    def _create_custom_cnn_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_custom_cnn_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         class CustomCNN(nn.Module):
             def __init__(self, num_classes: int, hidden_units: int = 256):
                 """
@@ -187,29 +203,43 @@ class CNNModel:
                         print(f"✗ Input shape ({height}, {width}) failed: {str(e)}")
                         return False
                         
+        # Custom CNN is always from scratch since it's not pretrained
+        print("Creating custom CNN model (always from scratch)")
         model = CustomCNN(num_classes=num_classes)
         model = apply_peft(model, peft_config if peft_config is not None else NoneFullConfig())
         return model
 
         
     @staticmethod
-    def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create a MobileNet model.
         
         Args:
             model_type: Model type (e.g., 'mobilenet_v3_small')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             MobileNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        
+        print(f"Creating MobileNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "small" in model_type:
-            model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
+            if from_scratch:
+                model = mobilenet_v3_small(weights=None)
+            else:
+                model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
         elif "large" in model_type:
-            model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+            if from_scratch:
+                model = mobilenet_v3_large(weights=None)
+            else:
+                model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported MobileNet model type: {model_type}")
         
@@ -228,35 +258,65 @@ class CNNModel:
         return model
     
     @staticmethod
-    def _create_efficientnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_efficientnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create an EfficientNet model.
         
         Args:
             model_type: Model type (e.g., 'efficientnet_b0')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             EfficientNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        
+        print(f"Creating EfficientNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "b0" in model_type:
-            model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b0(weights=None)
+            else:
+                model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
         elif "b1" in model_type:
-            model = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b1(weights=None)
+            else:
+                model = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
         elif "b2" in model_type:
-            model = efficientnet_b2(weights=EfficientNet_B2_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b2(weights=None)
+            else:
+                model = efficientnet_b2(weights=EfficientNet_B2_Weights.DEFAULT)
         elif "b3" in model_type:
-            model = efficientnet_b3(weights=EfficientNet_B3_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b3(weights=None)
+            else:
+                model = efficientnet_b3(weights=EfficientNet_B3_Weights.DEFAULT)
         elif "b4" in model_type:
-            model = efficientnet_b4(weights=EfficientNet_B4_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b4(weights=None)
+            else:
+                model = efficientnet_b4(weights=EfficientNet_B4_Weights.DEFAULT)
         elif "b5" in model_type:
-            model = efficientnet_b5(weights=EfficientNet_B5_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b5(weights=None)
+            else:
+                model = efficientnet_b5(weights=EfficientNet_B5_Weights.DEFAULT)
         elif "b6" in model_type:
-            model = efficientnet_b6(weights=EfficientNet_B6_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b6(weights=None)
+            else:
+                model = efficientnet_b6(weights=EfficientNet_B6_Weights.DEFAULT)
         elif "b7" in model_type:
-            model = efficientnet_b7(weights=EfficientNet_B7_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b7(weights=None)
+            else:
+                model = efficientnet_b7(weights=EfficientNet_B7_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported EfficientNet model type: {model_type}")
         
@@ -274,6 +334,7 @@ class CNNModel:
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
 
+        model = apply_peft(model, peft_config)
         
         return model
 

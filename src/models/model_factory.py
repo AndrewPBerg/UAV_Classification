@@ -139,13 +139,13 @@ class ModelFactory:
             # Create CNN model
             cnn_model = CNNModel()
             if "resnet" in model_type:
-                model = cnn_model._create_resnet_model(model_type, num_classes, peft_config)
+                model = cnn_model._create_resnet_model(model_type, num_classes, peft_config, general_config)
             elif "mobilenet" in model_type:
-                model = cnn_model._create_mobilenet_model(model_type, num_classes, peft_config)
+                model = cnn_model._create_mobilenet_model(model_type, num_classes, peft_config, general_config)
             elif "efficientnet" in model_type:
-                model = cnn_model._create_efficientnet_model(model_type, num_classes, peft_config)
+                model = cnn_model._create_efficientnet_model(model_type, num_classes, peft_config, general_config)
             elif "custom_cnn" in model_type:
-                model = cnn_model._create_custom_cnn_model(model_type, num_classes, peft_config)
+                model = cnn_model._create_custom_cnn_model(model_type, num_classes, peft_config, general_config)
             else:
                 raise ValueError(f"Unsupported CNN model type: {model_type}, please use one of the following: {CNNModel.cnn_models}")
         
@@ -157,12 +157,12 @@ class ModelFactory:
             model = model.to(device)
 
             
-        summary(model,
-                col_names=["num_params","trainable"],
-                col_width=20,
-                row_settings=["var_names"])
+        # summary(model,
+        #         col_names=["num_params","trainable"],
+        #         col_width=20,
+        #         row_settings=["var_names"])
 
-        print(model)
+        # print(model)
         
         # Log model parameter metrics
         ModelFactory.log_model_parameters(model)

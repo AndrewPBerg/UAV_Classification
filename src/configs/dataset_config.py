@@ -11,7 +11,7 @@ class DatasetConfig(BaseModel):
         strict = True
 
     # Dataset type selection
-    dataset_type: Literal["uav", "esc50"] = Field(
+    dataset_type: Literal["uav", "esc50", "esc10", "urbansound8k", "audiomnist"] = Field(
         description="Type of dataset to use"
     )
     
@@ -46,7 +46,7 @@ class DatasetConfig(BaseModel):
     @field_validator('dataset_type')
     @classmethod
     def validate_dataset_type(cls, v):
-        valid_types = ["uav", "esc50"]
+        valid_types = ["uav", "esc50", "esc10", "urbansound8k", "audiomnist"]
         if v not in valid_types:
             raise ValueError(f'dataset_type must be one of {valid_types}')
         return v
@@ -74,6 +74,27 @@ class DatasetConfig(BaseModel):
                 "description": "ESC-50 Environmental Sound Classification Dataset", 
                 "default_duration": 5,
                 "default_sr": 44100  # ESC-50 original sampling rate
+            }
+        elif self.dataset_type == "esc10":
+            return {
+                "expected_classes": 10,
+                "description": "ESC-10 Environmental Sound Classification Dataset (subset of ESC-50)",
+                "default_duration": 5,
+                "default_sr": 44100  # ESC-10 original sampling rate (same as ESC-50)
+            }
+        elif self.dataset_type == "urbansound8k":
+            return {
+                "expected_classes": 10,
+                "description": "UrbanSound8K Urban Sound Classification Dataset",
+                "default_duration": 4,  # UrbanSound8K clips are up to 4 seconds
+                "default_sr": 22050  # UrbanSound8K original sampling rate
+            }
+        elif self.dataset_type == "audiomnist":
+            return {
+                "expected_classes": 10,
+                "description": "AudioMNIST Spoken Digit Classification Dataset",
+                "default_duration": 1,  # AudioMNIST clips are typically ~1 second
+                "default_sr": 48000  # AudioMNIST original sampling rate
             }
         else:
             raise ValueError(f"Unknown dataset type: {self.dataset_type}")
@@ -122,12 +143,54 @@ class ESC50Config(DatasetConfig):
     @classmethod
     def validate_use_esc10_subset(cls, v):
         if v:
-            raise ValueError("Note implemented, use_esc10_subset must be false for ESC50Config")
+            raise ValueError("Not implemented, use_esc10_subset must be false for ESC50Config")
         return v
     
     fold_based_split: bool = Field(
         default=True,
         description="Whether to use the predefined fold-based splits from ESC-50"
+    )
+
+class ESC10Config(DatasetConfig):
+    """Specific configuration for ESC-10 dataset."""
+    
+    dataset_type: Literal["esc10"] = "esc10"
+    target_sr: int = 16000  # Resample from 44.1kHz to 16kHz for consistency
+    target_duration: int = 5
+    file_extension: str = ".wav"
+    
+    @field_validator('target_duration')
+    @classmethod
+    def validate_target_duration(cls, v):
+        if v != 5:
+            raise ValueError("target_duration must be 5 for ESC10Config")
+        return v
+    
+    # ESC-10 specific parameters
+    fold_based_split: bool = Field(
+        default=True,
+        description="Whether to use the predefined fold-based splits from ESC-10 (inherited from ESC-50)"
+    )
+
+class UrbanSound8KConfig(DatasetConfig):
+    """Specific configuration for UrbanSound8K dataset."""
+    
+    dataset_type: Literal["urbansound8k"] = "urbansound8k"
+    target_sr: int = 16000  # Resample from 22.05kHz to 16kHz for consistency
+    target_duration: int = 4  # UrbanSound8K clips are up to 4 seconds
+    file_extension: str = ".wav"
+    
+    @field_validator('target_duration')
+    @classmethod
+    def validate_target_duration(cls, v):
+        if v != 4:
+            raise ValueError("target_duration must be 4 for UrbanSound8KConfig")
+        return v
+    
+    # UrbanSound8K specific parameters
+    fold_based_split: bool = Field(
+        default=True,
+        description="Whether to use the predefined fold-based splits from UrbanSound8K"
     )
 
 class UAVConfig(DatasetConfig):
@@ -137,6 +200,32 @@ class UAVConfig(DatasetConfig):
     target_sr: int = 16000
     target_duration: int = 5
     file_extension: str = ".wav"
+
+class AudioMNISTConfig(DatasetConfig):
+    """Specific configuration for AudioMNIST dataset."""
+    
+    dataset_type: Literal["audiomnist"] = "audiomnist"
+    target_sr: int = 16000  # Resample from 48kHz to 16kHz for consistency
+    target_duration: int = 1  # AudioMNIST clips are typically ~1 second
+    file_extension: str = ".wav"
+    
+    @field_validator('target_duration')
+    @classmethod
+    def validate_target_duration(cls, v):
+        if v != 1:
+            raise ValueError("target_duration must be 1 for AudioMNISTConfig")
+        return v
+    
+    # AudioMNIST specific parameters
+    use_speaker_splits: bool = Field(
+        default=False,
+        description="Whether to use speaker-independent splits (speaker-based) or random splits"
+    )
+    
+    test_speakers: Optional[List[str]] = Field(
+        default=None,
+        description="List of speakers to use for testing (only used with use_speaker_splits=True)"
+    )
 
 def create_dataset_config(config_dict: Dict[str, Any]) -> DatasetConfig:
     """
@@ -152,6 +241,12 @@ def create_dataset_config(config_dict: Dict[str, Any]) -> DatasetConfig:
     
     if dataset_type == "esc50":
         return ESC50Config(**config_dict)
+    elif dataset_type == "esc10":
+        return ESC10Config(**config_dict)
+    elif dataset_type == "urbansound8k":
+        return UrbanSound8KConfig(**config_dict)
+    elif dataset_type == "audiomnist":
+        return AudioMNISTConfig(**config_dict)
     elif dataset_type == "uav":
         return UAVConfig(**config_dict)
     else:

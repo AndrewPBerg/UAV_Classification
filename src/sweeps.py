@@ -8,11 +8,9 @@ from icecream import ic
 
 # Import the PyTorch Lightning implementation
 from helper.ptl_trainer import PTLTrainer
-from helper.UAV_datamodule import UAVDataModule
+from esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
 from models.model_factory import ModelFactory
-from configs import (
-    load_configs,
-)
+from configs.configs_aggregate import load_configs
 
 from helper.util import wandb_login
 
@@ -41,89 +39,127 @@ def model_pipeline(sweep_config=None):
     Args:
         sweep_config: Configuration provided by wandb sweep
     """
-    # Initialize wandb run
-    with wandb.init(config=sweep_config):
-        # Get the sweep configuration
-        config = wandb.config
-        
-        # Load general config
-        yaml_config = load_config(config_path="configs/config.yaml")
-
-        # Combine sweep config with general config
-        mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
-        
-        # mixed_params_table = wandb.Table(data=[mixed_params])
-        # broken code for adding the mixed params to a wandb table
-        # columns = [f"col_{i}" for i in range(54)]
-        # mixed_params_table = wandb.Table(data=[mixed_params], columns=columns)
-        
-        # # Update wandb config with the mixed parameters
-        # wandb.log({"mixed_params_table": mixed_params_table})
-
-        # load into pydantic models w/ load_configs()
-        (
-        general_config,
-        feature_extraction_config,
-        peft_config,
-        wandb_config,
-        sweep_config,
-        augmentation_config
-         ) = load_configs(mixed_params)
-        
-        # Log the augmentation config to the W&B run
-        if augmentation_config:
-             wandb.config.update({"augmentations": augmentation_config.dict()}, allow_val_change=True)
-
-        # Create data module
-        data_module = UAVDataModule(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            augmentation_config=augmentation_config,
-            wandb_config=wandb_config,
-            sweep_config=sweep_config
-        )
-        
-        # Get model factory function
-        model_factory = ModelFactory.get_model_factory(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            peft_config=peft_config
-        )
-        
-        # Create PTL trainer
-        trainer = PTLTrainer(
-            general_config=general_config,
-            feature_extraction_config=feature_extraction_config,
-            peft_config=peft_config,
-            wandb_config=wandb_config,
-            sweep_config=None,  # We're not using a separate sweep config object here
-            data_module=data_module,
-            model_factory=model_factory
-        )
-        
-        # Train model
-        if general_config.use_kfold:
-            results = trainer.k_fold_cross_validation()
-            # Log results summary
-            wandb.log(results["avg_metrics"])
+    # Enable WandB service for better distributed training reliability
+    wandb.require("service")
+    
+    # Ensure any existing wandb run is finished before starting
+    try:
+        if wandb.run is not None:
+            print(f"Warning: Finishing existing wandb run: {wandb.run.name}")
+            wandb.finish()
+    except Exception as e:
+        print(f"Warning: Error finishing existing wandb run: {e}")
+        # Force finish any lingering runs
+        try:
+            wandb.finish()
+        except:
+            pass
+    
+    # Initialize wandb run with error handling
+    try:
+        with wandb.init(config=sweep_config):
+            # Get the sweep configuration
+            config = wandb.config
             
-            # Log inference metrics if available
-            inference_metrics = {k: v for k, v in results["avg_metrics"].items() if k.startswith("average_inference_") or k.startswith("std_inference_")}
-            if inference_metrics:
-                print("\nLogging inference metrics to sweep:")
-                for key, value in inference_metrics.items():
-                    print(f"  {key}: {value:.4f}")
-        else:
-            results = trainer.train()
-            # Log final test metrics
-            wandb.log(results)
+            # Load general config
+            yaml_config = load_config(config_path="configs/config.yaml")
+
+            # Combine sweep config with general config
+            mixed_params = get_mixed_params(general_config=yaml_config, sweep_config=config)
             
-            # Log inference metrics if available
-            inference_metrics = {k: v for k, v in results.items() if k.startswith("inference_")}
-            if inference_metrics:
-                print("\nLogging inference metrics to sweep:")
-                for key, value in inference_metrics.items():
-                    print(f"  {key}: {value:.4f}")
+            # Load into pydantic models w/ load_configs()
+            (
+                general_config,
+                feature_extraction_config,
+                dataset_config,
+                peft_config,
+                wandb_config,
+                sweep_config_obj,
+                augmentation_config,
+                optimizer_config
+            ) = load_configs(mixed_params)
+            
+            # Log the augmentation config to the W&B run with error handling
+            try:
+                if augmentation_config:
+                    # Convert to dict and filter out non-serializable objects
+                    aug_dict = augmentation_config.model_dump()
+                    # Remove any complex nested objects that might cause issues
+                    if 'aug_configs' in aug_dict:
+                        del aug_dict['aug_configs']
+                    wandb.config.update({"augmentations": aug_dict}, allow_val_change=True)
+            except Exception as e:
+                print(f"Warning: Could not log augmentation config to WandB: {e}")
+
+            # Create ESC50 data module
+            data_module = create_esc50_datamodule(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                esc50_config=dataset_config,  # dataset_config contains ESC50Config
+                augmentation_config=augmentation_config,
+                use_filename_based_splits=True
+            )
+            
+            # Get model factory function
+            model_factory = ModelFactory.get_model_factory(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                dataset_config=dataset_config,
+                peft_config=peft_config
+            )
+            
+            # Create PTL trainer
+            trainer = PTLTrainer(
+                general_config=general_config,
+                feature_extraction_config=feature_extraction_config,
+                dataset_config=dataset_config,
+                peft_config=peft_config,
+                wandb_config=wandb_config,
+                sweep_config=sweep_config_obj,
+                data_module=data_module,
+                model_factory=model_factory,
+                augmentation_config=augmentation_config,
+                optimizer_config=optimizer_config
+            )
+            
+            # Train model
+            if general_config.use_kfold:
+                results = trainer.k_fold_cross_validation()
+                # Log results summary
+                wandb.log(results["avg_metrics"])
+                
+                # Log inference metrics if available
+                inference_metrics = {k: v for k, v in results["avg_metrics"].items() if k.startswith("average_inference_") or k.startswith("std_inference_")}
+                if inference_metrics:
+                    print("\nLogging inference metrics to sweep:")
+                    for key, value in inference_metrics.items():
+                        print(f"  {key}: {value:.4f}")
+            else:
+                results = trainer.train()
+                # Log final test metrics
+                wandb.log(results)
+                
+                # Log inference metrics if available
+                inference_metrics = {k: v for k, v in results.items() if k.startswith("inference_")}
+                if inference_metrics:
+                    print("\nLogging inference metrics to sweep:")
+                    for key, value in inference_metrics.items():
+                        print(f"  {key}: {value:.4f}")
+            
+            # Ensure proper cleanup for distributed training
+            wandb.finish()
+                        
+    except Exception as e:
+        print(f"Error in model_pipeline: {e}")
+        import traceback
+        traceback.print_exc()
+        # Ensure cleanup even on error
+        try:
+            wandb.finish()
+        except:
+            pass
+        # Re-raise the exception so WandB can handle it properly
+        raise e
 
 def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -134,41 +170,75 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
         sweep_config: Sweep configuration dictionary
         
     Returns:
-        Mixed parameters dictionary
+        Mixed parameters dictionary with proper nested structure
     """
-
-    mixed_params = {}
+    # Start with a copy of the general config to maintain structure
+    mixed_params = general_config.copy()
     
-    # general
-    mixed_params.update(general_config['general'])
-    # augmentations
-    mixed_params.update(general_config['augmentations'])
-    # feature extraction
-    mixed_params.update(general_config['feature_extraction'])
-    # wandb
-    mixed_params.update(general_config['wandb'])
-    # sweep
-    mixed_params.update(general_config['sweep'])
-
-    # sweep project and name (this isn't needed, but for my peace of mind)
-    mixed_params['project'] = general_config['sweep']['project']
-    mixed_params['name'] = general_config['sweep']['name']
+    # Modify distributed training settings for sweep compatibility
+    if mixed_params['general']['distributed_training']:
+        # Use ddp_spawn strategy which is more compatible with sweeps
+        mixed_params['general']['strategy'] = 'ddp_spawn'
+        print("Modified distributed training strategy to ddp_spawn for sweep compatibility")
     
+    # Get the adapter type from sweep config or fall back to general config
     try: 
         peft_name = str(sweep_config['adapter_type'])
     except KeyError as e:
         ic("the adapter type is not included in the sweep config, defaulting to general config's: ", e)
         peft_name = str(general_config['general']['adapter_type']) 
    
-    # finally update the mixed_params with the correct peft config(sweep agnostic)
-    mixed_params.update(general_config[peft_name])
+    # Handle optimizer parameters specially since they were flattened in the sweep config
+    optimizer_params = {}
     
-    # Update with sweep config values
-    mixed_params.update(sweep_config)
+    # Update general section with sweep config values
+    for key, value in sweep_config.items():
+        # Handle flattened optimizer parameters
+        if key in ['optimizer_type', 'learning_rate', 'weight_decay', 'gradient_clipping_enabled']:
+            if key == 'optimizer_type':
+                optimizer_params['optimizer_type'] = value
+            elif key == 'learning_rate':
+                # Map learning_rate to the appropriate optimizer section
+                optimizer_type = sweep_config.get('optimizer_type', mixed_params['optimizer']['optimizer_type'])
+                if optimizer_type == 'adamw':
+                    if 'adamw' not in optimizer_params:
+                        optimizer_params['adamw'] = mixed_params['optimizer']['adamw'].copy()
+                    optimizer_params['adamw']['lr'] = value
+                elif optimizer_type == 'adam':
+                    if 'adam' not in optimizer_params:
+                        optimizer_params['adam'] = mixed_params['optimizer']['adam'].copy()
+                    optimizer_params['adam']['lr'] = value
+            elif key == 'weight_decay':
+                # Map weight_decay to the appropriate optimizer section
+                optimizer_type = sweep_config.get('optimizer_type', mixed_params['optimizer']['optimizer_type'])
+                if optimizer_type == 'adamw':
+                    if 'adamw' not in optimizer_params:
+                        optimizer_params['adamw'] = mixed_params['optimizer']['adamw'].copy()
+                    optimizer_params['adamw']['weight_decay'] = value
+                # Note: Adam doesn't typically use weight_decay in the same way
+            elif key == 'gradient_clipping_enabled':
+                optimizer_params['gradient_clipping_enabled'] = value
+        elif key in mixed_params['general']:
+            mixed_params['general'][key] = value
+        elif key in mixed_params.get('dataset', {}):
+            mixed_params['dataset'][key] = value
+        elif key in mixed_params.get('feature_extraction', {}):
+            mixed_params['feature_extraction'][key] = value
+        elif key in mixed_params.get('augmentations', {}):
+            mixed_params['augmentations'][key] = value
+        elif key in mixed_params.get(peft_name, {}):
+            mixed_params[peft_name][key] = value
+        else:
+            # If key doesn't exist in any section, add it to general
+            mixed_params['general'][key] = value
+    
+    # Update optimizer config with the processed parameters
+    if optimizer_params:
+        mixed_params['optimizer'].update(optimizer_params)
     
     # Ensure inference_size is properly set if not in sweep_config
     if 'inference_size' not in sweep_config and 'inference_size' in general_config['general']:
-        mixed_params['inference_size'] = general_config['general']['inference_size']
+        mixed_params['general']['inference_size'] = general_config['general']['inference_size']
     
     return mixed_params
 
@@ -176,6 +246,9 @@ def main():
     """
     Main function to initialize and run the sweep.
     """
+    # Setup WandB for spawned processes (required for ddp_spawn)
+    wandb.setup()
+    
     # Load configuration
     config = load_config(config_path="configs/config.yaml")
     

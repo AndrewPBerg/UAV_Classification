@@ -81,22 +81,34 @@ class AudioClassifier(pl.LightningModule):
         self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        if self.general_config.val_size > 0:
+        # Initialize validation metrics if we have val_size > 0 OR if we're using k-fold (which always provides separate val dataloaders)
+        # OR if this is an ESC dataset that uses fold-based splits (they always provide validation data)
+        should_init_val_metrics = (
+            (self.general_config.val_size > 0) or 
+            (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold) or
+            # Check for ESC datasets that use fold-based splits
+            (hasattr(self.general_config, 'fold_based_split') and getattr(self.general_config, 'fold_based_split', False))
+        )
+        
+        if should_init_val_metrics:
             self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
             self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Test metrics
-        if self.general_config.test_size > 0:
+        # Test metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_test_metrics:
             self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
             self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Prediction metrics - these will be re-initialized in on_predict_start
-        # but we initialize them here as well for completeness
-        if self.general_config.inference_size > 0:
+        # Prediction metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_predict_metrics:
             self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
@@ -237,8 +249,10 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.inference_size > 0:
+        # Update metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_log_predict_metrics:
             self.predict_accuracy(y_pred_class, y)
             self.predict_precision(y_pred_class, y)
             self.predict_recall(y_pred_class, y)
@@ -336,19 +350,28 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.val_size > 0:
-            self.val_accuracy(y_pred_class, y)
-            self.val_precision(y_pred_class, y)
-            self.val_recall(y_pred_class, y)
-            self.val_f1(y_pred_class, y)
+        # Initialize validation metrics on the fly if they don't exist
+        # This handles cases where validation data exists but wasn't detected during _init_metrics
+        if not hasattr(self, 'val_accuracy'):
+            device = self.device
+            self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+            print("Initialized validation metrics on the fly - validation data detected")
         
-            # Log metrics - ensure they appear in progress bar and are formatted consistently
-            self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        # Update validation metrics (always log if validation_step is called)
+        self.val_accuracy(y_pred_class, y)
+        self.val_precision(y_pred_class, y)
+        self.val_recall(y_pred_class, y)
+        self.val_f1(y_pred_class, y)
+    
+        # Log metrics - ensure they appear in progress bar and are formatted consistently
+        self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_f1', self.val_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_precision', self.val_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        self.log('val_recall', self.val_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
     
@@ -374,8 +397,10 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.test_size > 0:
+        # Update metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_log_test_metrics:
             self.test_accuracy(y_pred_class, y)
             self.test_precision(y_pred_class, y)
             self.test_recall(y_pred_class, y)
@@ -433,6 +458,7 @@ class AudioClassifier(pl.LightningModule):
         final_scheduler = None
         
         if self.optimizer_config.warmup.enabled:
+            print(f"LR warmup enabled: {self.optimizer_config.warmup.warmup_steps} steps, method: {self.optimizer_config.warmup.warmup_method}")
             warmup_scheduler = self._create_warmup_scheduler(optimizer, target_lr)
             
             # Check if we have a base scheduler that's compatible with SequentialLR
@@ -529,7 +555,9 @@ class AudioClassifier(pl.LightningModule):
         loss = optimizer_closure()
         
         # Apply gradient clipping if configured
-        if self.optimizer_config.gradient_clip_val is not None and self.optimizer_config.gradient_clip_val > 0:
+        if (self.optimizer_config.gradient_clipping_enabled and 
+            self.optimizer_config.gradient_clip_val is not None and 
+            self.optimizer_config.gradient_clip_val > 0):
             clip_val = self.optimizer_config.gradient_clip_val
             if self.optimizer_config.gradient_clip_algorithm == "value":
                 # Clip gradients by value
@@ -573,7 +601,7 @@ class AudioClassifier(pl.LightningModule):
                     # Initialize ReduceLROnPlateau after warmup
                     opt = self.optimizers()
                     self.post_warmup_scheduler = ReduceLROnPlateau(opt, **self.base_scheduler_config["params"])
-                    print(f"Warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
+                    print(f"LR warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
                 
                 # Use ReduceLROnPlateau if warmup is done
                 if self.post_warmup_scheduler is not None:

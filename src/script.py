@@ -123,7 +123,7 @@ def main():
             col_width=20,
             row_settings=["var_names"])
 
-    print(model)
+    # print(model)
     # sys.exit(1)
     # Create PyTorch Lightning trainer
     trainer = PTLTrainer(

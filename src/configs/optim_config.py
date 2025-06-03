@@ -76,6 +76,7 @@ class OptimizerConfig(BaseModel):
     cosine_annealing_lr: CosineAnnealingLRConfig = Field(default_factory=CosineAnnealingLRConfig)
     
     # Gradient clipping
+    gradient_clipping_enabled: bool = True
     gradient_clip_val: Optional[float] = None
     gradient_clip_algorithm: Literal["value", "norm"] = "value"
 

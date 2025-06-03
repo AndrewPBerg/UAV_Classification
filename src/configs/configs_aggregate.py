@@ -1,5 +1,5 @@
 from typing import Optional, Literal, Dict, Any, List
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 import yaml
 from icecream import ic
 import sys
@@ -72,6 +72,7 @@ class GeneralConfig(BaseModel):
     pinned_memory: bool = True
     epochs: int = 10
     save_model: bool = False
+    from_scratch: bool = False  # Whether to train models from scratch (no pretrained weights)
 
     # Data splitting configuration (kept here for backward compatibility)
     test_size: float = 0.2
@@ -92,6 +93,16 @@ class GeneralConfig(BaseModel):
 
     # Adapter configuration
     adapter_type: str = "none-classifier"
+    
+    @model_validator(mode='after')
+    def validate_from_scratch_with_adapter_type(self):
+        """Validate adapter_type and warn if incompatible with from_scratch training"""
+        if self.from_scratch and self.adapter_type != "none-full":
+            print(f"WARNING: Training from scratch (from_scratch=True) with adapter_type='{self.adapter_type}' is not recommended.")
+            print("Parameter-efficient fine-tuning methods are designed for pretrained models.")
+            print("Consider using adapter_type='none-full' for training from scratch.")
+        
+        return self
     
     # Training monitoring settings
     early_stopping: bool = True
@@ -238,13 +249,59 @@ def wandb_config_dict(general_config, feature_extraction_config, dataset_config,
     
     """
     res = {}
-    res['wandb_config'] = dict(wandb_config)
-    res['general_config'] = dict(general_config)
-    res['dataset_config'] = dict(dataset_config)
-    res['peft_config'] = dict(peft_config.to_dict())
-    res['feature_extraction_config'] = dict(feature_extraction_config)
-    res['augmentation_config'] = dict(augmentation_config)
-    res['optimizer_config'] = dict(optimizer_config)
+    
+    try:
+        res['wandb_config'] = wandb_config.model_dump() if hasattr(wandb_config, 'model_dump') else dict(wandb_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize wandb_config: {e}")
+        res['wandb_config'] = {}
+    
+    try:
+        res['general_config'] = general_config.model_dump() if hasattr(general_config, 'model_dump') else dict(general_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize general_config: {e}")
+        res['general_config'] = {}
+    
+    try:
+        res['dataset_config'] = dataset_config.model_dump() if hasattr(dataset_config, 'model_dump') else dict(dataset_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize dataset_config: {e}")
+        res['dataset_config'] = {}
+    
+    try:
+        if hasattr(peft_config, 'to_dict'):
+            res['peft_config'] = peft_config.to_dict()
+        elif hasattr(peft_config, 'model_dump'):
+            res['peft_config'] = peft_config.model_dump()
+        elif hasattr(peft_config, '__dict__'):
+            res['peft_config'] = dict(peft_config.__dict__)
+        else:
+            res['peft_config'] = str(peft_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize peft_config: {e}")
+        res['peft_config'] = {}
+    
+    try:
+        res['feature_extraction_config'] = feature_extraction_config.model_dump() if hasattr(feature_extraction_config, 'model_dump') else dict(feature_extraction_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize feature_extraction_config: {e}")
+        res['feature_extraction_config'] = {}
+    
+    try:
+        aug_dict = augmentation_config.model_dump() if hasattr(augmentation_config, 'model_dump') else dict(augmentation_config)
+        # Remove complex nested objects that might cause WandB serialization issues
+        if 'aug_configs' in aug_dict:
+            del aug_dict['aug_configs']
+        res['augmentation_config'] = aug_dict
+    except Exception as e:
+        print(f"Warning: Could not serialize augmentation_config: {e}")
+        res['augmentation_config'] = {}
+    
+    try:
+        res['optimizer_config'] = optimizer_config.model_dump() if hasattr(optimizer_config, 'model_dump') else dict(optimizer_config)
+    except Exception as e:
+        print(f"Warning: Could not serialize optimizer_config: {e}")
+        res['optimizer_config'] = {}
     
     return res
 

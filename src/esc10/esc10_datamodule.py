@@ -9,7 +9,6 @@ from torch.utils.data import Dataset, DataLoader
 from time import time as timer
 from icecream import ic
 import json
-# import pandas as pd
 
 # Import from the main codebase
 sys.path.append(str(Path(__file__).parent.parent))
@@ -21,19 +20,19 @@ from transformers import ASTFeatureExtractor, SeamlessM4TFeatureExtractor, Whisp
 # Import Pydantic configs
 from configs import AugConfig as AugmentationConfig
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
-from configs.dataset_config import ESC50Config
+from configs.dataset_config import ESC10Config
 
-# Import ESC-50 specific dataset and functions
-from esc50.esc50_dataset import ESC50Dataset, create_esc50_fold_splits, create_esc50_kfold_splits, create_esc50_fold_splits_filename_based, create_esc50_kfold_splits_filename_based
+# Import ESC-10 specific dataset and functions
+from esc10.esc10_dataset import ESC10Dataset, create_esc10_fold_splits, create_esc10_kfold_splits
 
 
-class ESC50DataModule(pl.LightningDataModule):
+class ESC10DataModule(pl.LightningDataModule):
     """
-    PyTorch Lightning DataModule for ESC-50 audio data.
+    PyTorch Lightning DataModule for ESC-10 audio data.
     
-    Handles ESC-50 specific features:
-    - Fold-based cross-validation using predefined ESC-50 folds
-    - ESC-10 subset filtering
+    Handles ESC-10 specific features:
+    - Fold-based cross-validation using predefined ESC-10 folds (inherited from ESC-50)
+    - 10 classes from the ESC-50 subset
     - Metadata integration
     - No test/inference splits (uses k-fold cross-validation)
     """
@@ -42,7 +41,7 @@ class ESC50DataModule(pl.LightningDataModule):
         self,
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
-        esc50_config: ESC50Config,
+        esc10_config: ESC10Config,
         augmentation_config: Optional[AugmentationConfig] = None,
         feature_extractor: Optional[Any] = None,
         num_channels: int = 1,
@@ -51,12 +50,12 @@ class ESC50DataModule(pl.LightningDataModule):
         use_filename_based_splits: bool = True
     ):
         """
-        Initialize the ESC50DataModule using Pydantic config models.
+        Initialize the ESC10DataModule using Pydantic config models.
         
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
-            esc50_config: ESC-50 specific configuration
+            esc10_config: ESC-10 specific configuration
             augmentation_config: Augmentation configuration
             feature_extractor: Optional pre-created feature extractor
             num_channels: Number of audio channels
@@ -69,7 +68,7 @@ class ESC50DataModule(pl.LightningDataModule):
         # Store configs
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
-        self.esc50_config = esc50_config
+        self.esc10_config = esc10_config
         self.augmentation_config = augmentation_config or AugmentationConfig(
             augmentations_per_sample=0, 
             augmentations=[],
@@ -80,7 +79,7 @@ class ESC50DataModule(pl.LightningDataModule):
         self.use_filename_based_splits = use_filename_based_splits
         
         # Unpack general config
-        self.data_path = esc50_config.data_path
+        self.data_path = esc10_config.data_path
         self.batch_size = general_config.batch_size
         self.num_workers = general_config.num_cuda_workers
         self.seed = general_config.seed
@@ -90,22 +89,18 @@ class ESC50DataModule(pl.LightningDataModule):
         self.use_sweep = general_config.use_sweep
         self.sweep_count = general_config.sweep_count
         
-        # ESC-50 specific parameters
-        self.use_esc10_subset = esc50_config.use_esc10_subset
-        self.fold_based_split = esc50_config.fold_based_split
+        # ESC-10 specific parameters
+        self.fold_based_split = esc10_config.fold_based_split
         
         # Unpack feature extraction config
         self.target_sr = feature_extraction_config.sampling_rate
-        self.target_duration = esc50_config.target_duration
+        self.target_duration = esc10_config.target_duration
         self.num_channels = num_channels
         
-        # Get number of classes
-        self.num_classes = esc50_config.get_num_classes()
-        viable_classes = [50,10]
-        if self.num_classes not in viable_classes:
-            raise ValueError(f"Number of classes must be one of {viable_classes}")
-        if self.use_esc10_subset:
-            self.num_classes = 10  # ESC-10 subset has 10 classes
+        # Get number of classes (ESC-10 always has 10 classes)
+        self.num_classes = esc10_config.get_num_classes()
+        if self.num_classes != 10:
+            ic(f"Warning: ESC-10 should have 10 classes, but found {self.num_classes}")
         
         # Create feature extractor if not provided
         if feature_extractor is None:
@@ -140,22 +135,22 @@ class ESC50DataModule(pl.LightningDataModule):
         self._validate_config()
         
     def _validate_config(self):
-        """Validate ESC-50 specific configuration."""
-        # ESC-50 should always use fold-based splits
+        """Validate ESC-10 specific configuration."""
+        # ESC-10 should always use fold-based splits
         if not self.fold_based_split:
-            raise ValueError("ESC-50 dataset should use fold_based_split=True")
+            raise ValueError("ESC-10 dataset should use fold_based_split=True")
         
-        # ESC-50 has exactly 5 folds
+        # ESC-10 has exactly 5 folds (inherited from ESC-50)
         if self.k_folds != 5:
-            ic(f"Warning: ESC-50 has 5 predefined folds, but k_folds is set to {self.k_folds}. Using 5 folds.")
+            ic(f"Warning: ESC-10 has 5 predefined folds, but k_folds is set to {self.k_folds}. Using 5 folds.")
             self.k_folds = 5
         
-        # ESC-50 doesn't use test/inference splits in k-fold mode
+        # ESC-10 doesn't use test/inference splits in k-fold mode
         if self.use_kfold:
             if hasattr(self.general_config, 'test_size') and self.general_config.test_size > 0:
-                ic("Warning: ESC-50 k-fold cross-validation doesn't use separate test sets. test_size will be ignored.")
+                ic("Warning: ESC-10 k-fold cross-validation doesn't use separate test sets. test_size will be ignored.")
             if hasattr(self.general_config, 'inference_size') and self.general_config.inference_size > 0:
-                ic("Warning: ESC-50 k-fold cross-validation doesn't use separate inference sets. inference_size will be ignored.")
+                ic("Warning: ESC-10 k-fold cross-validation doesn't use separate inference sets. inference_size will be ignored.")
         
     def prepare_data(self):
         """
@@ -164,15 +159,15 @@ class ESC50DataModule(pl.LightningDataModule):
         """
         # Check if data path exists
         if not os.path.exists(self.data_path):
-            raise FileNotFoundError(f"ESC-50 data path {self.data_path} does not exist")
+            raise FileNotFoundError(f"ESC-10 data path {self.data_path} does not exist")
             
         # Check if there are audio files
         all_paths = list(Path(self.data_path).glob("*/*.wav"))
         if len(all_paths) == 0:
             raise ValueError(f"No .wav files found in {self.data_path}")
         
-        # Check if metadata exists only if not using filename-based splits or if ESC-10 subset is requested
-        need_metadata = not self.use_filename_based_splits or self.use_esc10_subset
+        # Check if metadata exists (optional for ESC-10)
+        need_metadata = not self.use_filename_based_splits
         
         if need_metadata:
             data_path_obj = Path(self.data_path)
@@ -180,23 +175,20 @@ class ESC50DataModule(pl.LightningDataModule):
             
             meta_file_found = False
             for root in possible_roots:
-                meta_file = root / "meta" / "esc50.csv"
+                meta_file = root / "meta" / "esc10.csv"
                 if meta_file.exists():
                     meta_file_found = True
                     break
             
             if not meta_file_found:
-                raise FileNotFoundError(
-                    f"ESC-50 metadata file (esc50.csv) not found in any of the expected locations: "
-                    f"{[str(root / 'meta' / 'esc50.csv') for root in possible_roots]}. "
-                    f"Metadata is required when use_filename_based_splits=False or when using ESC-10 subset."
-                )
+                ic(f"ESC-10 metadata file (esc10.csv) not found, falling back to filename-based splits")
+                self.use_filename_based_splits = True
         else:
             ic("Using filename-based splits - metadata CSV not required")
         
     def setup(self, stage: Optional[str] = None):
         """
-        Setup datasets for training and validation using ESC-50 fold-based splits.
+        Setup datasets for training and validation using ESC-10 fold-based splits.
         
         Args:
             stage: Current stage ('fit', 'validate', 'test', or 'predict')
@@ -213,13 +205,13 @@ class ESC50DataModule(pl.LightningDataModule):
         end_time = timer()
         dataset_init_time = end_time - start_time
         
-        ic(f"ESC-50 datasets created in {dataset_init_time:.2f} seconds")
+        ic(f"ESC-10 datasets created in {dataset_init_time:.2f} seconds")
     
     def _setup_kfold(self):
         """
-        Setup datasets for k-fold cross validation using ESC-50 predefined folds.
+        Setup datasets for k-fold cross validation using ESC-10 predefined folds.
         """
-        ic("Setting up ESC-50 k-fold cross-validation")
+        ic("Setting up ESC-10 k-fold cross-validation")
         
         # Get all audio file paths
         data_path = self.data_path
@@ -237,7 +229,7 @@ class ESC50DataModule(pl.LightningDataModule):
         for path in all_paths:
             filename = path.name
             
-            # ESC-50 files have fold number as first character (1-5)
+            # ESC-10 files have fold number as first character (1-5) inherited from ESC-50
             try:
                 fold_num = int(filename[0])
                 if fold_num < 1 or fold_num > 5:
@@ -257,7 +249,7 @@ class ESC50DataModule(pl.LightningDataModule):
             elif fold_num == 5:
                 fold_5.append(path)
                 
-        print(f"Total files in fold_1: {len(fold_1)}")  # should be an even 400 per
+        print(f"Total files in fold_1: {len(fold_1)}")
         print(f"Total files in fold_2: {len(fold_2)}")
         print(f"Total files in fold_3: {len(fold_3)}")
         print(f"Total files in fold_4: {len(fold_4)}")
@@ -278,29 +270,25 @@ class ESC50DataModule(pl.LightningDataModule):
             for fold in fold_copy:
                 train_paths.extend(fold)
 
-            # simple validation specific to esc50
-            if len(val_paths) == 400:
-                pass
-            else:
-                ic(f"Val paths for fold {i} are len {len(val_paths)}")
-                raise ValueError(f"Val paths for fold {i} are not 400")
+            # simple validation specific to esc10
+            # Each fold in ESC-10 should have roughly the same number of files
+            # (ESC-10 has 400 files total, so ~80 per fold)
+            expected_val_size = len(all_paths) // 5
+            if abs(len(val_paths) - expected_val_size) > expected_val_size * 0.2:  # Allow 20% variation
+                ic(f"Warning: Val paths for fold {i} are len {len(val_paths)}, expected ~{expected_val_size}")
 
-            if len(train_paths) == 1600:
-                pass
-            else:
-                ic(f"Train paths for fold {i} are len {len(train_paths)}")
-                raise ValueError(f"Train paths for fold {i} are not 1600")
+            expected_train_size = len(all_paths) - len(val_paths)
+            if abs(len(train_paths) - expected_train_size) > expected_train_size * 0.1:  # Allow 10% variation
+                ic(f"Warning: Train paths for fold {i} are len {len(train_paths)}, expected ~{expected_train_size}")
             
             self.fold_splits.append({"train_paths": train_paths, "val_paths": val_paths})
-
-        # ic(f"Fold splits list created: {self.fold_splits}")
         
     def _setup_single_fold(self):
         """
-        Setup datasets for single fold training using ESC-50 predefined folds.
+        Setup datasets for single fold training using ESC-10 predefined folds.
         Uses fold 1 as validation set and folds 2-5 as training set.
         """
-        ic("Setting up ESC-50 single fold training")
+        ic("Setting up ESC-10 single fold training")
         
         # Reuse the fold splitting logic from _setup_kfold
         data_path = self.data_path
@@ -318,7 +306,7 @@ class ESC50DataModule(pl.LightningDataModule):
         for path in all_paths:
             filename = path.name
             
-            # ESC-50 files have fold number as first character (1-5)
+            # ESC-10 files have fold number as first character (1-5) inherited from ESC-50
             try:
                 fold_num = int(filename[0])
                 if fold_num < 1 or fold_num > 5:
@@ -342,27 +330,26 @@ class ESC50DataModule(pl.LightningDataModule):
         val_paths = fold_1
         train_paths = fold_2 + fold_3 + fold_4 + fold_5
         
-        
         # Create datasets
-        self.train_dataset = ESC50Dataset(
+        self.train_dataset = ESC10Dataset(
             data_path=self.data_path,
             data_paths=train_paths,
             feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            target_sr=self.esc50_config.target_sr,
-            target_duration=self.esc50_config.target_duration,
+            config=self.esc10_config,
+            target_sr=self.esc10_config.target_sr,
+            target_duration=self.esc10_config.target_duration,
             augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
             augmentations=self.augmentation_config.augmentations,
             aug_config=self.augmentation_config,
         )
 
-        self.val_dataset = ESC50Dataset(
+        self.val_dataset = ESC10Dataset(
             data_path=self.data_path,
             data_paths=val_paths,
             feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            target_sr=self.esc50_config.target_sr,
-            target_duration=self.esc50_config.target_duration,
+            config=self.esc10_config,
+            target_sr=self.esc10_config.target_sr,
+            target_duration=self.esc10_config.target_duration,
             augmentations_per_sample=0,  # No augmentations for validation
             augmentations=[],  # No augmentations for validation
             aug_config=self.augmentation_config,
@@ -381,41 +368,34 @@ class ESC50DataModule(pl.LightningDataModule):
         """
         
         paths_obj = self.fold_splits[fold_idx]
-        # ic(f"Got Paths obj: {paths_obj}")
         train_paths = paths_obj["train_paths"]
         val_paths = paths_obj["val_paths"]
 
-        train_dataset = ESC50Dataset(
+        train_dataset = ESC10Dataset(
             data_path=self.data_path,
             data_paths=train_paths,
             feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            target_sr=self.esc50_config.target_sr,
-            target_duration=self.esc50_config.target_duration,
+            config=self.esc10_config,
+            target_sr=self.esc10_config.target_sr,
+            target_duration=self.esc10_config.target_duration,
             augmentations_per_sample=self.augmentation_config.augmentations_per_sample,
             augmentations=self.augmentation_config.augmentations,
             aug_config=self.augmentation_config,
-            
         )
 
-        val_dataset = ESC50Dataset(
+        val_dataset = ESC10Dataset(
             data_path=self.data_path,
             data_paths=val_paths,
             feature_extractor=self.feature_extractor,
-            config=self.esc50_config,
-            target_sr=self.esc50_config.target_sr,
-            target_duration=self.esc50_config.target_duration,
+            config=self.esc10_config,
+            target_sr=self.esc10_config.target_sr,
+            target_duration=self.esc10_config.target_duration,
             augmentations_per_sample=0,  # No augmentations for validation
             augmentations=[],  # No augmentations for validation
             aug_config=self.augmentation_config,
-            
         )
         self.train_dataset = train_dataset
         self.val_dataset = val_dataset
-
-        # ic(f"Train dataset: {len(self.train_dataset)}")
-        # ic(f"Val dataset: {len(self.val_dataset)}")
-        # sys.exit()
         
         train_loader = DataLoader(
             train_dataset,
@@ -436,6 +416,7 @@ class ESC50DataModule(pl.LightningDataModule):
         )
         
         return train_loader, val_loader
+        
     def train_dataloader(self):
         """
         Get training dataloader.
@@ -476,20 +457,19 @@ class ESC50DataModule(pl.LightningDataModule):
         
     def test_dataloader(self):
         """
-        ESC-50 doesn't use separate test sets in k-fold cross-validation.
+        ESC-10 doesn't use separate test sets in k-fold cross-validation.
         Returns validation dataloader for compatibility.
         """
-        ic("Warning: ESC-50 uses k-fold cross-validation. Returning validation dataloader.")
+        ic("Warning: ESC-10 uses k-fold cross-validation. Returning validation dataloader.")
         return self.val_dataloader()
         
     def predict_dataloader(self):
         """
-        ESC-50 doesn't use separate inference sets in k-fold cross-validation.
+        ESC-10 doesn't use separate inference sets in k-fold cross-validation.
         Returns validation dataloader for compatibility.
         """
-        ic("Warning: ESC-50 uses k-fold cross-validation. Returning validation dataloader.")
+        ic("Warning: ESC-10 uses k-fold cross-validation. Returning validation dataloader.")
         return self.val_dataloader()
-        
         
     def get_all_fold_dataloaders(self):
         """
@@ -534,7 +514,7 @@ class ESC50DataModule(pl.LightningDataModule):
     
     def get_metadata_info(self):
         """
-        Get ESC-50 metadata information.
+        Get ESC-10 metadata information.
         
         Returns:
             Dictionary with metadata statistics
@@ -547,12 +527,11 @@ class ESC50DataModule(pl.LightningDataModule):
                     "num_folds": len(metadata_df['fold'].unique()),
                     "folds": sorted(metadata_df['fold'].unique()),
                     "categories": sorted(metadata_df['category'].unique()) if 'category' in metadata_df.columns else [],
-                    "esc10_files": len(metadata_df[metadata_df['esc10'] == True]) if 'esc10' in metadata_df.columns else 0,
-                    "use_esc10_subset": self.use_esc10_subset
+                    "dataset_type": "ESC-10"
                 }
                 return info
         
-        return {"error": "Metadata not available"}
+        return {"error": "Metadata not available", "dataset_type": "ESC-10"}
     
     def get_fold_info(self):
         """
@@ -565,7 +544,8 @@ class ESC50DataModule(pl.LightningDataModule):
             "use_kfold": self.use_kfold,
             "k_folds": self.k_folds,
             "current_fold": self.current_fold if self.use_kfold else None,
-            "fold_based_split": self.fold_based_split
+            "fold_based_split": self.fold_based_split,
+            "dataset_type": "ESC-10"
         }
         
         if self.fold_datasets:
@@ -583,32 +563,32 @@ class ESC50DataModule(pl.LightningDataModule):
         return info
 
 
-def create_esc50_datamodule(
+def create_esc10_datamodule(
     general_config: GeneralConfig,
     feature_extraction_config: FeatureExtractionConfig,
-    esc50_config: ESC50Config,
+    esc10_config: ESC10Config,
     augmentation_config: Optional[AugmentationConfig] = None,
     use_filename_based_splits: bool = True,
     **kwargs
-) -> ESC50DataModule:
+) -> ESC10DataModule:
     """
-    Factory function to create ESC50DataModule.
+    Factory function to create ESC10DataModule.
     
     Args:
         general_config: General configuration
         feature_extraction_config: Feature extraction configuration
-        esc50_config: ESC-50 specific configuration
+        esc10_config: ESC-10 specific configuration
         augmentation_config: Augmentation configuration
         use_filename_based_splits: Whether to use filename-based (faster) or metadata-based fold splitting
         **kwargs: Additional arguments
         
     Returns:
-        ESC50DataModule instance
+        ESC10DataModule instance
     """
-    return ESC50DataModule(
+    return ESC10DataModule(
         general_config=general_config,
         feature_extraction_config=feature_extraction_config,
-        esc50_config=esc50_config,
+        esc10_config=esc10_config,
         augmentation_config=augmentation_config,
         use_filename_based_splits=use_filename_based_splits,
         **kwargs
@@ -623,13 +603,16 @@ def example_usage():
     try:
         # Load configs from config.yaml
         print("Loading configs from config.yaml")
-        with open('../configs/config.yaml', 'r') as file:
+        with open('configs/config.yaml', 'r') as file:
             config = yaml.safe_load(file)
         
-        
-        # Change datapath for the sake of the ipynb's pathing
-        config['dataset']['data_path'] = "../datasets/ESC-50-master/classes"
+        # Change dataset type and datapath for ESC-10
+        config['dataset']['dataset_type'] = 'esc10'
+        config['dataset']['data_path'] = "datasets/ESC-10-master/classes"
+        # Enable k-fold for testing
+        config['general']['use_kfold'] = True
         print("Loading all configs using the configs_aggregate function")
+        
         # Load all configs using the configs_aggregate function
         (
             general_config,
@@ -638,21 +621,25 @@ def example_usage():
             peft_config,
             wandb_config,
             sweep_config,
-            augmentation_config
+            augmentation_config,
+            optimizer_config
         ) = load_configs(config)
         print("successfully loaded all configs")
+        
         # Create data module
-        data_module = create_esc50_datamodule(
+        data_module = create_esc10_datamodule(
             general_config=general_config,
             feature_extraction_config=feature_extraction_config,
-            esc50_config=dataset_config,  # dataset_config contains ESC50Config
+            esc10_config=dataset_config,  # dataset_config contains ESC10Config
             augmentation_config=augmentation_config,
             use_filename_based_splits=True
         )
         print("successfully created the data module")
+        
         # Setup data module
         data_module.setup()
         print("successfully setup the data module")
+        
         # Example of getting dataloaders for first fold
         train_loader, val_loader = data_module.get_fold_dataloaders(0)
         ic(f"First fold - Train batches: {len(train_loader)}, Val batches: {len(val_loader)}")
