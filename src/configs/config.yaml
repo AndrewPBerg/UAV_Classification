@@ -1,5 +1,6 @@
 general:
-  model_type: custom_cnn
+  model_type: efficientnet_b1
+  from_scratch: true
   batch_size: 8
   seed: 42
   num_cuda_workers: 2

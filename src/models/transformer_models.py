@@ -257,13 +257,36 @@ class TransformerModel:
         # Define the pretrained model to use
         pretrained_AST_model = "MIT/ast-finetuned-audioset-10-10-0.4593"
         
-        try:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError:
-            model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False)
         
-        # Update the classifier to match our number of classes
-        update_classifier(model, num_classes)
+        print(f"Creating AST model with from_scratch={from_scratch}")
+        
+        if from_scratch:
+            # For from scratch training, we need to create the model with random initialization
+            # NOTE: We still use the pretrained model name here, but ONLY to get the architecture
+            # configuration (num layers, hidden dims, etc.), NOT to load pretrained weights
+            try:
+                from transformers import ASTConfig
+                config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            except OSError:
+                config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
+            # Set number of labels
+            config.num_labels = num_classes
+            
+            # Create model from config (this will use random initialization, NO pretrained weights)
+            model = ASTForAudioClassification(config)
+            print("AST model created from scratch with random initialization")
+        else:
+            # Load pretrained model with weights
+            try:
+                model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+            except OSError:
+                model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            
+            # Update the classifier to match our number of classes
+            update_classifier(model, num_classes)
         
         # Special handling for AST model with ModulesToSaveWrapper
         if hasattr(model, 'classifier') and hasattr(model.classifier, 'modules_to_save'):
@@ -423,6 +446,7 @@ class TransformerModel:
             model.audio_spectrogram_transformer.embeddings.patch_embeddings
         )
         
+        # Load feature extractor (this doesn't need to change based on from_scratch)
         try:
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
@@ -445,11 +469,32 @@ class TransformerModel:
         
         pretrained_MERT_model = "m-a-p/MERT-v1-330M"
         
-        try:
-            model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
-        except OSError:
-            model = AutoModel.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False)
         
+        print(f"Creating MERT model with from_scratch={from_scratch}")
+        
+        if from_scratch:
+            # For from scratch training, we need to create the model with random initialization
+            # NOTE: We still use the pretrained model name here, but ONLY to get the architecture
+            # configuration (num layers, hidden dims, etc.), NOT to load pretrained weights
+            try:
+                from transformers import AutoConfig
+                config = AutoConfig.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
+            except OSError:
+                config = AutoConfig.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
+            
+            # Create model from config (this will use random initialization, NO pretrained weights)
+            model = AutoModel.from_config(config, trust_remote_code=True)
+            print("MERT model created from scratch with random initialization")
+        else:
+            # Load pretrained model with weights
+            try:
+                model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
+            except OSError:
+                model = AutoModel.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
+        
+        # Load feature extractor (this doesn't need to change based on from_scratch)
         try:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
         except OSError:
@@ -579,19 +624,54 @@ class TransformerModel:
             raise ValueError(f"Invalid model_type: {model_type}. Must be one of {list(model_mapping.keys())}")
             
         model_checkpoint = model_mapping[model_type]
-        print(f"Attempting to load ViT model: {model_checkpoint} with {num_classes} classes.")
+        
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False)
+        
+        print(f"Attempting to load ViT model: {model_checkpoint} with {num_classes} classes and from_scratch={from_scratch}.")
 
-        try:
-            print("Loading model with local_files_only=True...")
-            model = ViTForImageClassification.from_pretrained(
-                model_checkpoint,
-                num_labels=num_classes,
-                cache_dir=CACHE_DIR,
-                local_files_only=True,
-                ignore_mismatched_sizes=True
-            )
-            print("Model loaded successfully with local_files_only=True.")
+        if from_scratch:
+            # For from scratch training, we need to create the model with random initialization
+            # NOTE: We still use the pretrained model name here, but ONLY to get the architecture
+            # configuration (num layers, hidden dims, etc.), NOT to load pretrained weights
+            try:
+                from transformers import ViTConfig
+                config = ViTConfig.from_pretrained(model_checkpoint, cache_dir=CACHE_DIR, local_files_only=True)
+            except OSError:
+                config = ViTConfig.from_pretrained(model_checkpoint, cache_dir=CACHE_DIR)
             
+            # Set number of labels
+            config.num_labels = num_classes
+            
+            # Create model from config (this will use random initialization, NO pretrained weights)
+            model = ViTForImageClassification(config)
+            print("ViT model created from scratch with random initialization")
+            
+        else:
+            # Load pretrained model with weights
+            try:
+                print("Loading model with local_files_only=True...")
+                model = ViTForImageClassification.from_pretrained(
+                    model_checkpoint,
+                    num_labels=num_classes,
+                    cache_dir=CACHE_DIR,
+                    local_files_only=True,
+                    ignore_mismatched_sizes=True
+                )
+                print("Model loaded successfully with local_files_only=True.")
+                
+            except Exception as e:
+                print(f"Failed to load model with local_files_only=True, trying to download: {e}")
+                model = ViTForImageClassification.from_pretrained(
+                    model_checkpoint,
+                    num_labels=num_classes,
+                    cache_dir=CACHE_DIR,
+                    ignore_mismatched_sizes=True
+                )
+                print("Model downloaded successfully.")
+
+        # Load the processor (this doesn't change based on from_scratch)
+        try:
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
                 model_checkpoint,
@@ -604,16 +684,7 @@ class TransformerModel:
             print("Processor loaded successfully with local_files_only=True and configured for 224x224 images.")
             
         except Exception as e:
-            print(f"Failed to load model with local_files_only=True, trying to download: {e}")
-            model = ViTForImageClassification.from_pretrained(
-                model_checkpoint,
-                num_labels=num_classes,
-                cache_dir=CACHE_DIR,
-                ignore_mismatched_sizes=True
-            )
-            print("Model downloaded successfully.")
-            
-            # Load the processor with explicit resize configuration to 224x224
+            print(f"Failed to load processor with local_files_only=True, trying to download: {e}")
             processor = ViTImageProcessor.from_pretrained(
                 model_checkpoint,
                 cache_dir=CACHE_DIR,
@@ -826,19 +897,54 @@ class TransformerModel:
             raise ValueError(f"Invalid model_type: {model_type}. Must be one of {list(model_mapping.keys())}")
             
         model_checkpoint = model_mapping[model_type]
-        print(f"Attempting to load DeiT model: {model_checkpoint} with {num_classes} classes.")
+        
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False)
+        
+        print(f"Attempting to load DeiT model: {model_checkpoint} with {num_classes} classes and from_scratch={from_scratch}.")
 
-        try:
-            print("Loading model with local_files_only=True...")
-            model = ViTForImageClassification.from_pretrained(
-                model_checkpoint,
-                num_labels=num_classes,
-                cache_dir=CACHE_DIR,
-                local_files_only=True,
-                ignore_mismatched_sizes=True
-            )
-            print("Model loaded successfully with local_files_only=True.")
+        if from_scratch:
+            # For from scratch training, we need to create the model with random initialization
+            # NOTE: We still use the pretrained model name here, but ONLY to get the architecture
+            # configuration (num layers, hidden dims, etc.), NOT to load pretrained weights
+            try:
+                from transformers import ViTConfig
+                config = ViTConfig.from_pretrained(model_checkpoint, cache_dir=CACHE_DIR, local_files_only=True)
+            except OSError:
+                config = ViTConfig.from_pretrained(model_checkpoint, cache_dir=CACHE_DIR)
             
+            # Set number of labels
+            config.num_labels = num_classes
+            
+            # Create model from config (this will use random initialization, NO pretrained weights)
+            model = ViTForImageClassification(config)
+            print("DeiT model created from scratch with random initialization")
+            
+        else:
+            # Load pretrained model with weights
+            try:
+                print("Loading model with local_files_only=True...")
+                model = ViTForImageClassification.from_pretrained(
+                    model_checkpoint,
+                    num_labels=num_classes,
+                    cache_dir=CACHE_DIR,
+                    local_files_only=True,
+                    ignore_mismatched_sizes=True
+                )
+                print("Model loaded successfully with local_files_only=True.")
+                
+            except Exception as e:
+                print(f"Failed to load model with local_files_only=True, trying to download: {e}")
+                model = ViTForImageClassification.from_pretrained(
+                    model_checkpoint,
+                    num_labels=num_classes,
+                    cache_dir=CACHE_DIR,
+                    ignore_mismatched_sizes=True
+                )
+                print("Model downloaded successfully.")
+
+        # Load the processor (this doesn't change based on from_scratch)
+        try:
             # Load the processor with explicit resize configuration to 224x224
             processor = ViTImageProcessor.from_pretrained(
                 model_checkpoint,
@@ -851,16 +957,7 @@ class TransformerModel:
             print("Processor loaded successfully with local_files_only=True and configured for 224x224 images.")
             
         except Exception as e:
-            print(f"Failed to load model with local_files_only=True, trying to download: {e}")
-            model = ViTForImageClassification.from_pretrained(
-                model_checkpoint,
-                num_labels=num_classes,
-                cache_dir=CACHE_DIR,
-                ignore_mismatched_sizes=True
-            )
-            print("Model downloaded successfully.")
-            
-            # Load the processor with explicit resize configuration to 224x224
+            print(f"Failed to load processor with local_files_only=True, trying to download: {e}")
             processor = ViTImageProcessor.from_pretrained(
                 model_checkpoint,
                 cache_dir=CACHE_DIR,
