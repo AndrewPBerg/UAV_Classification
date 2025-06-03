@@ -1,28 +1,28 @@
 general:
-  model_type: ast
-  batch_size: 16
+  model_type: custom_cnn
+  batch_size: 8
   seed: 42
-  num_cuda_workers: 10
+  num_cuda_workers: 2
   pinned_memory: true
-  epochs: 20
+  epochs: 2
   save_model: false
-  test_size: 0.2
-  inference_size: 0
-  val_size: 0.1
+  test_size: 0.0
+  inference_size: 0.0
+  val_size: 0.0
   sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: true
-  use_sweep: true
+  use_wandb: false
+  use_sweep: false
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
   distributed_training: false
-  num_gpus: 2
+  num_gpus: 1
   strategy: ddp
 optimizer:
   optimizer_type: adamw
@@ -54,18 +54,16 @@ optimizer:
   gradient_clip_val: 5.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: esc50
-  data_path: ./datasets/ESC-50-master/classes
-  num_classes: 50
+  dataset_type: esc10
+  data_path: datasets/ESC-10-master/classes
+  num_classes: 10
   target_sr: 16000
   target_duration: 5
   file_extension: .wav
+  fold_based_split: true
 augmentations:
-  augmentations_per_sample: 1
-  augmentations:
-  - gaussian_noise
-  - time_mask
-  - polarity_inversion
+  augmentations_per_sample: 0
+  augmentations: []
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
   sin_distortion_p: 0.9

@@ -15,7 +15,7 @@ if str(project_root) not in sys.path:
 # Import Pydantic configs
 from configs import AugConfig as AugmentationConfig
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
-from configs.dataset_config import DatasetConfig, UAVConfig, ESC50Config
+from configs.dataset_config import DatasetConfig, UAVConfig, ESC50Config, ESC10Config
 
 # Import datamodules
 from .UAV_datamodule import UAVDataModule, create_uav_datamodule
@@ -25,7 +25,16 @@ try:
     from src.esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
 except ImportError as e:
     ic(f"Warning: Could not import ESC50DataModule: {e}")
-    raise ImportError(f"Could not import ESC50DataModule: {e}")
+    ESC50DataModule = None
+    create_esc50_datamodule = None
+
+# Try to import ESC10 datamodule with error handling
+try:
+    from src.esc10.esc10_datamodule import ESC10DataModule, create_esc10_datamodule
+except ImportError as e:
+    ic(f"Warning: Could not import ESC10DataModule: {e}")
+    ESC10DataModule = None
+    create_esc10_datamodule = None
 
 
 def create_datamodule(
@@ -45,7 +54,7 @@ def create_datamodule(
     Args:
         general_config: General configuration
         feature_extraction_config: Feature extraction configuration
-        dataset_config: Dataset configuration (UAVConfig or ESC50Config)
+        dataset_config: Dataset configuration (UAVConfig, ESC50Config, or ESC10Config)
         augmentation_config: Augmentation configuration
         feature_extractor: Optional pre-created feature extractor
         num_channels: Number of audio channels
@@ -54,7 +63,7 @@ def create_datamodule(
         **kwargs: Additional arguments
         
     Returns:
-        Appropriate datamodule instance (UAVDataModule or ESC50DataModule)
+        Appropriate datamodule instance (UAVDataModule, ESC50DataModule, or ESC10DataModule)
         
     Raises:
         ValueError: If dataset type is not supported
@@ -104,10 +113,27 @@ def create_datamodule(
             **common_args
         )
         
+    elif dataset_type == "esc10":
+        if ESC10DataModule is None:
+            raise ImportError(
+                "ESC10DataModule could not be imported. "
+                "Make sure the esc10 directory is accessible and contains the required files."
+            )
+        
+        if not isinstance(dataset_config, ESC10Config):
+            # Convert to ESC10Config if needed
+            dataset_config = ESC10Config(**dataset_config.model_dump())
+        
+        ic("Creating ESC-10 datamodule")
+        return ESC10DataModule(
+            esc10_config=dataset_config,
+            **common_args
+        )
+        
     else:
         raise ValueError(
             f"Unsupported dataset type: {dataset_type}. "
-            f"Supported types are: 'uav', 'esc50'"
+            f"Supported types are: 'uav', 'esc50', 'esc10'"
         )
 
 
@@ -116,7 +142,7 @@ def get_datamodule_class(dataset_type: str):
     Get the datamodule class for a given dataset type.
     
     Args:
-        dataset_type: Type of dataset ('uav' or 'esc50')
+        dataset_type: Type of dataset ('uav', 'esc50', or 'esc10')
         
     Returns:
         Datamodule class
@@ -134,10 +160,17 @@ def get_datamodule_class(dataset_type: str):
                 "Make sure the esc50 directory is accessible and contains the required files."
             )
         return ESC50DataModule
+    elif dataset_type == "esc10":
+        if ESC10DataModule is None:
+            raise ImportError(
+                "ESC10DataModule could not be imported. "
+                "Make sure the esc10 directory is accessible and contains the required files."
+            )
+        return ESC10DataModule
     else:
         raise ValueError(
             f"Unsupported dataset type: {dataset_type}. "
-            f"Supported types are: 'uav', 'esc50'"
+            f"Supported types are: 'uav', 'esc50', 'esc10'"
         )
 
 
@@ -152,6 +185,9 @@ def get_supported_dataset_types():
     
     if ESC50DataModule is not None:
         supported_types.append("esc50")
+    
+    if ESC10DataModule is not None:
+        supported_types.append("esc10")
     
     return supported_types
 
@@ -181,6 +217,13 @@ def validate_dataset_config(dataset_config: DatasetConfig):
         raise ImportError(
             "ESC-50 dataset type is configured but ESC50DataModule could not be imported. "
             "Make sure the esc50 directory is accessible and contains the required files."
+        )
+    
+    # Additional validation for ESC-10
+    if dataset_type == "esc10" and ESC10DataModule is None:
+        raise ImportError(
+            "ESC-10 dataset type is configured but ESC10DataModule could not be imported. "
+            "Make sure the esc10 directory is accessible and contains the required files."
         )
 
 
