@@ -1,5 +1,5 @@
 from typing import Optional, Literal, Dict, Any, List
-from pydantic import BaseModel, Field, ValidationError, field_validator
+from pydantic import BaseModel, Field, ValidationError, field_validator, model_validator
 import yaml
 from icecream import ic
 import sys
@@ -72,6 +72,7 @@ class GeneralConfig(BaseModel):
     pinned_memory: bool = True
     epochs: int = 10
     save_model: bool = False
+    from_scratch: bool = False  # Whether to train models from scratch (no pretrained weights)
 
     # Data splitting configuration (kept here for backward compatibility)
     test_size: float = 0.2
@@ -92,6 +93,16 @@ class GeneralConfig(BaseModel):
 
     # Adapter configuration
     adapter_type: str = "none-classifier"
+    
+    @model_validator(mode='after')
+    def validate_from_scratch_with_adapter_type(self):
+        """Validate adapter_type and warn if incompatible with from_scratch training"""
+        if self.from_scratch and self.adapter_type != "none-full":
+            print(f"WARNING: Training from scratch (from_scratch=True) with adapter_type='{self.adapter_type}' is not recommended.")
+            print("Parameter-efficient fine-tuning methods are designed for pretrained models.")
+            print("Consider using adapter_type='none-full' for training from scratch.")
+        
+        return self
     
     # Training monitoring settings
     early_stopping: bool = True
