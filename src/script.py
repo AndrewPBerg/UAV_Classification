@@ -27,7 +27,8 @@ def main():
      wandb_config,
      sweep_config, 
      augmentation_config,
-     optimizer_config) = load_configs(config)
+     optimizer_config,
+     peft_scheduling_config) = load_configs(config)
     
     print("_"*40+"\n")
 
@@ -136,7 +137,8 @@ def main():
         data_module=data_module,
         model_factory=model_factory,
         augmentation_config=augmentation_config,
-        optimizer_config=optimizer_config
+        optimizer_config=optimizer_config,
+        peft_scheduling_config=peft_scheduling_config
     )
     
     ic("trainer created")

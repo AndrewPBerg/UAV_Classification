@@ -18,13 +18,23 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: none-classifier
   save_dataloader: false
   monitor: val_acc
   mode: max
   distributed_training: false
   num_gpus: 1
   strategy: ddp
+
+# PEFT Scheduling Configuration - NEW FEATURE!
+peft_scheduling:
+  enabled: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+    - start_epoch: 1
+      peft_method: "none-full"
+
 optimizer:
   optimizer_type: adamw
   adam:
@@ -55,13 +65,8 @@ optimizer:
   gradient_clip_val: 5.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: audiomnist
-  data_path: datasets/audiomnist_dataset
-  num_classes: 10
-  target_sr: 16000
-  target_duration: 1
-  file_extension: .wav
-  fold_based_split: true
+  dataset_type: esc10
+  data_path: datasets/ESC-10-master/classes
 augmentations:
   augmentations_per_sample: 0
   augmentations: []

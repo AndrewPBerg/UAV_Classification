@@ -40,6 +40,14 @@ from .peft_config import (
     BitFitConfig
 )
 
+# Import PEFT scheduling configurations
+from .peft_scheduling_config import (
+    PEFTSchedulingConfig,
+    PEFTScheduleStep,
+    get_peft_scheduling_config,
+    create_simple_schedule
+)
+
 # Import native PEFT configs directly from peft library with correct paths
 try:
     from peft.config import (
@@ -118,6 +126,12 @@ __all__ = [
     'BatchNormConfig',
     'SSFConfig',
     'BitFitConfig',
+    
+    # peft_scheduling_config exports
+    'PEFTSchedulingConfig',
+    'PEFTScheduleStep',
+    'get_peft_scheduling_config',
+    'create_simple_schedule',
     
     # wandb_config exports
     'WandbConfig',

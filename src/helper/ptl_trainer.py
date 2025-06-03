@@ -15,6 +15,7 @@ from .lightning_module import AudioClassifier
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from configs.dataset_config import DatasetConfig
 from configs.optim_config import OptimizerConfig
+from configs.peft_scheduling_config import PEFTSchedulingConfig
 from .util import wandb_login
 import time
 
@@ -128,6 +129,7 @@ class PTLTrainer:
         model_factory: Callable,
         augmentation_config: AugmentationConfig,
         optimizer_config: OptimizerConfig,
+        peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
     ):
         """
         Initialize the PTLTrainer.
@@ -143,6 +145,7 @@ class PTLTrainer:
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
             optimizer_config: Optimizer configuration
+            peft_scheduling_config: PEFT scheduling configuration (optional)
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -154,6 +157,7 @@ class PTLTrainer:
         self.model_factory = model_factory
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
+        self.peft_scheduling_config = peft_scheduling_config
         
         # GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -340,7 +344,8 @@ class PTLTrainer:
             general_config=self.general_config,
             peft_config=self.peft_config,
             num_classes=num_classes,
-            optimizer_config=self.optimizer_config
+            optimizer_config=self.optimizer_config,
+            peft_scheduling_config=self.peft_scheduling_config
         )
         
         # Print training start message with clear formatting
@@ -381,7 +386,7 @@ class PTLTrainer:
         print(f"\nTotal training time: {formatted_end_time}")
         
         if self.wandb_logger:
-            self.wandb_logger.experiment.log({
+            self.wandb_logger.log_metrics({
                 "total_train_time": formatted_end_time
             })
         
@@ -568,7 +573,7 @@ class PTLTrainer:
                 # Log metrics to wandb if wandb logger is enabled
                 if self.wandb_logger and all(metrics.values()):
                     print("Logging prediction metrics to wandb...")
-                    self.wandb_logger.experiment.log({
+                    self.wandb_logger.log_metrics({
                         "inference_accuracy": metrics["inference_acc"],
                         "inference_precision": metrics["inference_precision"],
                         "inference_recall": metrics["inference_recall"],
@@ -643,7 +648,7 @@ class PTLTrainer:
             # Log manually calculated metrics to wandb if wandb logger is enabled
             if self.wandb_logger:
                 print("Logging manually calculated metrics to wandb...")
-                self.wandb_logger.experiment.log({
+                self.wandb_logger.log_metrics({
                     "inference_accuracy": metrics["inference_acc"],
                     "inference_precision": metrics["inference_precision"],
                     "inference_recall": metrics["inference_recall"],
@@ -723,7 +728,8 @@ class PTLTrainer:
                 general_config=self.general_config,
                 peft_config=self.peft_config,
                 num_classes=self.data_module.num_classes,
-                optimizer_config=self.optimizer_config
+                optimizer_config=self.optimizer_config,
+                peft_scheduling_config=self.peft_scheduling_config
             )
             
             # Create checkpoint directory for this fold

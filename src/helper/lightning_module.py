@@ -15,6 +15,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
+from configs.peft_scheduling_config import PEFTSchedulingConfig
 
 
 class AudioClassifier(pl.LightningModule):
@@ -29,6 +30,7 @@ class AudioClassifier(pl.LightningModule):
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
         optimizer_config: Optional[OptimizerConfig] = None,
+        peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
     ):
         """Initialize the classifier.
         
@@ -38,6 +40,7 @@ class AudioClassifier(pl.LightningModule):
             peft_config: PEFT configuration (optional)
             num_classes: Number of classes (optional)
             optimizer_config: Optimizer configuration (optional)
+            peft_scheduling_config: PEFT scheduling configuration (optional)
         """
         super().__init__()
         self.model = model
@@ -68,6 +71,16 @@ class AudioClassifier(pl.LightningModule):
         # Initialize tracking variables
         self.current_train_loss = None
         self.best_val_accuracy = 0.0
+
+        # PEFT Scheduling
+        self.peft_scheduling_config = peft_scheduling_config or PEFTSchedulingConfig()
+        self.current_peft_method = None
+        
+        # Initialize with first PEFT method if scheduling is enabled
+        if self.peft_scheduling_config.enabled:
+            initial_method = self.peft_scheduling_config.get_peft_config_for_epoch(0)
+            self._apply_peft_method(initial_method)
+            print(f"PEFT Scheduling enabled. Starting with method: {initial_method}")
 
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -617,3 +630,52 @@ class AudioClassifier(pl.LightningModule):
                 else:
                     # For other schedulers, step without arguments
                     self.lr_scheduler.step()
+
+    def _apply_peft_method(self, peft_method: str):
+        """Apply a specific PEFT method to the model"""
+        if self.current_peft_method == peft_method:
+            return  # No change needed
+            
+        print(f"Switching PEFT method from {self.current_peft_method} to {peft_method}")
+        
+        if peft_method == "none-classifier":
+            # Freeze all parameters except classifier
+            for name, param in self.model.named_parameters():
+                if 'classifier' in name.lower() or 'head' in name.lower() or 'fc' in name.lower():
+                    param.requires_grad = True
+                else:
+                    param.requires_grad = False
+                    
+        elif peft_method == "none-full":
+            # Unfreeze all parameters
+            for param in self.model.parameters():
+                param.requires_grad = True
+        
+        self.current_peft_method = peft_method
+        
+        # Log parameter counts
+        trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
+        total_params = sum(p.numel() for p in self.model.parameters())
+        print(f"PEFT method '{peft_method}': {trainable_params:,} trainable ({trainable_params/total_params:.2%} of {total_params:,})")
+
+    def on_train_epoch_start(self):
+        """Called at the start of each training epoch"""
+        super().on_train_epoch_start()
+        
+        if self.peft_scheduling_config.enabled:
+            current_epoch = self.current_epoch
+            required_method = self.peft_scheduling_config.get_peft_config_for_epoch(current_epoch)
+            
+            if required_method != self.current_peft_method:
+                self._apply_peft_method(required_method)
+                
+                # Log the change to wandb if available - use proper PyTorch Lightning logging
+                if self.logger is not None:
+                    # Use the Lightning logger's log_metrics method
+                    self.logger.log_metrics({
+                        "peft_method_epoch": current_epoch,
+                        "peft_method_name": required_method
+                    }, step=self.global_step)
+                    
+                    # Also log as a string metric using self.log
+                    self.log("peft_method", current_epoch, on_step=False, on_epoch=True)
