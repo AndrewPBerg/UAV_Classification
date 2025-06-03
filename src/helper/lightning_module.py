@@ -81,22 +81,28 @@ class AudioClassifier(pl.LightningModule):
         self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        if self.general_config.val_size > 0:
+        # Initialize validation metrics if we have val_size > 0 OR if we're using k-fold (which always provides separate val dataloaders)
+        should_init_val_metrics = (self.general_config.val_size > 0) or (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_val_metrics:
             self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
             self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Test metrics
-        if self.general_config.test_size > 0:
+        # Test metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_test_metrics:
             self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
             self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Prediction metrics - these will be re-initialized in on_predict_start
-        # but we initialize them here as well for completeness
-        if self.general_config.inference_size > 0:
+        # Prediction metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_predict_metrics:
             self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
             self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
             self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
@@ -237,8 +243,10 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.inference_size > 0:
+        # Update metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_log_predict_metrics:
             self.predict_accuracy(y_pred_class, y)
             self.predict_precision(y_pred_class, y)
             self.predict_recall(y_pred_class, y)
@@ -336,8 +344,11 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.val_size > 0:
+        # Update metrics for validation
+        # Log validation metrics if we have val_size > 0 OR if we're using k-fold (which provides separate val dataloaders)
+        should_log_val_metrics = (self.general_config.val_size > 0) or (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_log_val_metrics:
             self.val_accuracy(y_pred_class, y)
             self.val_precision(y_pred_class, y)
             self.val_recall(y_pred_class, y)
@@ -374,8 +385,10 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        if self.general_config.test_size > 0:
+        # Update metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_log_test_metrics:
             self.test_accuracy(y_pred_class, y)
             self.test_precision(y_pred_class, y)
             self.test_recall(y_pred_class, y)
