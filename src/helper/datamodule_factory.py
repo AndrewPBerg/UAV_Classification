@@ -15,7 +15,7 @@ if str(project_root) not in sys.path:
 # Import Pydantic configs
 from configs import AugConfig as AugmentationConfig
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig
-from configs.dataset_config import DatasetConfig, UAVConfig, ESC50Config, ESC10Config, UrbanSound8KConfig
+from configs.dataset_config import DatasetConfig, UAVConfig, ESC50Config, ESC10Config, UrbanSound8KConfig, AudioMNISTConfig
 
 # Import datamodules
 from .UAV_datamodule import UAVDataModule, create_uav_datamodule
@@ -43,6 +43,14 @@ except ImportError as e:
     ic(f"Warning: Could not import UrbanSound8KDataModule: {e}")
     UrbanSound8KDataModule = None
     create_urbansound8k_datamodule = None
+
+# Try to import AudioMNIST datamodule with error handling
+try:
+    from src.audioMNIST.audiomnist_datamodule import AudioMNISTDataModule, create_audiomnist_datamodule
+except ImportError as e:
+    ic(f"Warning: Could not import AudioMNISTDataModule: {e}")
+    AudioMNISTDataModule = None
+    create_audiomnist_datamodule = None
 
 
 def create_datamodule(
@@ -155,10 +163,27 @@ def create_datamodule(
             **common_args
         )
         
+    elif dataset_type == "audiomnist":
+        if AudioMNISTDataModule is None:
+            raise ImportError(
+                "AudioMNISTDataModule could not be imported. "
+                "Make sure the audiomnist directory is accessible and contains the required files."
+            )
+        
+        if not isinstance(dataset_config, AudioMNISTConfig):
+            # Convert to AudioMNISTConfig if needed
+            dataset_config = AudioMNISTConfig(**dataset_config.model_dump())
+        
+        ic("Creating AudioMNIST datamodule")
+        return AudioMNISTDataModule(
+            audiomnist_config=dataset_config,
+            **common_args
+        )
+        
     else:
         raise ValueError(
             f"Unsupported dataset type: {dataset_type}. "
-            f"Supported types are: 'uav', 'esc50', 'esc10', 'urbansound8k'"
+            f"Supported types are: 'uav', 'esc50', 'esc10', 'urbansound8k', 'audiomnist'"
         )
 
 
@@ -167,7 +192,7 @@ def get_datamodule_class(dataset_type: str):
     Get the datamodule class for a given dataset type.
     
     Args:
-        dataset_type: Type of dataset ('uav', 'esc50', 'esc10', or 'urbansound8k')
+        dataset_type: Type of dataset ('uav', 'esc50', 'esc10', 'urbansound8k', or 'audiomnist')
         
     Returns:
         Datamodule class
@@ -199,10 +224,17 @@ def get_datamodule_class(dataset_type: str):
                 "Make sure the urbansound8k directory is accessible and contains the required files."
             )
         return UrbanSound8KDataModule
+    elif dataset_type == "audiomnist":
+        if AudioMNISTDataModule is None:
+            raise ImportError(
+                "AudioMNISTDataModule could not be imported. "
+                "Make sure the audiomnist directory is accessible and contains the required files."
+            )
+        return AudioMNISTDataModule
     else:
         raise ValueError(
             f"Unsupported dataset type: {dataset_type}. "
-            f"Supported types are: 'uav', 'esc50', 'esc10', 'urbansound8k'"
+            f"Supported types are: 'uav', 'esc50', 'esc10', 'urbansound8k', 'audiomnist'"
         )
 
 
@@ -223,6 +255,9 @@ def get_supported_dataset_types():
     
     if UrbanSound8KDataModule is not None:
         supported_types.append("urbansound8k")
+    
+    if AudioMNISTDataModule is not None:
+        supported_types.append("audiomnist")
     
     return supported_types
 
@@ -266,6 +301,13 @@ def validate_dataset_config(dataset_config: DatasetConfig):
         raise ImportError(
             "UrbanSound8K dataset type is configured but UrbanSound8KDataModule could not be imported. "
             "Make sure the urbansound8k directory is accessible and contains the required files."
+        )
+    
+    # Additional validation for AudioMNIST
+    if dataset_type == "audiomnist" and AudioMNISTDataModule is None:
+        raise ImportError(
+            "AudioMNIST dataset type is configured but AudioMNISTDataModule could not be imported. "
+            "Make sure the audiomnist directory is accessible and contains the required files."
         )
 
 
