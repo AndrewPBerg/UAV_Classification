@@ -51,30 +51,31 @@ class ESC10Dataset(UAVDataset):
         self.fold_to_files = {}  # Dict[int, List[str]] - reverse mapping
         
         # Extract fold information from filenames in data_paths
-        for path_str in data_paths:
-            path = Path(path_str)
-            filename = path.name
-            
-            # ESC-10 files have fold number as first character (1-5) inherited from ESC-50
-            try:
-                fold_num = int(filename[0])
-                if fold_num < 1 or fold_num > 5:
-                    raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
-            except (ValueError, IndexError) as e:
-                raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
-            
-            self.file_names.append(filename)
-            self.assigned_fold.append(fold_num)
-            self.filename_to_fold[filename] = fold_num
-            
-            # Build reverse mapping
-            if fold_num not in self.fold_to_files:
-                self.fold_to_files[fold_num] = []
-            self.fold_to_files[fold_num].append(path_str)
-        
-        print(f"Found {len(self.file_names)} ESC-10 files across folds: {sorted(self.fold_to_files.keys())}")
-        for fold, files in self.fold_to_files.items():
-            print(f"  Fold {fold}: {len(files)} files")
+        # Comment out fold mapping code as it should be handled at datamodule level
+        # for path_str in data_paths:
+        #     path = Path(path_str)
+        #     filename = path.name
+        #     
+        #     # ESC-10 files have fold number as first character (1-5) inherited from ESC-50
+        #     try:
+        #         fold_num = int(filename[0])
+        #         if fold_num < 1 or fold_num > 5:
+        #             raise ValueError(f"Invalid fold number {fold_num} for file {filename}")
+        #     except (ValueError, IndexError) as e:
+        #         raise ValueError(f"Cannot extract fold number from filename {filename}: {e}")
+        #     
+        #     self.file_names.append(filename)
+        #     self.assigned_fold.append(fold_num)
+        #     self.filename_to_fold[filename] = fold_num
+        #     
+        #     # Build reverse mapping
+        #     if fold_num not in self.fold_to_files:
+        #         self.fold_to_files[fold_num] = []
+        #     self.fold_to_files[fold_num].append(path_str)
+        # 
+        # print(f"Found {len(self.file_names)} ESC-10 files across folds: {sorted(self.fold_to_files.keys())}")
+        # for fold, files in self.fold_to_files.items():
+        #     print(f"  Fold {fold}: {len(files)} files")
 
         # Load ESC-10 metadata if requested
         if load_metadata:
@@ -148,7 +149,7 @@ class ESC10Dataset(UAVDataset):
     
     def get_available_folds(self) -> List[int]:
         """Get list of available fold numbers."""
-        return sorted(self.fold_to_files.keys())
+        return sorted(self.fold_to_files.keys()) if self.fold_to_files else []
     
     def get_fold_statistics(self) -> dict:
         """Get statistics about fold distribution."""

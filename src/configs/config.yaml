@@ -15,7 +15,7 @@ general:
   use_wandb: false
   use_sweep: false
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
