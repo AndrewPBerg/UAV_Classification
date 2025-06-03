@@ -36,25 +36,41 @@ class CNNModel:
     
     cnn_models = ['resnet18','resnet50','resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'custom_cnn']
     @staticmethod
-    def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_resnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create a ResNet model.
         
         Args:
             model_type: Model type (e.g., 'resnet18')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             ResNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        weights = None if from_scratch else 'DEFAULT'
+        
+        print(f"Creating ResNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "18" in model_type:
-            model = resnet18(weights=ResNet18_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet18(weights=None)
+            else:
+                model = resnet18(weights=ResNet18_Weights.DEFAULT)
         elif "50" in model_type:
-            model = resnet50(weights=ResNet50_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet50(weights=None)
+            else:
+                model = resnet50(weights=ResNet50_Weights.DEFAULT)
         elif "152" in model_type:
-            model = resnet152(weights=ResNet152_Weights.DEFAULT)
+            if from_scratch:
+                model = resnet152(weights=None)
+            else:
+                model = resnet152(weights=ResNet152_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported ResNet model type: {model_type}")
         
@@ -73,16 +89,15 @@ class CNNModel:
         return model
     
     @staticmethod
-    def _create_custom_cnn_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_custom_cnn_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         class CustomCNN(nn.Module):
-            def __init__(self, num_classes: int, hidden_units: int = 256, input_shape: tuple = (128, 157)):
+            def __init__(self, num_classes: int, hidden_units: int = 256):
                 """
-                Initialize the CNN model with configurable hidden units for the fully connected layers.
+                Initialize the CNN model with dynamic input shape handling.
                 
                 Args:
                     num_classes (int): Number of output classes
                     hidden_units (int): Number of hidden units in the fully connected layer
-                    input_shape (tuple): Expected input shape (height, width) for feature maps
                 """
                 super(CustomCNN, self).__init__()
                 
@@ -110,39 +125,49 @@ class CNNModel:
                     nn.BatchNorm2d(64)
                 )
                 
-                # Calculate the size of flattened features
-                self._to_linear = None
-                self._get_conv_output_size(input_shape)  # Initialize _to_linear
+                # Adaptive pooling to handle different input sizes
+                self.adaptive_pool = nn.AdaptiveAvgPool2d((4, 4))  # Output 4x4 feature maps
+                
+                # Calculate fixed feature size after adaptive pooling
+                self.feature_size = 64 * 4 * 4  # 64 channels * 4 * 4 = 1024
                 
                 # Dense layers with configurable hidden units
-                self.fc1 = nn.Linear(self._to_linear, hidden_units)
+                self.fc1 = nn.Linear(self.feature_size, hidden_units)
                 self.dropout = nn.Dropout(p=0.5)
                 self.fc2 = nn.Linear(hidden_units, num_classes)
-
-
-
-
-            def _get_conv_output_size(self, shape):
-                """Helper function to calculate conv output size"""
-                bs = 1
-                x = torch.rand(bs, *shape)
-                x = x.unsqueeze(1)
-                x = self.conv1(x)
-                x = self.conv2(x)
-                x = self.conv3(x)
-                x = x.flatten(1)
-                self._to_linear = x.shape[1]
-                return self._to_linear
+                
+                # Track if we've seen data yet (for debugging/logging)
+                self._input_shape_logged = False
 
             def forward(self, x):
-                # Add channel dimension if not present
+                # Log input shape on first forward pass for debugging
+                if not self._input_shape_logged:
+                    print(f"CustomCNN: Processing input with shape {x.shape}")
+                    self._input_shape_logged = True
+                
+                # Add channel dimension if not present (batch_size, height, width) -> (batch_size, 1, height, width)
                 if x.dim() == 3:
                     x = x.unsqueeze(1)
-                    
+                elif x.dim() == 2:
+                    # Handle case where batch dimension might be missing
+                    x = x.unsqueeze(0).unsqueeze(0)
+                
+                # Ensure we have the right number of channels (should be 1 for grayscale spectrograms)
+                if x.size(1) != 1:
+                    # If RGB or other multi-channel, convert to grayscale
+                    if x.size(1) == 3:
+                        x = torch.mean(x, dim=1, keepdim=True)
+                    else:
+                        # Take only the first channel
+                        x = x[:, :1, :, :]
+                
                 # Convolutional layers
                 x = self.conv1(x)
                 x = self.conv2(x)
                 x = self.conv3(x)
+                
+                # Adaptive pooling to standardize feature map size
+                x = self.adaptive_pool(x)
                 
                 # Flatten
                 x = x.flatten(1)
@@ -154,41 +179,67 @@ class CNNModel:
                 
                 return x
             
-            # Get input shape from the first batch of data
-            def get_input_shape(self, dataloader):
-                """Get the input shape from the first batch of data"""
-                for batch in dataloader:
-                    if isinstance(batch, (tuple, list)):
-                        x = batch[0]
-                    else:
-                        x = batch
-                    return x.shape[1:]  # Return shape without batch dimension
+            def get_model_info(self):
+                """Get information about the model architecture"""
+                total_params = sum(p.numel() for p in self.parameters())
+                trainable_params = sum(p.numel() for p in self.parameters() if p.requires_grad)
                 
-            
-        # model = CustomCNN(num_classes=num_classes, input_shape=(128, 157))
+                return {
+                    'total_parameters': total_params,
+                    'trainable_parameters': trainable_params,
+                    'feature_size_after_conv': self.feature_size,
+                    'model_type': 'CustomCNN'
+                }
+                
+            def test_input_shape(self, height: int, width: int):
+                """Test the model with a given input shape to verify it works"""
+                with torch.no_grad():
+                    test_input = torch.randn(1, 1, height, width)
+                    try:
+                        output = self.forward(test_input)
+                        print(f"✓ Input shape ({height}, {width}) works. Output shape: {output.shape}")
+                        return True
+                    except Exception as e:
+                        print(f"✗ Input shape ({height}, {width}) failed: {str(e)}")
+                        return False
+                        
+        # Custom CNN is always from scratch since it's not pretrained
+        print("Creating custom CNN model (always from scratch)")
         model = CustomCNN(num_classes=num_classes)
-        model = apply_peft(model, NoneFullConfig())
+        model = apply_peft(model, peft_config if peft_config is not None else NoneFullConfig())
         return model
 
         
     @staticmethod
-    def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_mobilenet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create a MobileNet model.
         
         Args:
             model_type: Model type (e.g., 'mobilenet_v3_small')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             MobileNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        
+        print(f"Creating MobileNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "small" in model_type:
-            model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
+            if from_scratch:
+                model = mobilenet_v3_small(weights=None)
+            else:
+                model = mobilenet_v3_small(weights=MobileNet_V3_Small_Weights.DEFAULT)
         elif "large" in model_type:
-            model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
+            if from_scratch:
+                model = mobilenet_v3_large(weights=None)
+            else:
+                model = mobilenet_v3_large(weights=MobileNet_V3_Large_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported MobileNet model type: {model_type}")
         
@@ -207,35 +258,65 @@ class CNNModel:
         return model
     
     @staticmethod
-    def _create_efficientnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None) -> nn.Module:
+    def _create_efficientnet_model(model_type: str, num_classes: int, peft_config: Optional[PEFTConfig] = None, general_config: Optional[Any] = None) -> nn.Module:
         """
         Create an EfficientNet model.
         
         Args:
             model_type: Model type (e.g., 'efficientnet_b0')
             num_classes: Number of classes
-            input_shape: Input shape (channels, height, width)
+            peft_config: PEFT configuration
+            general_config: General configuration containing from_scratch flag
             
         Returns:
             EfficientNet model
         """
+        # Check if we should train from scratch
+        from_scratch = getattr(general_config, 'from_scratch', False) if general_config else False
+        
+        print(f"Creating EfficientNet model with from_scratch={from_scratch}")
+        
         # Parse model size from model type
         if "b0" in model_type:
-            model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b0(weights=None)
+            else:
+                model = efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
         elif "b1" in model_type:
-            model = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b1(weights=None)
+            else:
+                model = efficientnet_b1(weights=EfficientNet_B1_Weights.DEFAULT)
         elif "b2" in model_type:
-            model = efficientnet_b2(weights=EfficientNet_B2_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b2(weights=None)
+            else:
+                model = efficientnet_b2(weights=EfficientNet_B2_Weights.DEFAULT)
         elif "b3" in model_type:
-            model = efficientnet_b3(weights=EfficientNet_B3_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b3(weights=None)
+            else:
+                model = efficientnet_b3(weights=EfficientNet_B3_Weights.DEFAULT)
         elif "b4" in model_type:
-            model = efficientnet_b4(weights=EfficientNet_B4_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b4(weights=None)
+            else:
+                model = efficientnet_b4(weights=EfficientNet_B4_Weights.DEFAULT)
         elif "b5" in model_type:
-            model = efficientnet_b5(weights=EfficientNet_B5_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b5(weights=None)
+            else:
+                model = efficientnet_b5(weights=EfficientNet_B5_Weights.DEFAULT)
         elif "b6" in model_type:
-            model = efficientnet_b6(weights=EfficientNet_B6_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b6(weights=None)
+            else:
+                model = efficientnet_b6(weights=EfficientNet_B6_Weights.DEFAULT)
         elif "b7" in model_type:
-            model = efficientnet_b7(weights=EfficientNet_B7_Weights.DEFAULT)
+            if from_scratch:
+                model = efficientnet_b7(weights=None)
+            else:
+                model = efficientnet_b7(weights=EfficientNet_B7_Weights.DEFAULT)
         else:
             raise ValueError(f"Unsupported EfficientNet model type: {model_type}")
         
@@ -253,6 +334,7 @@ class CNNModel:
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)
 
+        model = apply_peft(model, peft_config)
         
         return model
 

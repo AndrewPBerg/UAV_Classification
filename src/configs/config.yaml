@@ -1,44 +1,88 @@
 general:
-  data_path: /app/src/datasets/UAV_Dataset_31
-  num_classes: 31
-  save_dataloader: false
-  model_type: vit-large
+  model_type: efficientnet_b1
+  from_scratch: true
   batch_size: 8
   seed: 42
-  num_cuda_workers: 10
+  num_cuda_workers: 2
   pinned_memory: true
-  epochs: 20
+  epochs: 2
   save_model: false
-  test_size: 0.2
-  inference_size: 0.1
-  val_size: 0.1
-  sweep_count: 50
-  accumulation_steps: 2
-  learning_rate: 0.001
-  patience: 3
-  use_wandb: true
+  test_size: 0.0
+  inference_size: 0.0
+  val_size: 0.0
+  sweep_count: 200
+  accumulation_steps: 1
+  patience: 5
+  use_wandb: false
   use_sweep: false
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5
-  adapter_type: ia3
+  adapter_type: none-full
+  save_dataloader: false
+  monitor: val_acc
+  mode: max
+  distributed_training: false
+  num_gpus: 1
+  strategy: ddp
+optimizer:
+  optimizer_type: adamw
+  adam:
+    lr: 1e-4
+    betas:
+    - 0.99
+    - 0.999
+  adamw:
+    lr: 0.0001
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.999
+  warmup:
+    enabled: false
+    warmup_steps: 100
+    warmup_start_lr: 1e-6
+    warmup_method: linear
+  scheduler_type: cosine_annealing_lr
+  cosine_annealing_lr:
+    T_max: 50
+    eta_min: 0.0
+  reduce_lr_on_plateau:
+    mode: max
+    factor: 0.85
+    patience: 3
+  gradient_clipping_enabled: false
+  gradient_clip_val: 5.0
+  gradient_clip_algorithm: norm
+dataset:
+  dataset_type: audiomnist
+  data_path: datasets/audiomnist_dataset
+  num_classes: 10
+  target_sr: 16000
+  target_duration: 1
+  file_extension: .wav
+  fold_based_split: true
 augmentations:
-  augmentations_per_sample: 3
-  augmentations:
-  - time_stretch
-  - sin_distortion
-  time_stretch_min_rate: 0.9
-  time_stretch_max_rate: 1.0
-  sin_distortion_min_rate: 0.01
-  sin_distortion_max_rate: 0.7
-  sin_distortion_p: 1
+  augmentations_per_sample: 0
+  augmentations: []
+  sin_distortion_min_rate: 0.1
+  sin_distortion_max_rate: 0.6
+  sin_distortion_p: 0.9
+  polarity_inversion_p: 0.8
+  gaussian_noise_min_amplitude: 0.1
+  gaussian_noise_max_amplitude: 0.15
+  gaussian_noise_p: 0.8
+  time_mask_min_band_part: 0.01
+  time_mask_max_band_part: 0.15
+  time_mask_fade_duration: 0.01
+  time_mask_p: 0.8
 feature_extraction:
   type: melspectrogram
   sampling_rate: 16000
   n_mfcc: 40
   n_mels: 128
   n_fft: 1024
-  hop_length: 512
+  hop_length: 128
   power: 2
 none-classifier:
   task_type: AUDIO_CLASSIFICATION
@@ -118,31 +162,62 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ViT-UAV-31
-  name: vit-large-ia3-3-augs
+  project: ast-eesc50-sweeps-baseline
+  name: ast-baseline-conservative-b48-lr1e4
   reinit: true
   notes: null
   tags:
-  - 31-class
+  - ast
+  - esc50
+  - baseline
+  - conservative
   - kfold
-  - vit-large
-  - ia3
-  - 3-augs
+  - none-classifier
+  - batch48
+  - lr1e-4
   dir: wandb
 sweep:
-  project: ast-experiments
-  name: ast-none-full-3-augs
-  method: random
+  project: ast-esc50-sweeps-baseline
+  name: ast-esc50-batch-optimizer-adapter
+  method: bayes
   metric:
     name: test_acc
     goal: maximize
   parameters:
+    batch_size:
+      values:
+      - 8
     learning_rate:
       values:
-      - 0.1
+      - 1e-4
+      - 5e-4
+    weight_decay:
+      values:
+      - 0.0
       - 0.01
-      - 0.001
-    seed:
-      distribution: int_uniform
-      min: 0
-      max: 1000
+      - 0.1
+    betas:
+      values:
+      - - 0.9
+        - 0.999
+      - - 0.99
+        - 0.999
+      - - 0.85
+        - 0.89
+      - - 0.8
+        - 0.85
+    gradient_clipping_enabled:
+      values:
+      - true
+      - false
+    adapter_type:
+      values:
+      - none-classifier
+      - none-full
+      - ssf
+      - layernorm
+      - lora
+      - ia3
+      - adalora
+      - oft
+      - hra

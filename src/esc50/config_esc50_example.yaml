@@ -1,0 +1,183 @@
+general:
+  # Core model configuration
+  model_type: efficientnet_b1
+  
+  # Training configuration
+  save_dataloader: false
+  batch_size: 8
+  seed: 42
+  num_cuda_workers: 10
+  pinned_memory: true
+  epochs: 20
+  save_model: false
+  
+  # Data splitting configuration (for non-fold-based splits)
+  test_size: 0.2
+  inference_size: 0.1
+  val_size: 0.1
+  
+  # Hyperparameter and experiment configuration
+  sweep_count: 50
+  accumulation_steps: 2
+  learning_rate: 0.001
+  patience: 3
+  use_wandb: true
+  use_sweep: false
+  torch_viz: false
+  
+  # Cross-validation configuration
+  use_kfold: true
+  k_folds: 5
+  
+  # Adapter configuration
+  adapter_type: none-full
+
+# Dataset configuration - NEW!
+dataset:
+  dataset_type: esc50
+  data_path: /path/to/esc50/classes  # Update this path
+  use_esc10_subset: false  # Set to true for ESC-10 subset (10 classes)
+  fold_based_split: true   # Use ESC-50's predefined folds
+  target_sr: 16000
+  target_duration: 5
+  file_extension: .wav
+
+augmentations:
+  augmentations_per_sample: 0
+  augmentations:
+  - time_stretch
+  - sin_distortion
+  time_stretch_min_rate: 0.9
+  time_stretch_max_rate: 1.0
+  sin_distortion_min_rate: 0.01
+  sin_distortion_max_rate: 0.7
+  sin_distortion_p: 1
+
+feature_extraction:
+  type: melspectrogram
+  sampling_rate: 16000
+  n_mfcc: 40
+  n_mels: 128
+  n_fft: 1024
+  hop_length: 512
+  power: 2
+
+none-classifier:
+  task_type: AUDIO_CLASSIFICATION
+
+none-full:
+  task_type: AUDIO_CLASSIFICATION
+
+lora:
+  r: 8
+  lora_alpha: 16
+  target_modules:
+  - key
+  - value
+  - query
+  - dense
+  lora_dropout: 0
+  bias: lora_only
+
+ia3:
+  feedforward_modules:
+  - key
+  - value
+  - query
+  - dense
+  target_modules:
+  - key
+  - value
+  - query
+  - dense
+
+adalora:
+  init_r: 4
+  target_r: 256
+  target_modules:
+  - key
+  - value
+  - query
+  - dense
+  lora_alpha: 4
+
+oft:
+  r: 128
+  target_modules:
+  - key
+  - value
+  - query
+  - dense
+  module_dropout: 0.2
+  init_weights: true
+
+layernorm:
+  target_modules:
+  - layernorm_before
+  - layernorm_after
+  task_type: AUDIO_CLASSIFICATION
+
+hra:
+  r: 2
+  target_modules:
+  - key
+  - value
+  - query
+  - dense
+
+ssf:
+  init_scale: 1.0
+  init_shift: 0.5
+  target_modules:
+  - linear
+  - dense
+  - batchnorm2d
+  - conv2d
+
+batchnorm:
+  target_modules:
+  - batchnorm2d
+
+lorac:
+  target_modules:
+  - linear
+  - conv2d
+  - batchnorm2d
+  r: 4
+  alpha: 8
+  dropout: 0
+
+bitfit:
+  trainable_components:
+  - bias
+
+wandb:
+  project: esc50-experiments
+  name: efficientnet_b1-esc50-kfold
+  reinit: true
+  notes: ESC-50 classification with k-fold cross-validation
+  tags:
+  - esc50
+  - kfold
+  - efficientnet_b1
+  - none-full
+  - 0-augs
+  dir: wandb
+
+sweep:
+  project: esc50-experiments
+  name: esc50-hyperparameter-sweep
+  method: random
+  metric:
+    name: test_acc
+    goal: maximize
+  parameters:
+    learning_rate:
+      values:
+      - 0.1
+      - 0.01
+      - 0.001
+    seed:
+      distribution: int_uniform
+      min: 0
+      max: 1000 

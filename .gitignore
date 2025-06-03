@@ -20,6 +20,16 @@ instructions.md
 lightning_logs/
 checkpoints/
 Drone_Lab_Server_Access.ipynb
+ESC-50-master.zip
+*.zip
+logs/
+src/ESC-50-master.zip
+kaggle.json
+
+
+# Datasets (too large to upload)
+esc50-data/
+ESC-50-master/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -8,8 +8,11 @@ dependencies = [
     "audiomentations>=0.35.0",
     "dotenv>=0.9.9",
     "icecream>=2.1.4",
+    "kaggle>=1.7.4.5",
+    "kagglehub>=0.3.12",
     "librosa>=0.10.2.post1",
     "matplotlib>=3.10.1",
+    "pandas>=2.2.3",
     "peft>=0.14.0",
     "pip>=25.0.1",
     "pydantic>=2.10.6",
@@ -18,10 +21,26 @@ dependencies = [
     "scikit-learn>=1.6.1",
     "scipy>=1.15.2",
     "telebot>=0.0.5",
-    "torchaudio>=2.6.0",
+    "torch>=2.7.0",
+    "torchaudio>=2.7.0",
     "torchinfo>=1.8.0",
-    "torchvision>=0.21.0",
+    "torchvision>=0.22.0",
     "torchviz>=0.0.3",
     "transformers>=4.49.0",
-    "wandb>=0.19.7",
+    "wandb>=0.19.11",
+]
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv.sources]
+torch = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+]
+torchvision = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
+]
+torchaudio = [
+  { index = "pytorch-cu128", marker = "sys_platform == 'linux' or sys_platform == 'win32'" }
 ]

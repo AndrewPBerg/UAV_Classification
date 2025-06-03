@@ -5,7 +5,7 @@ from icecream import ic
 
 # Import the rest of the modules
 from helper.ptl_trainer import PTLTrainer
-from helper.datamodule import AudioDataModule
+from helper.UAV_datamodule import UAVDataModule
 from models.model_factory import ModelFactory
 from configs import (
     load_configs,
@@ -155,10 +155,18 @@ def main():
             
             id, changes, type = run.get('id'), run.get('changes'), run.get('type')
             
-            # Finish any active wandb run before starting a new one
-            if wandb.run is not None:
-                ic(f"Finishing previous wandb run: {wandb.run.name}")
-                wandb.finish()
+            # Ensure any existing wandb run is finished before starting a new one
+            try:
+                if wandb.run is not None:
+                    ic(f"Finishing previous wandb run: {wandb.run.name}")
+                    wandb.finish()
+            except Exception as e:
+                ic(f"Warning: Error finishing previous wandb run: {e}")
+                # Force finish any lingering runs
+                try:
+                    wandb.finish()
+                except:
+                    pass
             
             ic(f'{id}: applying changes to config.yaml...')
             alter(changes, 'configs/config.yaml')
@@ -175,18 +183,24 @@ def main():
         ic('All runs completed.')
         
         # Make sure to finish the last wandb run
-        if wandb.run is not None:
-            ic(f"Finishing final wandb run: {wandb.run.name}")
-            wandb.finish()
+        try:
+            if wandb.run is not None:
+                ic(f"Finishing final wandb run: {wandb.run.name}")
+                wandb.finish()
+        except Exception as e:
+            ic(f"Warning: Error finishing final wandb run: {e}")
                 
         if oc.get('SEND_MESSAGE'):
             send_message(f'Your Symphony has stopped playing\n {run_count} run(s) completed.')
             
     except Exception as e:
         # Make sure to finish the wandb run even if there's an error
-        if wandb.run is not None:
-            ic(f"Finishing wandb run due to error: {wandb.run.name}")
-            wandb.finish()
+        try:
+            if wandb.run is not None:
+                ic(f"Finishing wandb run due to error: {wandb.run.name}")
+                wandb.finish()
+        except Exception as finish_error:
+            ic(f"Warning: Error finishing wandb run during cleanup: {finish_error}")
             
         ic('Error occurred during orchestration:', e)
         traceback_str = ''.join(traceback.format_exc())

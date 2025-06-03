@@ -3,16 +3,18 @@ import torch.nn as nn
 import pytorch_lightning as pl
 from typing import Dict, List, Any, Optional, Union, Tuple
 from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
-from torch.optim.lr_scheduler import ReduceLROnPlateau
+from torch.optim.lr_scheduler import ReduceLROnPlateau, SequentialLR, LambdaLR
 from torch.optim import AdamW, Adam
 from icecream import ic
 import os
 import re
+import math
 
 # Suppress TensorFlow warnings
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
+from configs.optim_config import OptimizerConfig
 
 
 class AudioClassifier(pl.LightningModule):
@@ -26,6 +28,7 @@ class AudioClassifier(pl.LightningModule):
         general_config: GeneralConfig,
         peft_config: Optional[Any] = None,
         num_classes: Optional[int] = None,
+        optimizer_config: Optional[OptimizerConfig] = None,
     ):
         """Initialize the classifier.
         
@@ -34,11 +37,13 @@ class AudioClassifier(pl.LightningModule):
             general_config: General configuration
             peft_config: PEFT configuration (optional)
             num_classes: Number of classes (optional)
+            optimizer_config: Optimizer configuration (optional)
         """
         super().__init__()
         self.model = model
         self.general_config = general_config
         self.peft_config = peft_config
+        self.optimizer_config = optimizer_config or OptimizerConfig()  # Use default if not provided
         
         # Set number of classes
         self.num_classes = num_classes if num_classes is not None else general_config.num_classes
@@ -76,23 +81,38 @@ class AudioClassifier(pl.LightningModule):
         self.train_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
         # Validation metrics
-        self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
-        self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        # Initialize validation metrics if we have val_size > 0 OR if we're using k-fold (which always provides separate val dataloaders)
+        # OR if this is an ESC dataset that uses fold-based splits (they always provide validation data)
+        should_init_val_metrics = (
+            (self.general_config.val_size > 0) or 
+            (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold) or
+            # Check for ESC datasets that use fold-based splits
+            (hasattr(self.general_config, 'fold_based_split') and getattr(self.general_config, 'fold_based_split', False))
+        )
         
-        # Test metrics
-        self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
-        self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        if should_init_val_metrics:
+            self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
         
-        # Prediction metrics - these will be re-initialized in on_predict_start
-        # but we initialize them here as well for completeness
-        self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+        # Test metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_test_metrics:
+            self.test_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.test_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+        
+        # Prediction metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_init_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
+        
+        if should_init_predict_metrics:
+            self.predict_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
+            self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
         
         # Initialize prediction metrics storage
         self.predict_batch_preds = []
@@ -206,28 +226,6 @@ class AudioClassifier(pl.LightningModule):
             return outputs.logits
         else:
             return outputs
-        
-    def on_predict_start(self):
-        """Called at the beginning of the prediction stage.
-        Initialize metrics for prediction.
-        """
-        # Get the current device
-        device = self.device
-        
-        # Initialize metrics for prediction and move them to the correct device
-        self.predict_accuracy = Accuracy(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_precision = Precision(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_recall = Recall(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        self.predict_f1 = F1Score(task="multiclass", num_classes=self.num_classes, average="weighted").to(device)
-        
-        # Initialize storage for predictions and targets
-        self.predict_batch_preds = []
-        self.predict_batch_targets = []
-        
-        # Initialize metrics dictionary
-        self.predict_metrics = {}
-        
-        print("Prediction metrics initialized")
 
     def predict_step(self, batch, batch_idx):
         """Prediction step.
@@ -251,49 +249,20 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        self.predict_accuracy(y_pred_class, y)
-        self.predict_precision(y_pred_class, y)
-        self.predict_recall(y_pred_class, y)
+        # Update metrics - only when inference_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_predict_metrics = (self.general_config.inference_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
         
-        # Store predictions and targets for later use
-        self.predict_batch_preds.append(y_pred_class)
-        self.predict_batch_targets.append(y)
+        if should_log_predict_metrics:
+            self.predict_accuracy(y_pred_class, y)
+            self.predict_precision(y_pred_class, y)
+            self.predict_recall(y_pred_class, y)
+            
+            # Store predictions and targets for later use
+            self.predict_batch_preds.append(y_pred_class)
+            self.predict_batch_targets.append(y)
         
         # Return predicted classes and targets
         return y_pred_class, y
-    
-    def on_predict_epoch_end(self):
-        """Called at the end of the prediction epoch.
-        Compute final metrics.
-        """
-        # Compute final metrics
-        predict_acc = self.predict_accuracy.compute()
-        predict_precision = self.predict_precision.compute()
-        predict_recall = self.predict_recall.compute()
-        predict_f1 = self.predict_f1.compute()
-        
-        # Store metrics in a dictionary
-        self.predict_metrics = {
-            "predict_acc": predict_acc.item(),
-            "predict_precision": predict_precision.item(),
-            "predict_recall": predict_recall.item(),
-            "predict_f1": predict_f1.item()
-        }
-        
-        # Print metrics in a concise format
-        print("\nPrediction Metrics:")
-        print(f"Accuracy: {predict_acc:.4f} | Precision: {predict_precision:.4f} | Recall: {predict_recall:.4f} | F1: {predict_f1:.4f}")
-        
-        # Reset metrics for next prediction
-        self.predict_accuracy.reset()
-        self.predict_precision.reset()
-        self.predict_recall.reset()
-        self.predict_f1.reset()
-        
-        # Clear storage
-        self.predict_batch_preds = []
-        self.predict_batch_targets = []
     
     def training_step(self, batch, batch_idx):
         """Training step."""
@@ -351,7 +320,7 @@ class AudioClassifier(pl.LightningModule):
         # Log metrics - ensure they appear in progress bar and are formatted consistently
         self.log('train_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_acc', self.train_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, sync_dist=True)
+        self.log('train_f1', self.train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('train_precision', self.train_precision, on_step=False, on_epoch=True, sync_dist=True)
         self.log('train_recall', self.train_recall, on_step=False, on_epoch=True, sync_dist=True)
 
@@ -381,12 +350,22 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
+        # Initialize validation metrics on the fly if they don't exist
+        # This handles cases where validation data exists but wasn't detected during _init_metrics
+        if not hasattr(self, 'val_accuracy'):
+            device = self.device
+            self.val_accuracy = MulticlassAccuracy(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_precision = MulticlassPrecision(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_recall = MulticlassRecall(num_classes=self.num_classes, average="weighted").to(device)
+            self.val_f1 = MulticlassF1Score(num_classes=self.num_classes, average="weighted").to(device)
+            print("Initialized validation metrics on the fly - validation data detected")
+        
+        # Update validation metrics (always log if validation_step is called)
         self.val_accuracy(y_pred_class, y)
         self.val_precision(y_pred_class, y)
         self.val_recall(y_pred_class, y)
         self.val_f1(y_pred_class, y)
-        
+    
         # Log metrics - ensure they appear in progress bar and are formatted consistently
         self.log('val_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         self.log('val_acc', self.val_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
@@ -418,100 +397,139 @@ class AudioClassifier(pl.LightningModule):
         # Get predicted classes
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
         
-        # Update metrics
-        self.test_accuracy(y_pred_class, y)
-        self.test_precision(y_pred_class, y)
-        self.test_recall(y_pred_class, y)
-        self.test_f1(y_pred_class, y)
+        # Update metrics - only when test_size > 0 and NOT using k-fold (k-fold ignores test/inference)
+        should_log_test_metrics = (self.general_config.test_size > 0) and not (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold)
         
-        # Log metrics - changed to only log at epoch level
-        self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-        self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+        if should_log_test_metrics:
+            self.test_accuracy(y_pred_class, y)
+            self.test_precision(y_pred_class, y)
+            self.test_recall(y_pred_class, y)
+            self.test_f1(y_pred_class, y)
+            
+            # Log metrics - changed to only log at epoch level
+            self.log('test_loss', loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_acc', self.test_accuracy, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_f1', self.test_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_precision', self.test_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
+            self.log('test_recall', self.test_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
         
         return loss
-
-    def on_train_epoch_end(self):
-        """Called at the end of the training epoch.
-        Track and log epoch-level metrics.
-        """
-        # Get current metrics
-        try:
-            train_acc = self.train_accuracy.compute()
-            train_f1 = self.train_f1.compute() 
-            train_precision = self.train_precision.compute()
-            train_recall = self.train_recall.compute()
-            
-            # Log epoch-level metrics
-            # self.log('train_acc_epoch', train_acc, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_f1_epoch', train_f1, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_precision_epoch', train_precision, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            # self.log('train_recall_epoch', train_recall, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            
-            # Also log train loss at epoch level if available
-            if hasattr(self, 'current_train_loss'):
-                self.log('train_loss_epoch', self.current_train_loss, on_step=False, on_epoch=True, prog_bar=True, sync_dist=True)
-            
-            # Track validation metrics if available
-            if hasattr(self, 'val_accuracy'):
-                val_acc = self.val_accuracy.compute()
-                val_f1 = self.val_f1.compute()
-                val_precision = self.val_precision.compute()
-                val_recall = self.val_recall.compute()
-                
-                if val_acc is not None:
-                    # Store best validation accuracy and related metrics
-                    if not hasattr(self, 'best_val_accuracy') or val_acc > self.best_val_accuracy:
-                        self.best_val_accuracy = val_acc.item()
-                        self.best_val_f1 = val_f1.item()
-                        self.best_val_precision = val_precision.item()
-                        self.best_val_recall = val_recall.item()
-                        
-                        # Log best validation metrics
-                        # self.log('best_val_acc', self.best_val_accuracy, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_f1', self.best_val_f1, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_precision', self.best_val_precision, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-                        # self.log('best_val_recall', self.best_val_recall, on_step=False, on_epoch=True, prog_bar=False, sync_dist=True)
-        except Exception as e:
-            print(f"Warning: Error in on_train_epoch_end: {str(e)}")
-            # Don't let this error stop training
-            pass
     
+    def _create_warmup_scheduler(self, optimizer, target_lr: float):
+        """Create a warmup scheduler based on configuration."""
+        warmup_config = self.optimizer_config.warmup
+        
+        if warmup_config.warmup_method == "linear":
+            # Linear warmup: lr multiplier increases linearly from start_lr/target_lr to 1.0
+            def lr_lambda(step):
+                if step < warmup_config.warmup_steps:
+                    start_factor = warmup_config.warmup_start_lr / target_lr
+                    lr_multiplier = start_factor + (1.0 - start_factor) * step / warmup_config.warmup_steps
+                    return lr_multiplier
+                return 1.0
+        else:  # cosine
+            # Cosine warmup: lr multiplier increases following cosine curve
+            def lr_lambda(step):
+                if step < warmup_config.warmup_steps:
+                    start_factor = warmup_config.warmup_start_lr / target_lr
+                    warmup_progress = step / warmup_config.warmup_steps
+                    cosine_factor = 0.5 * (1 + math.cos(math.pi * (1 - warmup_progress)))
+                    lr_multiplier = start_factor + (1.0 - start_factor) * (1 - cosine_factor)
+                    return lr_multiplier
+                return 1.0
+        
+        return LambdaLR(optimizer, lr_lambda)
+
     def configure_optimizers(self):
         """Configure optimizers and learning rate schedulers."""
-        # Choose optimizer based on model type
-        if re.match(r'^(ast|vit|mert)', self.general_config.model_type.lower()):
-            optimizer =  AdamW(self.model.parameters(), lr=self.general_config.learning_rate, weight_decay=0.01)
+        # Get optimizer configuration based on type
+        if self.optimizer_config.optimizer_type == "adamw":
+            optimizer_params = dict(self.optimizer_config.adamw)
+            target_lr = optimizer_params['lr']
+            optimizer = AdamW(self.model.parameters(), **optimizer_params)
+        elif self.optimizer_config.optimizer_type == "adam":
+            optimizer_params = dict(self.optimizer_config.adam)
+            target_lr = optimizer_params['lr']
+            optimizer = Adam(self.model.parameters(), **optimizer_params)
         else:
-            optimizer = Adam(self.model.parameters(), lr=self.general_config.learning_rate)
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
         
-        # Configure scheduler
-        scheduler = ReduceLROnPlateau(
-            optimizer, 
-            mode='min', 
-            factor=0.1, 
-            patience=2,
-        )
+        # Handle warmup + scheduler combinations
+        final_scheduler = None
+        
+        if self.optimizer_config.warmup.enabled:
+            print(f"LR warmup enabled: {self.optimizer_config.warmup.warmup_steps} steps, method: {self.optimizer_config.warmup.warmup_method}")
+            warmup_scheduler = self._create_warmup_scheduler(optimizer, target_lr)
+            
+            # Check if we have a base scheduler that's compatible with SequentialLR
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                # ReduceLROnPlateau is not compatible with SequentialLR
+                # We'll use only warmup for now and handle ReduceLROnPlateau manually
+                final_scheduler = warmup_scheduler
+                # Store the base scheduler config for manual handling later
+                self.base_scheduler_config = {
+                    "type": "reduce_lr_on_plateau",
+                    "params": dict(self.optimizer_config.reduce_lr_on_plateau)
+                }
+                self.warmup_steps = self.optimizer_config.warmup.warmup_steps
+                self.post_warmup_scheduler = None
+            elif self.optimizer_config.scheduler_type == "step_lr":
+                from torch.optim.lr_scheduler import StepLR
+                scheduler_params = dict(self.optimizer_config.step_lr)
+                base_scheduler = StepLR(optimizer, **scheduler_params)
+                final_scheduler = SequentialLR(optimizer, [warmup_scheduler, base_scheduler], [self.optimizer_config.warmup.warmup_steps])
+            elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
+                from torch.optim.lr_scheduler import CosineAnnealingLR
+                scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
+                base_scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
+                final_scheduler = SequentialLR(optimizer, [warmup_scheduler, base_scheduler], [self.optimizer_config.warmup.warmup_steps])
+            else:
+                # Only warmup, no base scheduler
+                final_scheduler = warmup_scheduler
+        else:
+            # No warmup, just use base scheduler if specified
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                scheduler_params = dict(self.optimizer_config.reduce_lr_on_plateau)
+                final_scheduler = ReduceLROnPlateau(optimizer, **scheduler_params)
+            elif self.optimizer_config.scheduler_type == "step_lr":
+                from torch.optim.lr_scheduler import StepLR
+                scheduler_params = dict(self.optimizer_config.step_lr)
+                final_scheduler = StepLR(optimizer, **scheduler_params)
+            elif self.optimizer_config.scheduler_type == "cosine_annealing_lr":
+                from torch.optim.lr_scheduler import CosineAnnealingLR
+                scheduler_params = dict(self.optimizer_config.cosine_annealing_lr)
+                final_scheduler = CosineAnnealingLR(optimizer, **scheduler_params)
         
         # Store scheduler as an attribute so we can access it in on_epoch_end
-        self.lr_scheduler = scheduler
+        self.lr_scheduler = final_scheduler
         
         # For manual optimization, just return the optimizer
         if not self.automatic_optimization:
             return optimizer
         
-        # For automatic optimization, return with scheduler config
-        return {
-            "optimizer": optimizer,
-            "lr_scheduler": {
-                "scheduler": scheduler,
-                "monitor": "val_loss",
-                "interval": "epoch",
-                "frequency": 1
-            }
-        }
+        # For automatic optimization, return with scheduler config if scheduler exists
+        if final_scheduler is not None:
+            if self.optimizer_config.scheduler_type == "reduce_lr_on_plateau":
+                return {
+                    "optimizer": optimizer,
+                    "lr_scheduler": {
+                        "scheduler": final_scheduler,
+                        "monitor": "val_loss",
+                        "interval": "step" if self.optimizer_config.warmup.enabled else "epoch",
+                        "frequency": 1
+                    }
+                }
+            else:
+                return {
+                    "optimizer": optimizer,
+                    "lr_scheduler": {
+                        "scheduler": final_scheduler,
+                        "interval": "step" if self.optimizer_config.warmup.enabled else "epoch",
+                        "frequency": 1
+                    }
+                }
+        else:
+            return optimizer
 
     def optimizer_step(
         self,
@@ -537,10 +555,16 @@ class AudioClassifier(pl.LightningModule):
         loss = optimizer_closure()
         
         # Apply gradient clipping if configured
-        if hasattr(self.general_config, 'gradient_clip_val') and self.general_config.gradient_clip_val > 0:
-            clip_val = self.general_config.gradient_clip_val
-            # Clip gradients by value
-            torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
+        if (self.optimizer_config.gradient_clipping_enabled and 
+            self.optimizer_config.gradient_clip_val is not None and 
+            self.optimizer_config.gradient_clip_val > 0):
+            clip_val = self.optimizer_config.gradient_clip_val
+            if self.optimizer_config.gradient_clip_algorithm == "value":
+                # Clip gradients by value
+                torch.nn.utils.clip_grad_value_(self.parameters(), clip_value=clip_val)
+            elif self.optimizer_config.gradient_clip_algorithm == "norm":
+                # Clip gradients by norm
+                torch.nn.utils.clip_grad_norm_(self.parameters(), max_norm=clip_val)
         
         # Skip optimizer step if any gradients are invalid (infinity/NaN)
         valid_gradients = True
@@ -563,10 +587,33 @@ class AudioClassifier(pl.LightningModule):
     def on_validation_epoch_end(self):
         """Called at the end of the validation epoch.
         If using manual optimization, manually step the learning rate scheduler.
+        Also handle transition from warmup to ReduceLROnPlateau when needed.
         """
         if not self.automatic_optimization and hasattr(self, 'lr_scheduler'):
-            # Get the current validation loss
-            val_loss = self.trainer.callback_metrics.get('val_loss')
-            if val_loss is not None:
-                # Step the scheduler with the validation loss
-                self.lr_scheduler.step(val_loss)
+            # Handle warmup + ReduceLROnPlateau combination
+            if (hasattr(self, 'base_scheduler_config') and 
+                self.base_scheduler_config["type"] == "reduce_lr_on_plateau" and
+                hasattr(self, 'warmup_steps')):
+                
+                # Check if we've finished warmup and need to initialize ReduceLROnPlateau
+                current_step = self.global_step
+                if current_step >= self.warmup_steps and self.post_warmup_scheduler is None:
+                    # Initialize ReduceLROnPlateau after warmup
+                    opt = self.optimizers()
+                    self.post_warmup_scheduler = ReduceLROnPlateau(opt, **self.base_scheduler_config["params"])
+                    print(f"LR warmup completed at step {current_step}. Switching to ReduceLROnPlateau scheduler.")
+                
+                # Use ReduceLROnPlateau if warmup is done
+                if self.post_warmup_scheduler is not None:
+                    val_loss = self.trainer.callback_metrics.get('val_loss')
+                    if val_loss is not None:
+                        self.post_warmup_scheduler.step(val_loss)
+            else:
+                # Standard scheduler stepping
+                if isinstance(self.lr_scheduler, ReduceLROnPlateau):
+                    val_loss = self.trainer.callback_metrics.get('val_loss')
+                    if val_loss is not None:
+                        self.lr_scheduler.step(val_loss)
+                else:
+                    # For other schedulers, step without arguments
+                    self.lr_scheduler.step()

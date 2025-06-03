@@ -12,10 +12,103 @@ from icecream import ic
 from datetime import datetime
 
 from .lightning_module import AudioClassifier
-from .datamodule import AudioDataModule
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
+from configs.dataset_config import DatasetConfig
+from configs.optim_config import OptimizerConfig
 from .util import wandb_login
 import time
+
+
+class CustomProgressBar(TQDMProgressBar):
+    """Custom progress bar for training that shows formatted metrics."""
+    def get_metrics(self, trainer, model):
+        # Get metrics from parent class
+        items = super().get_metrics(trainer, model)
+        
+        # Format all metrics to 2 decimal places
+        for key in list(items.keys()):
+            if key in ['v_num', 'epoch', 'step']:
+                continue
+            if isinstance(items[key], (float, int, torch.Tensor)):
+                try:
+                    # Convert to float first to handle tensor values
+                    value = float(items[key])
+                    items[key] = f"{value:.2f}"
+                except (ValueError, TypeError):
+                    # If conversion fails, keep the original value
+                    pass
+        
+        # Reorder metrics to show in desired order
+        ordered_items = {}
+        
+        # First show epoch and step
+        if 'epoch' in items:
+            ordered_items['epoch'] = items['epoch']
+        if 'step' in items:
+            ordered_items['step'] = items['step']
+        
+        # Then show train metrics
+        for metric in ['train_loss', 'train_acc', 'train_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Then show validation metrics
+        for metric in ['val_loss', 'val_acc', 'val_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Add any remaining metrics
+        for key, val in items.items():
+            if key not in ordered_items:
+                ordered_items[key] = val
+        
+        return ordered_items
+
+
+class CustomFoldProgressBar(TQDMProgressBar):
+    """Custom progress bar for k-fold training that shows formatted metrics."""
+    def get_metrics(self, trainer, model):
+        # Get metrics from parent class
+        items = super().get_metrics(trainer, model)
+        
+        # Format all metrics to 2 decimal places
+        for key in list(items.keys()):
+            if key in ['v_num', 'epoch', 'step']:
+                continue
+            if isinstance(items[key], (float, int, torch.Tensor)):
+                try:
+                    # Convert to float first to handle tensor values
+                    value = float(items[key])
+                    items[key] = f"{value:.2f}"
+                except (ValueError, TypeError):
+                    # If conversion fails, keep the original value
+                    pass
+        
+        # Reorder metrics to show in desired order
+        ordered_items = {}
+        
+        # First show epoch and step
+        if 'epoch' in items:
+            ordered_items['epoch'] = items['epoch']
+        if 'step' in items:
+            ordered_items['step'] = items['step']
+        
+        # Then show train metrics
+        for metric in ['train_loss', 'train_acc', 'train_f1']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Then show validation metrics
+        for metric in ['val_loss', 'val_acc']:
+            if metric in items:
+                ordered_items[metric] = items[metric]
+        
+        # Add any remaining metrics
+        for key, val in items.items():
+            if key not in ordered_items:
+                ordered_items[key] = val
+        
+        return ordered_items
 
 
 class PTLTrainer:
@@ -27,12 +120,14 @@ class PTLTrainer:
         self,
         general_config: GeneralConfig,
         feature_extraction_config: FeatureExtractionConfig,
+        dataset_config: DatasetConfig,
         peft_config: Any,
         wandb_config: WandbConfig,
         sweep_config: SweepConfig,
-        data_module: AudioDataModule,
+        data_module: pl.LightningDataModule,
         model_factory: Callable,
         augmentation_config: AugmentationConfig,
+        optimizer_config: OptimizerConfig,
     ):
         """
         Initialize the PTLTrainer.
@@ -40,24 +135,39 @@ class PTLTrainer:
         Args:
             general_config: General configuration
             feature_extraction_config: Feature extraction configuration
+            dataset_config: Dataset configuration
             peft_config: PEFT configuration
             wandb_config: WandB configuration
             sweep_config: Sweep configuration
-            data_module: Audio data module
+            data_module: Lightning data module (UAVDataModule or ESC50DataModule)
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
+            optimizer_config: Optimizer configuration
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
+        self.dataset_config = dataset_config
         self.peft_config = peft_config
         self.wandb_config = wandb_config
         self.sweep_config = sweep_config
         self.data_module = data_module
         self.model_factory = model_factory
         self.augmentation_config = augmentation_config
+        self.optimizer_config = optimizer_config
         
-        # Single GPU configuration
+        # GPU configuration
         self.gpu_available = torch.cuda.is_available()
+        self.num_gpus = general_config.num_gpus if general_config.distributed_training else 1
+        self.distributed_strategy = general_config.strategy if general_config.distributed_training else None
+        
+        # Validate GPU configuration
+        if general_config.distributed_training:
+            if not self.gpu_available:
+                raise ValueError("Distributed training requires CUDA to be available")
+            available_gpus = torch.cuda.device_count()
+            if self.num_gpus > available_gpus:
+                print(f"Warning: Requested {self.num_gpus} GPUs but only {available_gpus} available. Using {available_gpus} GPUs.")
+                self.num_gpus = available_gpus
         
         # Set up wandb logger
         self.wandb_logger = None
@@ -70,8 +180,15 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
-                group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
+                config=wandb_config_dict(
+                    self.general_config, 
+                    self.feature_extraction_config, 
+                    self.dataset_config,
+                    self.peft_config, 
+                    self.wandb_config, 
+                    self.augmentation_config,
+                    self.optimizer_config
+                ),
                 reinit=True  # Force reinitialize a new wandb run
             )
         
@@ -84,162 +201,114 @@ class PTLTrainer:
         torch.cuda.manual_seed(general_config.seed)
         np.random.seed(general_config.seed)
     
+    def _get_current_lr(self) -> float:
+        """Get the current learning rate from optimizer config."""
+        if self.optimizer_config.optimizer_type == "adamw":
+            return self.optimizer_config.adamw.lr
+        elif self.optimizer_config.optimizer_type == "adam":
+            return self.optimizer_config.adam.lr
+        else:
+            raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
+    
     def _get_callbacks(self) -> List[pl.Callback]:
         """
-        Get the callbacks for the trainer.
+        Get PyTorch Lightning callbacks.
         
         Returns:
             List of callbacks
         """
         callbacks = []
         
-        # Early stopping callback
-        if self.general_config.patience > 0:
-            early_stopping = EarlyStopping(
-                monitor="val_loss",
+        # Add custom progress bar
+        callbacks.append(CustomProgressBar(refresh_rate=10))
+        
+        # Add learning rate monitor
+        callbacks.append(LearningRateMonitor(logging_interval='epoch'))
+        
+        # Determine if validation metrics will be available
+        # This should match the logic in lightning_module._init_metrics()
+        will_have_val_metrics = (
+            (self.general_config.val_size > 0) or 
+            (hasattr(self.general_config, 'use_kfold') and self.general_config.use_kfold) or
+            # Also check if datamodule has validation data (for ESC datasets)
+            (hasattr(self.data_module, 'val_dataset') and self.data_module.val_dataset is not None)
+        )
+        
+        # Choose appropriate monitor metric and mode
+        if will_have_val_metrics and self.general_config.monitor.startswith('val_'):
+            monitor_metric = self.general_config.monitor
+            monitor_mode = self.general_config.mode
+        else:
+            # Fallback to training metrics if validation metrics aren't available
+            if self.general_config.monitor == 'val_acc':
+                monitor_metric = 'train_acc'
+                monitor_mode = 'max'
+            elif self.general_config.monitor == 'val_loss':
+                monitor_metric = 'train_loss'
+                monitor_mode = 'min'
+            elif self.general_config.monitor == 'val_f1':
+                monitor_metric = 'train_f1'
+                monitor_mode = 'max'
+            else:
+                # Use the configured monitor if it's already a training metric
+                monitor_metric = self.general_config.monitor
+                monitor_mode = self.general_config.mode
+        
+        print(f"Using monitor metric: {monitor_metric} (mode: {monitor_mode})")
+        
+        # Add model checkpoint callback
+        if self.general_config.checkpointing:
+            checkpoint_callback = ModelCheckpoint(
+                monitor=monitor_metric,
+                mode=monitor_mode,
+                save_top_k=self.general_config.save_top_k,
+                save_last=True,
+                filename='{epoch}-{' + monitor_metric.replace('_', '-') + ':.2f}',
+                auto_insert_metric_name=False
+            )
+            callbacks.append(checkpoint_callback)
+        
+        # Add early stopping callback
+        if self.general_config.early_stopping:
+            early_stop_callback = EarlyStopping(
+                monitor=monitor_metric,
+                mode=monitor_mode,
                 patience=self.general_config.patience,
-                mode="min",
                 verbose=True
             )
-            callbacks.append(early_stopping)
+            callbacks.append(early_stop_callback)
         
-        # Model checkpoint callback
-        checkpoint_callback = ModelCheckpoint(
-            dirpath="checkpoints",
-            filename="{epoch}-{val_loss:.4f}",
-            monitor="val_loss",
-            mode="min",
-            save_top_k=1,
-            verbose=True
-        )
-        callbacks.append(checkpoint_callback)
-        
-        # Learning rate monitor
-        lr_monitor = LearningRateMonitor(logging_interval="epoch")
-        callbacks.append(lr_monitor)
-        
-        # Custom progress bar with better metric display
-        class CustomProgressBar(TQDMProgressBar):
-            def get_metrics(self, trainer, model):
-                # Get metrics from parent class
-                items = super().get_metrics(trainer, model)
-                
-                # Format all metrics to 2 decimal places
-                for key in list(items.keys()):
-                    if key in ['v_num', 'epoch', 'step']:
-                        continue
-                    if isinstance(items[key], (float, int, torch.Tensor)):
-                        try:
-                            # Convert to float first to handle tensor values
-                            value = float(items[key])
-                            items[key] = f"{value:.2f}"
-                        except (ValueError, TypeError):
-                            # If conversion fails, keep the original value
-                            pass
-                
-                # Reorder metrics to show in desired order
-                ordered_items = {}
-                
-                # First show epoch and step
-                if 'epoch' in items:
-                    ordered_items['epoch'] = items['epoch']
-                if 'step' in items:
-                    ordered_items['step'] = items['step']
-                
-                # Then show train metrics
-                for metric in ['train_loss', 'train_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show validation metrics
-                for metric in ['val_loss', 'val_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Then show test metrics
-                for metric in ['test_loss', 'test_acc']:
-                    if metric in items:
-                        ordered_items[metric] = items[metric]
-                
-                # Add any remaining metrics
-                for key, val in items.items():
-                    if key not in ordered_items:
-                        ordered_items[key] = val
-                
-                return ordered_items
-        
-        # Add custom progress bar
-        progress_bar = CustomProgressBar()
-        callbacks.append(progress_bar)
-
         return callbacks
+    
+    def _get_num_classes(self) -> int:
+        """
+        Get the number of classes from the data module.
+        
+        Returns:
+            Number of classes
+        """
+        if hasattr(self.data_module, 'num_classes'):
+            return self.data_module.num_classes
+        else:
+            # Fallback to dataset config
+            return self.dataset_config.get_num_classes()
     
     def train(self) -> Dict[str, Any]:
         """
-        Train the model.
+        Train the model using PyTorch Lightning.
         
         Returns:
-            Dict[str, Any]: Test results
+            Dictionary of test results
         """
-        import torch
-        
-        # Set float32 matmul precision to 'high' to properly utilize Tensor Cores on CUDA devices
-        if torch.cuda.is_available():
-            torch.set_float32_matmul_precision('high')
-            print("Set float32 matmul precision to 'high' for better performance on Tensor Core GPUs")
-        
-        # Check if deterministic algorithms are enabled and disable them if needed
-        # This is necessary for operations like interpolation that don't have deterministic implementations
-        if torch.are_deterministic_algorithms_enabled():
-            print("Deterministic algorithms are enabled. Disabling for compatibility with certain operations.")
-            torch.use_deterministic_algorithms(False)
-        
-        # Create model
-        model, feature_extractor = self.model_factory(self.device)
-        
-        # Create a custom callback to display metrics after each epoch
-        class MetricsDisplayCallback(pl.Callback):
-            def on_train_epoch_end(self, trainer, pl_module):
-                metrics = trainer.callback_metrics
-                
-                # Extract metrics
-                train_loss = metrics.get('train_loss_epoch', None)
-                train_acc = metrics.get('train_acc_epoch', None)
-                val_loss = metrics.get('val_loss', None)
-                val_acc = metrics.get('val_acc', None)
-                
-                # Convert tensors to floats
-                if isinstance(train_loss, torch.Tensor):
-                    train_loss = train_loss.item()
-                if isinstance(train_acc, torch.Tensor):
-                    train_acc = train_acc.item()
-                if isinstance(val_loss, torch.Tensor):
-                    val_loss = val_loss.item()
-                if isinstance(val_acc, torch.Tensor):
-                    val_acc = val_acc.item()
-                
-                # Print metrics in a nice format
-                print("\n" + "-"*50)
-                print(f"Epoch {trainer.current_epoch} Metrics:")
-                
-                # Format metrics safely, handling None values
-                train_loss_str = f"{train_loss:.4f}" if train_loss is not None else "N/A"
-                train_acc_str = f"{train_acc:.4f}" if train_acc is not None else "N/A"
-                val_loss_str = f"{val_loss:.4f}" if val_loss is not None else "N/A"
-                val_acc_str = f"{val_acc:.4f}" if val_acc is not None else "N/A"
-                
-                print(f"Train Loss: {train_loss_str} | Train Acc: {train_acc_str}")
-                print(f"Val Loss: {val_loss_str} | Val Acc: {val_acc_str}")
-                print("-"*50 + "\n")
-        
-        # Create trainer with our custom callbacks
+        # Get callbacks
         callbacks = self._get_callbacks()
-        callbacks.append(MetricsDisplayCallback())
         
+        # Create trainer
         trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,
+            devices=self.num_gpus if self.gpu_available else "auto",
+            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
             callbacks=callbacks,
             logger=self.wandb_logger,
             deterministic=False,
@@ -249,30 +318,35 @@ class PTLTrainer:
         
         # Ensure data module is set up - call setup directly
         try:
-            self.data_module.setup()
+            self.data_module.setup(stage="fit")
         except Exception as e:
             print(f"Warning: Error during data module setup: {str(e)}")
             print("This may be normal if the data module is already set up.")
             
         # Validate number of classes
-        if not hasattr(self.data_module, 'num_classes') or self.data_module.num_classes <= 0:
-            raise ValueError(f"Invalid number of classes: {getattr(self.data_module, 'num_classes', None)}. Must be positive.")
+        num_classes = self._get_num_classes()
+        if num_classes <= 0:
+            raise ValueError(f"Invalid number of classes: {num_classes}. Must be positive.")
             
         # Log number of classes for debugging
-        print(f"Number of classes in data module: {self.data_module.num_classes}")
+        print(f"Number of classes in data module: {num_classes}")
+        
+        # Create model
+        model, feature_extractor = self.model_factory(self.device)
         
         # Create lightning module
         lightning_module = AudioClassifier(
             model=model,
             general_config=self.general_config,
             peft_config=self.peft_config,
-            num_classes=self.data_module.num_classes
+            num_classes=num_classes,
+            optimizer_config=self.optimizer_config
         )
         
         # Print training start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Start timer
@@ -312,47 +386,44 @@ class PTLTrainer:
             })
         
         # Run test evaluation after training
-        print("\n" + "="*80)
-        print("RUNNING TEST EVALUATION")
-        print("="*80 + "\n")
-        
-        test_results = trainer.test(
-            model=lightning_module,
-            datamodule=self.data_module
-        )
-        
-        # Print test results in a nice table
-        if test_results:
+
+        if self.general_config.test_size > 0:
+            
             print("\n" + "="*80)
-            print("TEST RESULTS")
-            print("="*80)
-            
-            print(f"{'Metric':<20} {'Value':<10}")
-            print("-"*30)
-            
-            # Print test metrics in a specific order
-            test_metric_order = [
-                'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
-            ]
-            
-            for metric_name in test_metric_order:
-                if metric_name in test_results[0]:
-                    value = test_results[0][metric_name]
-                    if isinstance(value, torch.Tensor):
-                        value = value.item()
-                    print(f"{metric_name:<20} {value:.2f}")
-            
+            print("RUNNING TEST EVALUATION")
             print("="*80 + "\n")
             
-            # Log final test metrics to wandb summary
-            # if self.wandb_logger:
-            #     for metric_name in test_metric_order:
-            #         if metric_name in test_results[0]:
-            #             value = test_results[0][metric_name]
-            #             if isinstance(value, torch.Tensor):
-            #                 value = value.item()
-            #             # Add to wandb summary
-            #             self.wandb_logger.experiment.summary[f"final_{metric_name}"] = value
+            test_results = trainer.test(
+                model=lightning_module,
+                datamodule=self.data_module
+            )
+            
+            # Print test results in a nice table
+            if test_results:
+                print("\n" + "="*80)
+                print("TEST RESULTS")
+                print("="*80)
+                
+                print(f"{'Metric':<20} {'Value':<10}")
+                print("-"*30)
+                
+                # Print test metrics in a specific order
+                test_metric_order = [
+                    'test_loss_epoch', 'test_acc_epoch', 'test_f1_epoch', 'test_precision_epoch', 'test_recall_epoch'
+                ]
+                
+                for metric_name in test_metric_order:
+                    if metric_name in test_results[0]:
+                        value = test_results[0][metric_name]
+                        if isinstance(value, torch.Tensor):
+                            value = value.item()
+                        print(f"{metric_name:<20} {value:.2f}")
+                
+                print("="*80 + "\n")
+                
+        else:
+            print("No test split available, skipping test evaluation.")
+            test_results = []
         
         # Run inference on the inference split if available
         inference_results = {}
@@ -428,35 +499,6 @@ class PTLTrainer:
         if inference_results:
             for key, value in inference_results.items():
                 results_dict[key] = value
-        
-        # Log best validation metrics to wandb summary
-        # if self.wandb_logger and hasattr(lightning_module, 'best_val_accuracy'):
-        #     self.wandb_logger.experiment.summary['final_best_val_acc'] = lightning_module.best_val_accuracy
-            
-        #     # Log other best validation metrics if available
-        #     if hasattr(lightning_module, 'best_val_f1'):
-        #         self.wandb_logger.experiment.summary['final_best_val_f1'] = lightning_module.best_val_f1
-            
-        #     if hasattr(lightning_module, 'best_val_precision'):
-        #         self.wandb_logger.experiment.summary['final_best_val_precision'] = lightning_module.best_val_precision
-                
-        #     if hasattr(lightning_module, 'best_val_recall'):
-        #         self.wandb_logger.experiment.summary['final_best_val_recall'] = lightning_module.best_val_recall
-        
-        # Print a summary of all metrics at the end
-        print("\n" + "="*80)
-        print("TRAINING SUMMARY")
-        print("="*80)
-        print(f"Model: {self.general_config.model_type}")
-        print(f"Total training time: {formatted_end_time}")
-        
-        # Get validation accuracy
-        val_acc = None
-        if 'val_acc' in trainer.callback_metrics:
-            val_acc = trainer.callback_metrics['val_acc']
-            if isinstance(val_acc, torch.Tensor):
-                val_acc = val_acc.item()
-        
         # Get test accuracy
         test_acc = None
         if 'test_acc_epoch' in results_dict:
@@ -472,11 +514,9 @@ class PTLTrainer:
                 inf_acc = inf_acc.item()
         
         # Format metrics safely, handling None values
-        val_acc_str = f"{val_acc:.2f}" if val_acc is not None else "N/A"
         test_acc_str = f"{test_acc:.2f}" if test_acc is not None else "N/A"
         inf_acc_str = f"{inf_acc:.2f}" if inf_acc is not None else "N/A"
         
-        print(f"Final validation accuracy: {val_acc_str}")
         print(f"Test accuracy: {test_acc_str}")
         print(f"Inference accuracy: {inf_acc_str}")
         
@@ -654,7 +694,7 @@ class PTLTrainer:
                 notes=self.wandb_config.notes,
                 log_model=False,
                 save_dir="wandb",
-                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config),
+                config=wandb_config_dict(self.general_config, self.feature_extraction_config, self.peft_config, self.wandb_config, self.augmentation_config, self.optimizer_config),
                 group=self.wandb_config.group if hasattr(self.wandb_config, 'group') and self.wandb_config.group else None,
                 reinit=True  # Force reinitialize a new wandb run
             )
@@ -662,7 +702,7 @@ class PTLTrainer:
         # Print k-fold start message with clear formatting
         print("\n" + "="*80)
         print(f"STARTING {self.general_config.k_folds}-FOLD CROSS-VALIDATION: {self.general_config.model_type.upper()} MODEL")
-        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self.general_config.learning_rate}")
+        print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
         print("="*80 + "\n")
         
         # Train on each fold
@@ -682,7 +722,8 @@ class PTLTrainer:
                 model=model,
                 general_config=self.general_config,
                 peft_config=self.peft_config,
-                num_classes=self.data_module.num_classes
+                num_classes=self.data_module.num_classes,
+                optimizer_config=self.optimizer_config
             )
             
             # Create checkpoint directory for this fold
@@ -690,51 +731,6 @@ class PTLTrainer:
             checkpoint_dir.mkdir(parents=True, exist_ok=True)
             
             # Create custom progress bar for this fold
-            class CustomFoldProgressBar(TQDMProgressBar):
-                def get_metrics(self, trainer, model):
-                    # Get metrics from parent class
-                    items = super().get_metrics(trainer, model)
-                    
-                    # Format all metrics to 2 decimal places
-                    for key in list(items.keys()):
-                        if key in ['v_num', 'epoch', 'step']:
-                            continue
-                        if isinstance(items[key], (float, int, torch.Tensor)):
-                            try:
-                                # Convert to float first to handle tensor values
-                                value = float(items[key])
-                                items[key] = f"{value:.2f}"
-                            except (ValueError, TypeError):
-                                # If conversion fails, keep the original value
-                                pass
-                    
-                    # Reorder metrics to show in desired order
-                    ordered_items = {}
-                    
-                    # First show epoch and step
-                    if 'epoch' in items:
-                        ordered_items['epoch'] = items['epoch']
-                    if 'step' in items:
-                        ordered_items['step'] = items['step']
-                    
-                    # Then show train metrics
-                    for metric in ['train_loss', 'train_acc']:
-                        if metric in items:
-                            ordered_items[metric] = items[metric]
-                    
-                    # Then show validation metrics
-                    for metric in ['val_loss', 'val_acc']:
-                        if metric in items:
-                            ordered_items[metric] = items[metric]
-                    
-                    # Add any remaining metrics
-                    for key, val in items.items():
-                        if key not in ordered_items:
-                            ordered_items[key] = val
-                    
-                    return ordered_items
-            
-            # Create callbacks for this fold
             fold_callbacks = [
                 ModelCheckpoint(
                     dirpath=str(checkpoint_dir),
@@ -757,7 +753,8 @@ class PTLTrainer:
             trainer = pl.Trainer(
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
-            devices=1,
+            devices=self.num_gpus if self.gpu_available else "auto",
+            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
             callbacks=fold_callbacks,
             logger=self.wandb_logger,
             deterministic=False,
