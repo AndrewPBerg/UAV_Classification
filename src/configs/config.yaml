@@ -15,7 +15,7 @@ general:
   use_wandb: false
   use_sweep: false
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
@@ -54,11 +54,11 @@ optimizer:
   gradient_clip_val: 5.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: esc10
-  data_path: datasets/ESC-10-master/classes
+  dataset_type: urbansound8k
+  data_path: datasets/UrbanSound8K/classes
   num_classes: 10
   target_sr: 16000
-  target_duration: 5
+  target_duration: 4
   file_extension: .wav
   fold_based_split: true
 augmentations:
