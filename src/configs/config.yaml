@@ -1,7 +1,7 @@
 general:
   model_type: ast
   from_scratch: false
-  batch_size: 8
+  batch_size: 12
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
@@ -16,7 +16,7 @@ general:
   use_wandb: false
   use_sweep: false
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5
   adapter_type: none-classifier
   save_dataloader: false
@@ -32,7 +32,7 @@ peft_scheduling:
   schedule:
   - start_epoch: 0
     peft_method: none-full
-  - start_epoch: 6
+  - start_epoch: 10
     peft_method: ia3
   - start_epoch: 12
     peft_method: none-classifier
@@ -69,7 +69,7 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 1
   augmentations: []
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
@@ -167,8 +167,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: vit-base-peft-sch
-  name: vit-base-
+  project: ast-peft-sch
+  name: ast-full-ia3-none-1aug
   reinit: true
   notes: null
   tags:

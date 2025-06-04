@@ -11,3 +11,15 @@ runs:
     changes:
       general:
         model_type: ast
+      wandb:
+        project: ast-peft-sch
+        name: ast-full-ia3-none-1aug
+  - id: 2
+    type: script
+    changes:
+      general:
+        model_type: ast
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        name: ast-full-ia3-none-1aug
