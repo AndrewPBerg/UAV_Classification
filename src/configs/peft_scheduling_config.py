@@ -111,7 +111,6 @@ class PEFTScheduleStep(BaseModel):
 class PEFTSchedulingConfig(BaseModel):
     """Configuration for PEFT method scheduling during training"""
     enabled: bool = Field(default=False, description="Whether to enable PEFT scheduling")
-    model_name: Optional[str] = Field(default=None, description="Model name for compatibility validation")
     schedule: List[PEFTScheduleStep] = Field(
         default_factory=list,
         description="List of PEFT method changes during training"
@@ -121,14 +120,50 @@ class PEFTSchedulingConfig(BaseModel):
         description="Automatically merge additive PEFT methods when switching"
     )
     
+    def validate_with_model(self, model_name: str) -> List[str]:
+        """
+        Validate all scheduled PEFT methods against a model after initialization.
+        
+        Args:
+            model_name: Name of the model to validate against
+            
+        Returns:
+            List of validation errors (empty if all valid)
+        """
+        errors = []
+        
+        try:
+            model_type = get_model_type(model_name)
+            compatible_methods = MODEL_PEFT_COMPATIBILITY[model_type]
+            
+            for step in self.schedule:
+                if step.peft_method not in compatible_methods:
+                    errors.append(
+                        f'PEFT method "{step.peft_method}" at epoch {step.start_epoch} '
+                        f'is not compatible with {model_type.value} model "{model_name}". '
+                        f'Compatible methods: {sorted(compatible_methods)}'
+                    )
+        except ValueError as e:
+            errors.append(str(e))
+        
+        # Validate merging logic
+        for i in range(1, len(self.schedule)):
+            current_step = self.schedule[i]
+            previous_step = self.schedule[i-1]
+            
+            # If previous method requires merging and current step doesn't merge, warn
+            if (requires_reparameterization(previous_step.peft_method) and 
+                not current_step.merge_previous):
+                errors.append(f"Warning: Previous PEFT method '{previous_step.peft_method}' requires "
+                             f"reparameterization but merge_previous=False for step at epoch {current_step.start_epoch}")
+        
+        return errors
+    
     @field_validator('schedule')
     @classmethod
-    def validate_schedule(cls, v, info):
+    def validate_schedule(cls, v):
         if not v:
             return v
-        
-        # Get model_name from the validation context
-        model_name = info.data.get('model_name') if info.data else None
         
         # Check that start_epochs are in ascending order
         start_epochs = [step.start_epoch for step in v]
@@ -138,28 +173,6 @@ class PEFTSchedulingConfig(BaseModel):
         # Check for duplicate start_epochs
         if len(set(start_epochs)) != len(start_epochs):
             raise ValueError('Schedule steps cannot have duplicate start_epochs')
-        
-        # Validate model compatibility if model_name is provided
-        if model_name:
-            for step in v:
-                if not is_peft_compatible(model_name, step.peft_method):
-                    model_type = get_model_type(model_name)
-                    compatible_methods = MODEL_PEFT_COMPATIBILITY[model_type]
-                    raise ValueError(
-                        f'PEFT method "{step.peft_method}" is not compatible with {model_type.value} '
-                        f'model "{model_name}". Compatible methods: {sorted(compatible_methods)}'
-                    )
-        
-        # Validate merging logic
-        for i in range(1, len(v)):
-            current_step = v[i]
-            previous_step = v[i-1]
-            
-            # If previous method requires merging and current step doesn't merge, warn
-            if (requires_reparameterization(previous_step.peft_method) and 
-                not current_step.merge_previous):
-                print(f"Warning: Previous PEFT method '{previous_step.peft_method}' requires "
-                      f"reparameterization but merge_previous=False for step at epoch {current_step.start_epoch}")
         
         return v
     
@@ -223,38 +236,10 @@ class PEFTSchedulingConfig(BaseModel):
                 }
         
         return None
-    
-    def validate_model_compatibility(self, model_name: str) -> List[str]:
-        """
-        Validate all scheduled PEFT methods against a model.
-        
-        Args:
-            model_name: Name of the model to validate against
-            
-        Returns:
-            List of validation errors (empty if all valid)
-        """
-        errors = []
-        
-        try:
-            model_type = get_model_type(model_name)
-            compatible_methods = MODEL_PEFT_COMPATIBILITY[model_type]
-            
-            for step in self.schedule:
-                if step.peft_method not in compatible_methods:
-                    errors.append(
-                        f'PEFT method "{step.peft_method}" at epoch {step.start_epoch} '
-                        f'is not compatible with {model_type.value} model "{model_name}"'
-                    )
-        except ValueError as e:
-            errors.append(str(e))
-        
-        return errors
 
 
 def create_simple_schedule(
     switch_epoch: int = 10, 
-    model_name: Optional[str] = None,
     from_method: str = "none-classifier",
     to_method: str = "none-full"
 ) -> PEFTSchedulingConfig:
@@ -263,7 +248,6 @@ def create_simple_schedule(
     
     Args:
         switch_epoch: Epoch to switch methods
-        model_name: Model name for compatibility validation
         from_method: Initial PEFT method
         to_method: PEFT method to switch to
         
@@ -272,7 +256,6 @@ def create_simple_schedule(
     """
     return PEFTSchedulingConfig(
         enabled=True,
-        model_name=model_name,
         schedule=[
             PEFTScheduleStep(start_epoch=0, peft_method=from_method),
             PEFTScheduleStep(start_epoch=switch_epoch, peft_method=to_method)
@@ -308,7 +291,6 @@ def create_progressive_schedule(
     
     return PEFTSchedulingConfig(
         enabled=True,
-        model_name=model_name,
         schedule=[
             PEFTScheduleStep(start_epoch=0, peft_method="none-classifier"),
             PEFTScheduleStep(start_epoch=classifier_epochs, peft_method=selective_method),
@@ -353,7 +335,6 @@ def create_adapter_schedule(
     
     return PEFTSchedulingConfig(
         enabled=True,
-        model_name=model_name,
         schedule=[
             PEFTScheduleStep(start_epoch=0, peft_method="none-classifier"),
             PEFTScheduleStep(start_epoch=5, peft_method=adapter_method),
@@ -377,11 +358,31 @@ def get_peft_scheduling_config(config: dict) -> Optional[PEFTSchedulingConfig]:
     
     peft_scheduling_config_dict = config["peft_scheduling"]
     
-    # Add model_name from the main config if not specified
-    if "model_name" not in peft_scheduling_config_dict and "model" in config:
-        peft_scheduling_config_dict["model_name"] = config["model"]["model_name"]
+    # Create the basic config without model validation
+    peft_config = PEFTSchedulingConfig(**peft_scheduling_config_dict)
     
-    return PEFTSchedulingConfig(**peft_scheduling_config_dict)
+    # Validate against model if we can extract the model name
+    model_name = None
+    
+    # Try to extract model name from various possible locations in config
+    if "general" in config and "model_type" in config["general"]:
+        model_name = config["general"]["model_type"]
+    elif "model_type" in config:
+        model_name = config["model_type"]
+    elif "model" in config:
+        if isinstance(config["model"], dict) and "model_name" in config["model"]:
+            model_name = config["model"]["model_name"]
+        elif isinstance(config["model"], str):
+            model_name = config["model"]
+    
+    # Validate with model if we found one
+    if model_name and peft_config.enabled and peft_config.schedule:
+        validation_errors = peft_config.validate_with_model(model_name)
+        if validation_errors:
+            error_msg = f"PEFT scheduling validation errors for model '{model_name}':\n" + "\n".join(validation_errors)
+            raise ValueError(error_msg)
+    
+    return peft_config
 
 
 def get_compatible_peft_methods(model_name: str) -> Dict[str, List[str]]:

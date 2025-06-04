@@ -1,7 +1,7 @@
 general:
-  model_type: vit-base
+  model_type: ast
   from_scratch: false
-  batch_size: 16
+  batch_size: 14
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
@@ -13,7 +13,7 @@ general:
   sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: true
+  use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: false
@@ -27,11 +27,21 @@ general:
   strategy: ddp
 peft_scheduling:
   enabled: true
+  auto_merge: true
+  model_name: ast
   schedule:
   - start_epoch: 0
-    peft_method: none-full
-  - start_epoch: 10
     peft_method: none-classifier
+    merge_previous: false
+  - start_epoch: 2
+    peft_method: bitfit
+    merge_previous: false
+  - start_epoch: 4
+    peft_method: none-full
+    merge_previous: false
+  - start_epoch: 8
+    peft_method: bitfit
+    merge_previous: false
 optimizer:
   optimizer_type: adam
   adam:
