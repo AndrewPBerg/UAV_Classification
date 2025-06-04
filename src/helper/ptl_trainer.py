@@ -5,6 +5,7 @@ import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor, TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 import wandb
 from pathlib import Path
@@ -297,6 +298,36 @@ class PTLTrainer:
             # Fallback to dataset config
             return self.dataset_config.get_num_classes()
     
+    def _get_strategy(self):
+        """
+        Get the appropriate strategy for distributed training.
+        
+        Returns:
+            Strategy configuration for PyTorch Lightning trainer
+        """
+        if not self.general_config.distributed_training:
+            return "auto"
+        
+        # Check if PEFT scheduling is enabled
+        peft_scheduling_enabled = (
+            self.peft_scheduling_config is not None and 
+            self.peft_scheduling_config.enabled
+        )
+        
+        # If PEFT scheduling is enabled, we need to handle unused parameters
+        if peft_scheduling_enabled:
+            print("PEFT scheduling detected - enabling find_unused_parameters for DDP")
+            if self.general_config.strategy == "ddp":
+                return DDPStrategy(find_unused_parameters=True)
+            elif self.general_config.strategy == "ddp_spawn":
+                return DDPStrategy(process_group_backend="nccl", find_unused_parameters=True)
+            else:
+                # For other strategies, use the string and hope it works
+                return self.distributed_strategy
+        else:
+            # No PEFT scheduling, use the configured strategy
+            return self.distributed_strategy
+    
     def train(self) -> Dict[str, Any]:
         """
         Train the model using PyTorch Lightning.
@@ -312,7 +343,7 @@ class PTLTrainer:
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
             devices=self.num_gpus if self.gpu_available else "auto",
-            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
+            strategy=self._get_strategy(),
             callbacks=callbacks,
             logger=self.wandb_logger,
             deterministic=False,
@@ -760,7 +791,7 @@ class PTLTrainer:
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
             devices=self.num_gpus if self.gpu_available else "auto",
-            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
+            strategy=self._get_strategy(),
             callbacks=fold_callbacks,
             logger=self.wandb_logger,
             deterministic=False,

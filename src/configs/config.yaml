@@ -1,11 +1,11 @@
 general:
-  model_type: ast
+  model_type: vit-base
   from_scratch: false
-  batch_size: 14
+  batch_size: 16
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
-  epochs: 20
+  epochs: 30
   save_model: false
   test_size: 0.0
   inference_size: 0.0
@@ -13,7 +13,7 @@ general:
   sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: false
@@ -33,7 +33,7 @@ peft_scheduling:
   - start_epoch: 10
     peft_method: none-classifier
 optimizer:
-  optimizer_type: adamw
+  optimizer_type: adam
   adam:
     lr: 1e-4
     betas:
@@ -46,8 +46,8 @@ optimizer:
     - 0.9
     - 0.999
   warmup:
-    enabled: false
-    warmup_steps: 100
+    enabled: true
+    warmup_steps: 50
     warmup_start_lr: 1e-6
     warmup_method: linear
   scheduler_type: cosine_annealing_lr
@@ -58,8 +58,8 @@ optimizer:
     mode: max
     factor: 0.85
     patience: 3
-  gradient_clipping_enabled: false
-  gradient_clip_val: 5.0
+  gradient_clipping_enabled: true
+  gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 dataset:
   dataset_type: esc50
@@ -164,19 +164,12 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ast-eesc50-sweeps-baseline
-  name: ast-baseline-conservative-b48-lr1e4
+  project: vit-base-peft-sch
+  name: vit-base-
   reinit: true
   notes: null
   tags:
-  - ast
-  - esc50
-  - baseline
-  - conservative
-  - kfold
-  - none-classifier
-  - batch48
-  - lr1e-4
+  - vit-base
   dir: wandb
 sweep:
   project: ast-esc50-sweeps-baseline
