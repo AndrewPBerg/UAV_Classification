@@ -138,7 +138,8 @@ def main():
         model_factory=model_factory,
         augmentation_config=augmentation_config,
         optimizer_config=optimizer_config,
-        peft_scheduling_config=peft_scheduling_config
+        peft_scheduling_config=peft_scheduling_config,
+        config_dict=config
     )
     
     ic("trainer created")

@@ -131,6 +131,7 @@ class PTLTrainer:
         augmentation_config: AugmentationConfig,
         optimizer_config: OptimizerConfig,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        config_dict: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the PTLTrainer.
@@ -147,6 +148,7 @@ class PTLTrainer:
             augmentation_config: Augmentation configuration
             optimizer_config: Optimizer configuration
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            config_dict: Configuration dictionary (optional)
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -159,6 +161,7 @@ class PTLTrainer:
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
         self.peft_scheduling_config = peft_scheduling_config
+        self.config_dict = config_dict
         
         # GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -376,7 +379,8 @@ class PTLTrainer:
             peft_config=self.peft_config,
             num_classes=num_classes,
             optimizer_config=self.optimizer_config,
-            peft_scheduling_config=self.peft_scheduling_config
+            peft_scheduling_config=self.peft_scheduling_config,
+            config_dict=self.config_dict
         )
         
         # Print training start message with clear formatting
@@ -760,7 +764,8 @@ class PTLTrainer:
                 peft_config=self.peft_config,
                 num_classes=self.data_module.num_classes,
                 optimizer_config=self.optimizer_config,
-                peft_scheduling_config=self.peft_scheduling_config
+                peft_scheduling_config=self.peft_scheduling_config,
+                config_dict=self.config_dict
             )
             
             # Create checkpoint directory for this fold

@@ -1,7 +1,7 @@
 general:
   model_type: ast
   from_scratch: false
-  batch_size: 14
+  batch_size: 4
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
@@ -22,8 +22,8 @@ general:
   save_dataloader: false
   monitor: val_acc
   mode: max
-  distributed_training: true
-  num_gpus: 2
+  distributed_training: false
+  num_gpus: 1
   strategy: ddp
 peft_scheduling:
   enabled: true
@@ -31,13 +31,13 @@ peft_scheduling:
   model_name: ast
   schedule:
   - start_epoch: 0
-    peft_method: none-full
+    peft_method: lora
     merge_previous: false
-  - start_epoch: 5
-    peft_method: ia3
-    merge_previous: false
-  - start_epoch: 10
-    peft_method: none-classifier
+  - start_epoch: 1
+    peft_method: adalora
+    merge_previous: true
+  - start_epoch: 2
+    peft_method: oft
     merge_previous: true
 optimizer:
   optimizer_type: adam

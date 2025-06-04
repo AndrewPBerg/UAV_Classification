@@ -15,7 +15,9 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 
 from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
-from configs.peft_scheduling_config import PEFTSchedulingConfig
+from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
+from configs.peft_config import create_peft_config
+from models.transformer_models import apply_peft
 
 
 class AudioClassifier(pl.LightningModule):
@@ -31,6 +33,7 @@ class AudioClassifier(pl.LightningModule):
         num_classes: Optional[int] = None,
         optimizer_config: Optional[OptimizerConfig] = None,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        config_dict: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the classifier.
         
@@ -41,12 +44,14 @@ class AudioClassifier(pl.LightningModule):
             num_classes: Number of classes (optional)
             optimizer_config: Optimizer configuration (optional)
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            config_dict: Original config dictionary (optional)
         """
         super().__init__()
         self.model = model
         self.general_config = general_config
         self.peft_config = peft_config
         self.optimizer_config = optimizer_config or OptimizerConfig()  # Use default if not provided
+        self.config_dict = config_dict  # Store the original config dictionary
         
         # Set number of classes
         self.num_classes = num_classes if num_classes is not None else general_config.num_classes
@@ -55,7 +60,7 @@ class AudioClassifier(pl.LightningModule):
         self.loss_fn = nn.CrossEntropyLoss()
         
         # Save hyperparameters for checkpointing
-        self.save_hyperparameters(ignore=['model'])
+        self.save_hyperparameters(ignore=['model', 'config_dict'])
         
         # Initialize metrics
         self._init_metrics()
@@ -81,6 +86,12 @@ class AudioClassifier(pl.LightningModule):
             initial_method = self.peft_scheduling_config.get_peft_config_for_epoch(0)
             self._apply_peft_method(initial_method)
             print(f"PEFT Scheduling enabled. Starting with method: {initial_method}")
+        else:
+            # Initialize with the general config adapter type if no scheduling
+            if hasattr(general_config, 'adapter_type'):
+                initial_method = general_config.adapter_type
+                self._apply_peft_method(initial_method)
+                print(f"Using static PEFT method: {initial_method}")
 
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -638,18 +649,72 @@ class AudioClassifier(pl.LightningModule):
             
         print(f"Switching PEFT method from {self.current_peft_method} to {peft_method}")
         
-        if peft_method == "none-classifier":
-            # Freeze all parameters except classifier
-            for name, param in self.model.named_parameters():
-                if 'classifier' in name.lower() or 'head' in name.lower() or 'fc' in name.lower():
+        # Handle transition - check if we need to merge previous PEFT method
+        transition_info = self.peft_scheduling_config.get_transition_info(self.current_epoch)
+        if transition_info and transition_info.get('requires_merge', False):
+            print(f"Merging previous PEFT method: {transition_info['from_method']}")
+            # TODO: Implement PEFT merging - for now just print
+            # This would require the PEFTMerger class to be integrated
+        
+        # Create new PEFT configuration for the target method
+        # We need to construct a config dict with the right structure
+        config_dict = {
+            'general': {
+                'model_type': self.general_config.model_type,
+                'adapter_type': peft_method
+            }
+        }
+        
+        # Add the specific PEFT config if it exists in the stored config_dict
+        if self.config_dict and peft_method in self.config_dict:
+            config_dict[peft_method] = self.config_dict[peft_method]
+        
+        try:
+            # Create PEFT config for the new method
+            peft_config = create_peft_config(config_dict, peft_method)
+            
+            if peft_method in ["none-classifier", "none-full"]:
+                # Handle simple cases directly
+                if peft_method == "none-classifier":
+                    # Freeze all parameters except classifier
+                    for name, param in self.model.named_parameters():
+                        if any(classifier_term in name.lower() for classifier_term in ['classifier', 'head', 'fc', 'dense']):
+                            param.requires_grad = True
+                        else:
+                            param.requires_grad = False
+                            
+                elif peft_method == "none-full":
+                    # Unfreeze all parameters
+                    for param in self.model.parameters():
+                        param.requires_grad = True
+            else:
+                # Handle advanced PEFT methods using the apply_peft function
+                # First, we need to remove any existing PEFT adapters
+                self._remove_existing_peft()
+                
+                # Apply the new PEFT method
+                self.model = apply_peft(self.model, peft_config, self.general_config)
+                
+                print(f"Applied PEFT method: {peft_method}")
+                
+        except Exception as e:
+            print(f"Error applying PEFT method {peft_method}: {e}")
+            import traceback
+            traceback.print_exc()
+            # Fallback to basic parameter freezing/unfreezing
+            if peft_method == "none-classifier":
+                for name, param in self.model.named_parameters():
+                    if any(classifier_term in name.lower() for classifier_term in ['classifier', 'head', 'fc', 'dense']):
+                        param.requires_grad = True
+                    else:
+                        param.requires_grad = False
+            elif peft_method == "none-full":
+                for param in self.model.parameters():
                     param.requires_grad = True
-                else:
-                    param.requires_grad = False
-                    
-        elif peft_method == "none-full":
-            # Unfreeze all parameters
-            for param in self.model.parameters():
-                param.requires_grad = True
+            else:
+                print(f"Failed to apply PEFT method {peft_method}, falling back to none-full")
+                for param in self.model.parameters():
+                    param.requires_grad = True
         
         self.current_peft_method = peft_method
         
@@ -657,6 +722,27 @@ class AudioClassifier(pl.LightningModule):
         trainable_params = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         total_params = sum(p.numel() for p in self.model.parameters())
         print(f"PEFT method '{peft_method}': {trainable_params:,} trainable ({trainable_params/total_params:.2%} of {total_params:,})")
+
+    def _remove_existing_peft(self):
+        """Remove existing PEFT adapters from the model"""
+        # Check if model has PEFT adapters
+        if hasattr(self.model, 'peft_config'):
+            try:
+                # Try to merge and unload PEFT adapters if they exist
+                if hasattr(self.model, 'merge_and_unload'):
+                    print("Merging and unloading existing PEFT adapters")
+                    self.model = self.model.merge_and_unload()
+                elif hasattr(self.model, 'unload'):
+                    print("Unloading existing PEFT adapters")
+                    self.model = self.model.unload()
+                else:
+                    print("Warning: Could not remove existing PEFT adapters")
+            except Exception as e:
+                print(f"Warning: Error removing existing PEFT adapters: {e}")
+        
+        # Reset all parameters to be trainable (base state)
+        for param in self.model.parameters():
+            param.requires_grad = True
 
     def on_train_epoch_start(self):
         """Called at the start of each training epoch"""
