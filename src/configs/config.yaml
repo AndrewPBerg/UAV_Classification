@@ -1,7 +1,7 @@
 general:
   model_type: ast
   from_scratch: false
-  batch_size: 4
+  batch_size: 8
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
@@ -31,16 +31,13 @@ peft_scheduling:
   model_name: ast
   schedule:
   - start_epoch: 0
-    peft_method: lora
-    merge_previous: false
-  - start_epoch: 1
-    peft_method: adalora
-    merge_previous: true
-  - start_epoch: 2
-    peft_method: oft
-    merge_previous: true
+    peft_method: none-full
+  - start_epoch: 6
+    peft_method: ia3
+  - start_epoch: 12
+    peft_method: none-classifier
 optimizer:
-  optimizer_type: adam
+  optimizer_type: adamw
   adam:
     lr: 1e-4
     betas:
@@ -54,7 +51,7 @@ optimizer:
     - 0.999
   warmup:
     enabled: true
-    warmup_steps: 50
+    warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
   scheduler_type: cosine_annealing_lr
@@ -155,7 +152,6 @@ ssf:
   - linear
   - dense
   - batchnorm2d
-  - conv2d
 batchnorm:
   target_modules:
   - batchnorm2d

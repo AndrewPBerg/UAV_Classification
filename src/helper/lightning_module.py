@@ -16,7 +16,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
 from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
-from configs.peft_config import create_peft_config
+from configs.peft_config import get_peft_config
 from models.transformer_models import apply_peft
 
 
@@ -671,7 +671,7 @@ class AudioClassifier(pl.LightningModule):
         
         try:
             # Create PEFT config for the new method
-            peft_config = create_peft_config(config_dict, peft_method)
+            peft_config = get_peft_config(config_dict)
             
             if peft_method in ["none-classifier", "none-full"]:
                 # Handle simple cases directly
@@ -702,6 +702,7 @@ class AudioClassifier(pl.LightningModule):
             import traceback
             traceback.print_exc()
             # Fallback to basic parameter freezing/unfreezing
+            raise e
             if peft_method == "none-classifier":
                 for name, param in self.model.named_parameters():
                     if any(classifier_term in name.lower() for classifier_term in ['classifier', 'head', 'fc', 'dense']):
