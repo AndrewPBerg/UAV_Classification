@@ -31,17 +31,14 @@ peft_scheduling:
   model_name: ast
   schedule:
   - start_epoch: 0
-    peft_method: none-classifier
-    merge_previous: false
-  - start_epoch: 2
-    peft_method: bitfit
-    merge_previous: false
-  - start_epoch: 4
     peft_method: none-full
     merge_previous: false
-  - start_epoch: 8
-    peft_method: bitfit
+  - start_epoch: 5
+    peft_method: ia3
     merge_previous: false
+  - start_epoch: 10
+    peft_method: none-classifier
+    merge_previous: true
 optimizer:
   optimizer_type: adam
   adam:
