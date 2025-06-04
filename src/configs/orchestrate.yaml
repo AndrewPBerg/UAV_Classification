@@ -11,10 +11,28 @@ runs:
     changes:
       general:
         model_type: ast
+        use_wandb: true
+        use_kfold: true
+        adapter_type: none-full
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 1
       wandb:
-        project: ast-peft-sch
-        name: ast-full-ia3-none-1aug
+        project: esc50-none-full-transformers
+        name: ast-full-esc50-1aug
   - id: 2
+    type: script
+    changes:
+      general:
+        model_type: ast
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc50-none-full-transformers
+        name: ast-full-esc50-0aug
+  - id: 3
     type: script
     changes:
       general:
@@ -22,4 +40,229 @@ runs:
       augmentations:
         augmentations_per_sample: 2
       wandb:
-        name: ast-full-ia3-none-1aug
+        project: esc50-none-full-transformers
+        name: ast-full-esc50-2aug
+  - id: 4
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-base-full-esc50-0aug
+  - id: 5
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-base-full-esc50-1aug
+  - id: 6
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-base-full-esc50-2aug
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-large-full-esc50-2aug
+  - id: 8
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-large-full-esc50-1aug
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc50-none-full-transformers
+        name: vit-large-full-esc50-0aug
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc50-none-full-transformers
+        name: deit-base-full-esc50-2aug
+  - id: 11
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc50-none-full-transformers
+        name: deit-base-full-esc50-1aug
+  - id: 12
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc50-none-full-transformers
+        name: deit-base-full-esc50-0aug
+
+
+
+
+
+
+
+  - id: 13
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: true
+        adapter_type: none-full
+      dataset:
+        dataset_type: esc10
+        data_path: datasets/ESC-10-master/classes
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc10-none-full-transformers
+        name: ast-full-esc10-1aug
+  - id: 14
+    type: script
+    changes:
+      general:
+        model_type: ast
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc10-none-full-transformers
+        name: ast-full-esc10-0aug
+  - id: 15
+    type: script
+    changes:
+      general:
+        model_type: ast
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc10-none-full-transformers
+        name: ast-full-esc10-2aug
+  - id: 16
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-base-full-esc10-0aug
+  - id: 17
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-base-full-esc10-1aug
+  - id: 18
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-base-full-esc10-2aug
+  - id: 19
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-large-full-esc10-2aug
+  - id: 20
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-large-full-esc10-1aug
+  - id: 21
+    type: script
+    changes:
+      general:
+        model_type: vit-large
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc10-none-full-transformers
+        name: vit-large-full-esc10-0aug
+  - id: 22
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 2
+      wandb:
+        project: esc10-none-full-transformers
+        name: deit-base-full-esc10-2aug
+  - id: 23
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 1
+      wandb:
+        project: esc10-none-full-transformers
+        name: deit-base-full-esc10-1aug
+  - id: 24
+    type: script
+    changes:
+      general:
+        model_type: deit-base
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: esc10-none-full-transformers
+        name: deit-base-full-esc10-0aug
+

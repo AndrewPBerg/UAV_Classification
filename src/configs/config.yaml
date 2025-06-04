@@ -13,12 +13,12 @@ general:
   sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: true
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -26,16 +26,7 @@ general:
   num_gpus: 1
   strategy: ddp
 peft_scheduling:
-  enabled: true
-  auto_merge: true
-  model_name: ast
-  schedule:
-  - start_epoch: 0
-    peft_method: none-full
-  - start_epoch: 10
-    peft_method: ia3
-  - start_epoch: 12
-    peft_method: none-classifier
+  enabled: false
 optimizer:
   optimizer_type: adamw
   adam:
@@ -167,8 +158,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ast-peft-sch
-  name: ast-full-ia3-none-1aug
+  project: esc50-none-full-transformers
+  name: ast-full-esc50-1aug
   reinit: true
   notes: null
   tags:
