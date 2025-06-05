@@ -12,21 +12,25 @@ general:
   val_size: 0.2
   sweep_count: 200
   accumulation_steps: 1
-  patience: 5
+  patience: 20
   use_wandb: true
   use_sweep: false
   torch_viz: false
-  use_kfold: true
+  use_kfold: false
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
-  distributed_training: false
-  num_gpus: 1
+  distributed_training: true
+  num_gpus: 2
   strategy: ddp
 peft_scheduling:
-  enabled: false
+  enabled: true
+  auto_merge: true
+  schedule:
+  - start_epoch: 25
+    peft_method: none-classifier
 optimizer:
   optimizer_type: adamw
   adam:
@@ -60,7 +64,7 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 1
+  augmentations_per_sample: 0
   augmentations: []
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
@@ -158,8 +162,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-none-full-transformers
-  name: ast-full-esc50-1aug
+  project: esc50-ast-peft-schedules
+  name: ast-esc50-full-to-classifier-25
   reinit: true
   notes: null
   tags:

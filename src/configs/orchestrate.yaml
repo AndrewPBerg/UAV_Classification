@@ -5,264 +5,162 @@
 SEND_MESSAGE: true
 
 runs:
-  # Run 1: Conservative AST baseline - proven configuration from paper
   - id: 1
     type: script
     changes:
       general:
         model_type: ast
         use_wandb: true
-        use_kfold: true
+        use_kfold: false
         adapter_type: none-full
+        epochs: 30
+        patience: 20
       dataset:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 1
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 25
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: ast-full-esc50-1aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-full-to-classifier-25
   - id: 2
     type: script
     changes:
       general:
         model_type: ast
-      augmentations:
-        augmentations_per_sample: 0
+        adapter_type: none-full
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 20
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: ast-full-esc50-0aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-full-to-classifier-20
   - id: 3
     type: script
     changes:
       general:
         model_type: ast
-      augmentations:
-        augmentations_per_sample: 2
+        adapter_type: none-full
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 15
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: ast-full-esc50-2aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-full-to-classifier-15
   - id: 4
     type: script
     changes:
       general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 0
+        model_type: ast
+        adapter_type: none-full
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 10
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: vit-base-full-esc50-0aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-full-to-classifier-10
+
   - id: 5
     type: script
     changes:
       general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 1
+        model_type: ast
+        adapter_type: oft
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 10
+          peft_method: none-full
+        - start_epoch: 25
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: vit-base-full-esc50-1aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-oft-full-classifier-10-25
   - id: 6
     type: script
     changes:
       general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 2
+        model_type: ast
+        adapter_type: ssf
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 10
+          peft_method: none-full
+        - start_epoch: 25
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: vit-base-full-esc50-2aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-ssf-full-classifier-10-25
   - id: 7
     type: script
     changes:
       general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 2
+        model_type: ast
+        adapter_type: ia3
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 10
+          peft_method: none-full
+        - start_epoch: 25
+          peft_method: none-classifier
       wandb:
-        project: esc50-none-full-transformers
-        name: vit-large-full-esc50-2aug
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-ia3-full-classifier-10-25
   - id: 8
     type: script
     changes:
       general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: esc50-none-full-transformers
-        name: vit-large-full-esc50-1aug
-  - id: 9
-    type: script
-    changes:
-      general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc50-none-full-transformers
-        name: vit-large-full-esc50-0aug
-  - id: 10
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 2
-      wandb:
-        project: esc50-none-full-transformers
-        name: deit-base-full-esc50-2aug
-  - id: 11
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: esc50-none-full-transformers
-        name: deit-base-full-esc50-1aug
-  - id: 12
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc50-none-full-transformers
-        name: deit-base-full-esc50-0aug
-
-
-
-
-
-
-
-  - id: 13
-    type: script
-    changes:
-      general:
         model_type: ast
-        use_wandb: true
-        use_kfold: true
-        adapter_type: none-full
+        adapter_type: none-classifer
       dataset:
-        dataset_type: esc10
-        data_path: datasets/ESC-10-master/classes
-      augmentations:
-        augmentations_per_sample: 1
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      peft_scheduling:
+        enabled: true
+        auto_merge: true
+        schedule:
+        - start_epoch: 10
+          peft_method: none-full
+        - start_epoch: 25
+          peft_method: none-classifier
       wandb:
-        project: esc10-none-full-transformers
-        name: ast-full-esc10-1aug
-  - id: 14
-    type: script
-    changes:
-      general:
-        model_type: ast
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc10-none-full-transformers
-        name: ast-full-esc10-0aug
-  - id: 15
-    type: script
-    changes:
-      general:
-        model_type: ast
-      augmentations:
-        augmentations_per_sample: 2
-      wandb:
-        project: esc10-none-full-transformers
-        name: ast-full-esc10-2aug
-  - id: 16
-    type: script
-    changes:
-      general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-base-full-esc10-0aug
-  - id: 17
-    type: script
-    changes:
-      general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-base-full-esc10-1aug
-  - id: 18
-    type: script
-    changes:
-      general:
-        model_type: vit-base
-      augmentations:
-        augmentations_per_sample: 2
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-base-full-esc10-2aug
-  - id: 19
-    type: script
-    changes:
-      general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 2
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-large-full-esc10-2aug
-  - id: 20
-    type: script
-    changes:
-      general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-large-full-esc10-1aug
-  - id: 21
-    type: script
-    changes:
-      general:
-        model_type: vit-large
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc10-none-full-transformers
-        name: vit-large-full-esc10-0aug
-  - id: 22
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 2
-      wandb:
-        project: esc10-none-full-transformers
-        name: deit-base-full-esc10-2aug
-  - id: 23
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 1
-      wandb:
-        project: esc10-none-full-transformers
-        name: deit-base-full-esc10-1aug
-  - id: 24
-    type: script
-    changes:
-      general:
-        model_type: deit-base
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        project: esc10-none-full-transformers
-        name: deit-base-full-esc10-0aug
-
+        project: esc50-ast-peft-schedules
+        name: ast-esc50-classifier-full-classifier-10-25
