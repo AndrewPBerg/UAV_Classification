@@ -678,7 +678,7 @@ class AudioClassifier(pl.LightningModule):
                 if peft_method == "none-classifier":
                     # Freeze all parameters except classifier
                     for name, param in self.model.named_parameters():
-                        if any(classifier_term in name.lower() for classifier_term in ['classifier', 'head', 'fc', 'dense']):
+                        if any(classifier_term in name.lower() for classifier_term in ['classifier']):
                             param.requires_grad = True
                         else:
                             param.requires_grad = False

@@ -1,7 +1,7 @@
 general:
   model_type: ast
   from_scratch: false
-  batch_size: 12
+  batch_size: 8
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
@@ -18,7 +18,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: oft
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -26,11 +26,11 @@ general:
   num_gpus: 2
   strategy: ddp
 peft_scheduling:
-  enabled: true
+  enabled: false
   auto_merge: true
   schedule:
-  - start_epoch: 25
-    peft_method: none-classifier
+  - start_epoch: 10
+    peft_method: none-full
 optimizer:
   optimizer_type: adamw
   adam:
@@ -39,10 +39,10 @@ optimizer:
     - 0.99
     - 0.999
   adamw:
-    lr: 0.0001
+    lr: 0.0008
     weight_decay: 0.01
     betas:
-    - 0.9
+    - 0.99
     - 0.999
   warmup:
     enabled: true
@@ -65,7 +65,10 @@ dataset:
   data_path: datasets/ESC-50-master/classes
 augmentations:
   augmentations_per_sample: 0
-  augmentations: []
+  augmentations:
+  - time_mask
+  - time_stretch
+  - sin_distortion
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
   sin_distortion_p: 0.9
@@ -162,8 +165,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-ast-peft-schedules
-  name: ast-esc50-full-to-classifier-25
+  project: esc50-ast-peft-baselines
+  name: ast-oft
   reinit: true
   notes: null
   tags:

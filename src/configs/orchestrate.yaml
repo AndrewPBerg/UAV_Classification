@@ -5,7 +5,191 @@
 SEND_MESSAGE: true
 
 runs:
-  - id: 1
+  # - id: 1
+  #   type: script
+  #   changes:
+  #     general:
+  #       model_type: ast
+  #       use_wandb: true
+  #       use_kfold: false
+  #       adapter_type: none-full
+  #       epochs: 30
+  #       patience: 20
+  #     dataset:
+  #       dataset_type: esc50
+  #       data_path: datasets/ESC-50-master/classes
+  #     augmentations:
+  #       augmentations_per_sample: 0
+  #     peft_scheduling:
+  #       enabled: true
+  #       auto_merge: true
+  #       schedule:
+  #       - start_epoch: 25
+  #         peft_method: none-classifier
+  #     wandb:
+  #       project: esc50-ast-peft-schedules
+  #       name: ast-esc50-full-to-classifier-25
+  - id: 2
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: oft
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-oft
+  - id: 3
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: ssf
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-ssf
+  - id: 4
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: ia3
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-ia3
+  - id: 5
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: hra
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-hra
+  - id: 6
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: lora
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-lora
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: adalora
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-adalora
+  - id: 8
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: layernorm
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-layernorm
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: ast
+        use_wandb: true
+        use_kfold: false
+        adapter_type: bitfit
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-ast-peft-baselines
+        name: ast-bitfit
+  - id: 10
     type: script
     changes:
       general:
@@ -21,146 +205,27 @@ runs:
       augmentations:
         augmentations_per_sample: 0
       peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 25
-          peft_method: none-classifier
+        enabled: false
       wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-full-to-classifier-25
-  - id: 2
+        project: esc50-ast-peft-baselines
+        name: ast-none-full
+  - id: 11
     type: script
     changes:
       general:
         model_type: ast
-        adapter_type: none-full
+        use_wandb: true
+        use_kfold: false
+        adapter_type: none-classifier
+        epochs: 30
+        patience: 20
       dataset:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 0
       peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 20
-          peft_method: none-classifier
+        enabled: false
       wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-full-to-classifier-20
-  - id: 3
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: none-full
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 15
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-full-to-classifier-15
-  - id: 4
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: none-full
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 10
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-full-to-classifier-10
-
-  - id: 5
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: oft
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 10
-          peft_method: none-full
-        - start_epoch: 25
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-oft-full-classifier-10-25
-  - id: 6
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: ssf
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 10
-          peft_method: none-full
-        - start_epoch: 25
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-ssf-full-classifier-10-25
-  - id: 7
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: ia3
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 10
-          peft_method: none-full
-        - start_epoch: 25
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-ia3-full-classifier-10-25
-  - id: 8
-    type: script
-    changes:
-      general:
-        model_type: ast
-        adapter_type: none-classifer
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      peft_scheduling:
-        enabled: true
-        auto_merge: true
-        schedule:
-        - start_epoch: 10
-          peft_method: none-full
-        - start_epoch: 25
-          peft_method: none-classifier
-      wandb:
-        project: esc50-ast-peft-schedules
-        name: ast-esc50-classifier-full-classifier-10-25
+        project: esc50-ast-peft-baselines
+        name: ast-none-classifier
