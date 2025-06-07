@@ -17,7 +17,38 @@ from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
 from configs.peft_config import get_peft_config
-from models.transformer_models import apply_peft
+
+
+def get_apply_peft_function(model_type: str):
+    """
+    Get the appropriate apply_peft function based on model type.
+    
+    Args:
+        model_type: The type of model (e.g., 'resnet18', 'ast', 'vit-base', etc.)
+        
+    Returns:
+        The apply_peft function for the specific model type
+    """
+    # CNN models
+    cnn_models = ['resnet18', 'resnet50', 'resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 
+                  'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 
+                  'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'custom_cnn']
+    
+    # Transformer models
+    transformer_models = ['ast', 'mert', 'vit-base', 'vit-large', 'deit-tiny', 'deit-small', 
+                         'deit-base', 'deit-tiny-distil', 'deit-small-distil', 'deit-base-distil']
+    
+    if model_type in cnn_models:
+        from models.cnn_models import apply_peft
+        return apply_peft
+    elif model_type in transformer_models:
+        from models.transformer_models import apply_peft
+        return apply_peft
+    else:
+        # Default to CNN apply_peft for unknown models
+        print(f"Warning: Unknown model type '{model_type}', defaulting to CNN apply_peft function")
+        from models.cnn_models import apply_peft
+        return apply_peft
 
 
 class AudioClassifier(pl.LightningModule):
@@ -87,11 +118,11 @@ class AudioClassifier(pl.LightningModule):
             self._apply_peft_method(initial_method)
             print(f"PEFT Scheduling enabled. Starting with method: {initial_method}")
         else:
-            # Initialize with the general config adapter type if no scheduling
+            # When PEFT scheduling is disabled, the model already has PEFT applied from the model factory
+            # Just track the current method for consistency
             if hasattr(general_config, 'adapter_type'):
-                initial_method = general_config.adapter_type
-                self._apply_peft_method(initial_method)
-                print(f"Using static PEFT method: {initial_method}")
+                self.current_peft_method = general_config.adapter_type
+                print(f"Using static PEFT method: {general_config.adapter_type} (already applied during model creation)")
 
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -692,8 +723,18 @@ class AudioClassifier(pl.LightningModule):
                 # First, we need to remove any existing PEFT adapters
                 self._remove_existing_peft()
                 
-                # Apply the new PEFT method
-                self.model = apply_peft(self.model, peft_config, self.general_config)
+                # Get the appropriate apply_peft function based on model type
+                apply_peft_func = get_apply_peft_function(self.general_config.model_type)
+                
+                # Apply the new PEFT method - handle different function signatures
+                if self.general_config.model_type in ['resnet18', 'resnet50', 'resnet152', 'mobilenet_v3_small', 'mobilenet_v3_large', 
+                                                     'efficientnet_b0', 'efficientnet_b1', 'efficientnet_b2', 'efficientnet_b3', 
+                                                     'efficientnet_b4', 'efficientnet_b5', 'efficientnet_b6', 'efficientnet_b7', 'custom_cnn']:
+                    # CNN models - apply_peft takes only model and peft_config
+                    self.model = apply_peft_func(self.model, peft_config)
+                else:
+                    # Transformer models - apply_peft takes model, peft_config, and general_config
+                    self.model = apply_peft_func(self.model, peft_config, self.general_config)
                 
                 print(f"Applied PEFT method: {peft_method}")
                 

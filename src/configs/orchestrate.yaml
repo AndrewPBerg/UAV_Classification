@@ -1,6 +1,6 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
-# AST runs optimized for ESC-50 small dataset based on research findings
+# efficientnet_b0 runs optimized for ESC-50 small dataset based on research findings
 
 SEND_MESSAGE: true
 
@@ -9,7 +9,7 @@ runs:
   #   type: script
   #   changes:
   #     general:
-  #       model_type: ast
+  #       model_type: efficientnet_b0
   #       use_wandb: true
   #       use_kfold: false
   #       adapter_type: none-full
@@ -27,33 +27,54 @@ runs:
   #       - start_epoch: 25
   #         peft_method: none-classifier
   #     wandb:
-  #       project: esc50-ast-peft-schedules
-  #       name: ast-esc50-full-to-classifier-25
-  - id: 2
+  #       project: esc50-efficientnet_b0-peft-schedules
+  #       name: efficientnet_b0-esc50-full-to-classifier-25
+ 
+  - id: 7
     type: script
     changes:
       general:
-        model_type: ast
+        model_type: efficientnet_b0
         use_wandb: true
         use_kfold: false
-        adapter_type: oft
+        adapter_type: lorac
         epochs: 30
         patience: 20
       dataset:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 2
       peft_scheduling:
         enabled: false
       wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-oft
-  - id: 3
+        project: esc50-efficientnet_b0-peft-baselines
+        name: efficientnet_b0-lorac-2augs
+  - id: 8
     type: script
     changes:
       general:
-        model_type: ast
+        model_type: efficientnet_b0
+        use_wandb: true
+        use_kfold: false
+        adapter_type: batchnorm
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b0-peft-baselines
+        name: efficientnet_b0-batchnorm-2augs
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
         use_wandb: true
         use_kfold: false
         adapter_type: ssf
@@ -63,137 +84,17 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 2
       peft_scheduling:
         enabled: false
       wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-ssf
-  - id: 4
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: ia3
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-ia3
-  - id: 5
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: hra
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-hra
-  - id: 6
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: lora
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-lora
-  - id: 7
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: adalora
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-adalora
-  - id: 8
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: layernorm
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-layernorm
-  - id: 9
-    type: script
-    changes:
-      general:
-        model_type: ast
-        use_wandb: true
-        use_kfold: false
-        adapter_type: bitfit
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 0
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-bitfit
+        project: esc50-efficientnet_b0-peft-baselines
+        name: efficientnet_b0-ssf-2augs
   - id: 10
     type: script
     changes:
       general:
-        model_type: ast
+        model_type: efficientnet_b0
         use_wandb: true
         use_kfold: false
         adapter_type: none-full
@@ -203,17 +104,17 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 2
       peft_scheduling:
         enabled: false
       wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-none-full
+        project: esc50-efficientnet_b0-peft-baselines
+        name: efficientnet_b0-none-full-2augs
   - id: 11
     type: script
     changes:
       general:
-        model_type: ast
+        model_type: efficientnet_b0
         use_wandb: true
         use_kfold: false
         adapter_type: none-classifier
@@ -223,9 +124,208 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 0
+        augmentations_per_sample: 2
       peft_scheduling:
         enabled: false
       wandb:
-        project: esc50-ast-peft-baselines
-        name: ast-none-classifier
+        project: esc50-efficientnet_b0-peft-baselines
+        name: efficientnet_b0-none-classifier-2augs
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b4
+        use_wandb: true
+        use_kfold: false
+        adapter_type: lorac
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b4-peft-baselines
+        name: efficientnet_b4-lorac-2augs
+  - id: 8
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b4
+        use_wandb: true
+        use_kfold: false
+        adapter_type: batchnorm
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b4-peft-baselines
+        name: efficientnet_b4-batchnorm-2augs
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b4
+        use_wandb: true
+        use_kfold: false
+        adapter_type: ssf
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b4-peft-baselines
+        name: efficientnet_b4-ssf-2augs
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b4
+        use_wandb: true
+        use_kfold: false
+        adapter_type: none-full
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b4-peft-baselines
+        name: efficientnet_b4-none-full-2augs
+  - id: 11
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b4
+        use_wandb: true
+        use_kfold: false
+        adapter_type: none-classifier
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b4-peft-baselines
+        name: efficientnet_b4-none-classifier-2augs
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: false
+        adapter_type: lorac
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b7-peft-baselines
+        name: efficientnet_b7-lorac-2augs
+  - id: 8
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: false
+        adapter_type: batchnorm
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b7-peft-baselines
+        name: efficientnet_b7-batchnorm-2augs
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: false
+        adapter_type: ssf
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b7-peft-baselines
+        name: efficientnet_b7-ssf-2augs
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: false
+        adapter_type: none-full
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b7-peft-baselines
+        name: efficientnet_b7-none-full-2augs
+  - id: 11
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: false
+        adapter_type: none-classifier
+        epochs: 30
+        patience: 20
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      augmentations:
+        augmentations_per_sample: 2
+      peft_scheduling:
+        enabled: false
+      wandb:
+        project: esc50-efficientnet_b7-peft-baselines
+        name: efficientnet_b7-none-classifier-2augs

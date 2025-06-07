@@ -1,5 +1,5 @@
 general:
-  model_type: ast
+  model_type: efficientnet_b0
   from_scratch: false
   batch_size: 8
   seed: 42
@@ -18,11 +18,11 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: oft
+  adapter_type: batchnorm
   save_dataloader: false
   monitor: val_acc
   mode: max
-  distributed_training: true
+  distributed_training: false
   num_gpus: 2
   strategy: ddp
 peft_scheduling:
@@ -64,7 +64,7 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 2
   augmentations:
   - time_mask
   - time_stretch
@@ -165,8 +165,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-ast-peft-baselines
-  name: ast-oft
+  project: esc50-efficientnet_b0-peft-baselines
+  name: efficientnet_b0-batchnorm-2augs
   reinit: true
   notes: null
   tags:
