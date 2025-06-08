@@ -44,12 +44,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-lorac-2augs
+        name: efficientnet_b0-lorac-5augs
   - id: 8
     type: script
     changes:
@@ -64,12 +64,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-batchnorm-2augs
+        name: efficientnet_b0-batchnorm-5augs
   - id: 9
     type: script
     changes:
@@ -84,12 +84,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-ssf-2augs
+        name: efficientnet_b0-ssf-5augs
   - id: 10
     type: script
     changes:
@@ -104,12 +104,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-none-full-2augs
+        name: efficientnet_b0-none-full-5augs
   - id: 11
     type: script
     changes:
@@ -124,12 +124,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-none-classifier-2augs
+        name: efficientnet_b0-none-classifier-5augs
   - id: 7
     type: script
     changes:
@@ -144,12 +144,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-lorac-2augs
+        name: efficientnet_b4-lorac-5augs
   - id: 8
     type: script
     changes:
@@ -164,12 +164,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-batchnorm-2augs
+        name: efficientnet_b4-batchnorm-5augs
   - id: 9
     type: script
     changes:
@@ -184,12 +184,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-ssf-2augs
+        name: efficientnet_b4-ssf-5augs
   - id: 10
     type: script
     changes:
@@ -204,12 +204,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-none-full-2augs
+        name: efficientnet_b4-none-full-5augs
   - id: 11
     type: script
     changes:
@@ -224,12 +224,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-none-classifier-2augs
+        name: efficientnet_b4-none-classifier-5augs
     type: script
     changes:
       general:
@@ -243,12 +243,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-lorac-2augs
+        name: efficientnet_b7-lorac-5augs
   - id: 8
     type: script
     changes:
@@ -263,12 +263,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-batchnorm-2augs
+        name: efficientnet_b7-batchnorm-5augs
   - id: 9
     type: script
     changes:
@@ -283,12 +283,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-ssf-2augs
+        name: efficientnet_b7-ssf-5augs
   - id: 10
     type: script
     changes:
@@ -303,12 +303,12 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-none-full-2augs
+        name: efficientnet_b7-none-full-5augs
   - id: 11
     type: script
     changes:
@@ -323,9 +323,9 @@ runs:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       augmentations:
-        augmentations_per_sample: 2
+        augmentations_per_sample: 5
       peft_scheduling:
         enabled: false
       wandb:
         project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-none-classifier-2augs
+        name: efficientnet_b7-none-classifier-5augs

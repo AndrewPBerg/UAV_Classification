@@ -1,5 +1,5 @@
 general:
-  model_type: efficientnet_b0
+  model_type: efficientnet_b7
   from_scratch: false
   batch_size: 8
   seed: 42
@@ -18,7 +18,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: batchnorm
+  adapter_type: none-classifier
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -64,7 +64,7 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 2
+  augmentations_per_sample: 5
   augmentations:
   - time_mask
   - time_stretch
@@ -165,8 +165,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-efficientnet_b0-peft-baselines
-  name: efficientnet_b0-batchnorm-2augs
+  project: esc50-efficientnet_b7-peft-baselines
+  name: efficientnet_b7-none-classifier-5augs
   reinit: true
   notes: null
   tags:
