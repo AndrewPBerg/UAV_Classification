@@ -18,7 +18,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: lorac
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max

@@ -76,7 +76,8 @@ def model_pipeline(sweep_config=None):
                 wandb_config,
                 sweep_config_obj,
                 augmentation_config,
-                optimizer_config
+                optimizer_config,
+                peft_scheduling_config
             ) = load_configs(mixed_params)
             
             # Log the augmentation config to the W&B run with error handling
@@ -119,7 +120,8 @@ def model_pipeline(sweep_config=None):
                 data_module=data_module,
                 model_factory=model_factory,
                 augmentation_config=augmentation_config,
-                optimizer_config=optimizer_config
+                optimizer_config=optimizer_config,
+                peft_scheduling_config=peft_scheduling_config
             )
             
             # Train model

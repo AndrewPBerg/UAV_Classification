@@ -51,6 +51,7 @@ def alter(changes: dict, file_path: str='config.yaml') -> None:
     """
     Applies validated changes to the config file.
     Assumes changes dictionary structure matches config.yaml structure.
+    Skips sweep parameters as they should only be used by WandB.
     
     Args:
         changes (dict): Nested dictionary containing changes to apply
@@ -59,6 +60,12 @@ def alter(changes: dict, file_path: str='config.yaml') -> None:
     def process_nested_dict(d: dict, prefix: str = ''):
         for key, value in d.items():
             current_path = f"{prefix}.{key}" if prefix else key
+            
+            # Skip sweep section as it contains WandB-specific parameters
+            # that shouldn't be applied to the base config
+            if key == 'sweep' and prefix == '':
+                continue
+                
             if isinstance(value, dict):
                 process_nested_dict(value, current_path)
             else:
