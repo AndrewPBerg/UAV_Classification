@@ -189,21 +189,57 @@ sweep:
     peft_scheduling.schedule.0.peft_method:
       values:
       - none-classifier
+      - lora
+      - adalora
+      - hra
+      - ia3
+      - oft
+      - ssf
+      - none-full
+      - layernorm
+      - bitfit
     peft_scheduling.schedule.1.start_epoch:
       values:
       - 5
     peft_scheduling.schedule.1.peft_method:
       values:
       - none-full
+      - lora
+      - adalora
+      - hra
+      - ia3
+      - oft
+      - ssf
+      - none-full
+      - layernorm
+      - bitfit
     peft_scheduling.schedule.2.start_epoch:
       values:
       - 10
     peft_scheduling.schedule.2.peft_method:
       values:
       - none-full
+      - lora
+      - adalora
+      - hra
+      - ia3
+      - oft
+      - ssf
+      - none-full
+      - layernorm
+      - bitfit
     peft_scheduling.schedule.3.start_epoch:
       values:
       - 15
     peft_scheduling.schedule.3.peft_method:
       values:
       - none-full
+      - lora
+      - adalora
+      - hra
+      - ia3
+      - oft
+      - ssf
+      - none-full
+      - layernorm
+      - bitfit
