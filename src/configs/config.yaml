@@ -1,5 +1,5 @@
 general:
-  model_type: efficientnet_b7
+  model_type: ast
   from_scratch: false
   batch_size: 8
   seed: 42
@@ -14,23 +14,26 @@ general:
   accumulation_steps: 1
   patience: 20
   use_wandb: true
-  use_sweep: false
+  use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-classifier
+  adapter_type: lorac
   save_dataloader: false
   monitor: val_acc
   mode: max
   distributed_training: false
-  num_gpus: 2
+  num_gpus: 1
   strategy: ddp
 peft_scheduling:
-  enabled: false
+  enabled: true
   auto_merge: true
   schedule:
   - start_epoch: 10
+    peft_method: none-classifier
+  - start_epoch: 20
     peft_method: none-full
+    merge_previous: true
 optimizer:
   optimizer_type: adamw
   adam:
@@ -64,7 +67,7 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 5
+  augmentations_per_sample: 2
   augmentations:
   - time_mask
   - time_stretch
@@ -100,7 +103,7 @@ lora:
   - value
   - query
   - dense
-  lora_dropout: 0
+  lora_dropout: 0.1
   bias: lora_only
 ia3:
   feedforward_modules:
@@ -114,7 +117,7 @@ ia3:
   - query
   - dense
 adalora:
-  init_r: 4
+  init_r: 8
   target_r: 256
   target_modules:
   - key
@@ -165,55 +168,42 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-efficientnet_b7-peft-baselines
-  name: efficientnet_b7-none-classifier-5augs
+  project: esc50-ast-peft-baselines
+  name: ast-oft
   reinit: true
   notes: null
   tags:
   - vit-base
   dir: wandb
 sweep:
-  project: ast-esc50-sweeps-baseline
-  name: ast-esc50-batch-optimizer-adapter
-  method: bayes
+  project: sweep-esc50
+  name: ast-peft-schedule-sweep
+  method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    batch_size:
+    peft_scheduling.schedule.0.start_epoch:
       values:
-      - 8
-    learning_rate:
-      values:
-      - 1e-4
-      - 5e-4
-    weight_decay:
-      values:
-      - 0.0
-      - 0.01
-      - 0.1
-    betas:
-      values:
-      - - 0.9
-        - 0.999
-      - - 0.99
-        - 0.999
-      - - 0.85
-        - 0.89
-      - - 0.8
-        - 0.85
-    gradient_clipping_enabled:
-      values:
-      - true
-      - false
-    adapter_type:
+      - 0
+    peft_scheduling.schedule.0.peft_method:
       values:
       - none-classifier
+    peft_scheduling.schedule.1.start_epoch:
+      values:
+      - 5
+    peft_scheduling.schedule.1.peft_method:
+      values:
       - none-full
-      - ssf
-      - layernorm
-      - lora
-      - ia3
-      - adalora
-      - oft
-      - hra
+    peft_scheduling.schedule.2.start_epoch:
+      values:
+      - 5
+    peft_scheduling.schedule.2.peft_method:
+      values:
+      - none-full
+    peft_scheduling.schedule.3.start_epoch:
+      values:
+      - 5
+    peft_scheduling.schedule.3.peft_method:
+      values:
+      - none-full

@@ -1,331 +1,607 @@
 # This file is used to orchestrate the sweeps and script in main.py
 # Define a list of runs that can be easily iterated over
-# efficientnet_b0 runs optimized for ESC-50 small dataset based on research findings
+# AST runs optimized for ESC-50 small dataset based on research findings
 
 SEND_MESSAGE: true
 
 runs:
-  # - id: 1
-  #   type: script
+
+  # ======================================================
+  # 1. ESC-50 Sweeps
+  # ======================================================
+
+  - id: 1
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: sweep-esc50
+        name: ast-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  - id: 2
+    type: sweep
+    changes:
+      general:
+        model_type: resnet18
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: sweep-esc50
+        name: resnet18-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 3
+    type: sweep
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: sweep-esc50
+        name: mobilenet-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 4
+    type: sweep
+    changes:
+      general:
+        model_type: vit-large
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: sweep-esc50
+        name: vit-large-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  # ======================================================
+  # 2. ESC-10 Sweeps
+  # ======================================================
+
+  - id: 5
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+      dataset:
+        dataset_type: esc10
+        data_path: datasets/ESC-10-master/classes
+      sweep:
+        project: sweep-esc10
+        name: ast-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  - id: 6
+    type: sweep
+    changes:
+      general:
+        model_type: resnet18
+      dataset:
+        dataset_type: esc10
+        data_path: datasets/ESC-10-master/classes
+      sweep:
+        project: sweep-esc10
+        name: resnet18-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 7
+    type: sweep
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+      dataset:
+        dataset_type: esc10
+        data_path: datasets/ESC-10-master/classes
+      sweep:
+        project: sweep-esc10
+        name: mobilenet-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 8
+    type: sweep
+    changes:
+      general:
+        model_type: vit-large
+      dataset:
+        dataset_type: esc10
+        data_path: datasets/ESC-10-master/classes
+      sweep:
+        project: sweep-esc10
+        name: vit-large-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  # ======================================================
+  # 3. UrbanSound8K Sweeps
+  # ======================================================
+
+  - id: 9
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k/classes
+      sweep:
+        project: sweep-urbansound8k
+        name: ast-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  - id: 10
+    type: sweep
+    changes:
+      general:
+        model_type: resnet18
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k/classes
+      sweep:
+        project: sweep-urbansound8k
+        name: resnet18-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 11
+    type: sweep
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k/classes
+      sweep:
+        project: sweep-urbansound8k
+        name: mobilenet-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 12
+    type: sweep
+    changes:
+      general:
+        model_type: vit-large
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k/classes
+      sweep:
+        project: sweep-urbansound8k
+        name: vit-large-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  # ======================================================
+  # 4. UAV Sweeps
+  # ======================================================
+
+  - id: 13
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: sweep-uav
+        name: ast-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  - id: 14
+    type: sweep
+    changes:
+      general:
+        model_type: resnet18
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: sweep-uav
+        name: resnet18-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 15
+    type: sweep
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: sweep-uav
+        name: mobilenet-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 16
+    type: sweep
+    changes:
+      general:
+        model_type: vit-large
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: sweep-uav
+        name: vit-large-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  # ======================================================
+  # 5. AudioMNIST Sweeps
+  # ======================================================
+
+  # - id: 17 #skip bc of shaping issues
+  #   type: sweep
   #   changes:
   #     general:
-  #       model_type: efficientnet_b0
-  #       use_wandb: true
-  #       use_kfold: false
-  #       adapter_type: none-full
-  #       epochs: 30
-  #       patience: 20
+  #       model_type: ast
   #     dataset:
-  #       dataset_type: esc50
-  #       data_path: datasets/ESC-50-master/classes
-  #     augmentations:
-  #       augmentations_per_sample: 0
-  #     peft_scheduling:
-  #       enabled: true
-  #       auto_merge: true
-  #       schedule:
-  #       - start_epoch: 25
-  #         peft_method: none-classifier
-  #     wandb:
-  #       project: esc50-efficientnet_b0-peft-schedules
-  #       name: efficientnet_b0-esc50-full-to-classifier-25
- 
-  - id: 7
-    type: script
+  #       dataset_type: audiomnist
+  #       data_path: datasets/audiomnist_dataset
+  #     sweep:
+  #       project: sweep-audiomnist
+  #       name: ast-peft-schedule-sweep
+    #     parameters:
+    #       peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+    #         values: [0]
+    #       peft_scheduling.schedule.0.peft_method:
+    #         values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+    #       peft_scheduling.schedule.1.start_epoch:
+    #         values: [5]
+    #       peft_scheduling.schedule.1.peft_method:
+    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+    #       peft_scheduling.schedule.2.start_epoch:
+    #         values: [10]
+    #       peft_scheduling.schedule.2.peft_method:
+    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+    #       peft_scheduling.schedule.3.start_epoch:
+    #         values: [15]
+    #       peft_scheduling.schedule.3.peft_method:
+    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+
+  - id: 18
+    type: sweep
     changes:
       general:
-        model_type: efficientnet_b0
-        use_wandb: true
-        use_kfold: false
-        adapter_type: lorac
-        epochs: 30
-        patience: 20
+        model_type: resnet18
       dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-lorac-5augs
-  - id: 8
-    type: script
+        dataset_type: audiomnist
+        data_path: datasets/audiomnist_dataset
+      sweep:
+        project: sweep-audiomnist
+        name: resnet18-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 19
+    type: sweep
     changes:
       general:
-        model_type: efficientnet_b0
-        use_wandb: true
-        use_kfold: false
-        adapter_type: batchnorm
-        epochs: 30
-        patience: 20
+        model_type: mobilenet_v3_small
       dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-batchnorm-5augs
-  - id: 9
-    type: script
+        dataset_type: audiomnist
+        data_path: datasets/audiomnist_dataset
+      sweep:
+        project: sweep-audiomnist
+        name: mobilenet-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+
+  - id: 20
+    type: sweep
     changes:
       general:
-        model_type: efficientnet_b0
-        use_wandb: true
-        use_kfold: false
-        adapter_type: ssf
-        epochs: 30
-        patience: 20
+        model_type: vit-large
       dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-ssf-5augs
-  - id: 10
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b0
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-full
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-none-full-5augs
-  - id: 11
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b0
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-classifier
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b0-peft-baselines
-        name: efficientnet_b0-none-classifier-5augs
-  - id: 7
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        use_wandb: true
-        use_kfold: false
-        adapter_type: lorac
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-lorac-5augs
-  - id: 8
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        use_wandb: true
-        use_kfold: false
-        adapter_type: batchnorm
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-batchnorm-5augs
-  - id: 9
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        use_wandb: true
-        use_kfold: false
-        adapter_type: ssf
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-ssf-5augs
-  - id: 10
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-full
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-none-full-5augs
-  - id: 11
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-classifier
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b4-peft-baselines
-        name: efficientnet_b4-none-classifier-5augs
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        use_wandb: true
-        use_kfold: false
-        adapter_type: lorac
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-lorac-5augs
-  - id: 8
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        use_wandb: true
-        use_kfold: false
-        adapter_type: batchnorm
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-batchnorm-5augs
-  - id: 9
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        use_wandb: true
-        use_kfold: false
-        adapter_type: ssf
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-ssf-5augs
-  - id: 10
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-full
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-none-full-5augs
-  - id: 11
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        use_wandb: true
-        use_kfold: false
-        adapter_type: none-classifier
-        epochs: 30
-        patience: 20
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      augmentations:
-        augmentations_per_sample: 5
-      peft_scheduling:
-        enabled: false
-      wandb:
-        project: esc50-efficientnet_b7-peft-baselines
-        name: efficientnet_b7-none-classifier-5augs
+        dataset_type: audiomnist
+        data_path: datasets/audiomnist_dataset
+      sweep:
+        project: sweep-audiomnist
+        name: vit-large-peft-schedule-sweep
+        parameters:
+          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
+            values: [0]
+          peft_scheduling.schedule.0.peft_method:
+            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.1.start_epoch:
+            values: [5]
+          peft_scheduling.schedule.1.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.2.start_epoch:
+            values: [10]
+          peft_scheduling.schedule.2.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          peft_scheduling.schedule.3.start_epoch:
+            values: [15]
+          peft_scheduling.schedule.3.peft_method:
+            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
