@@ -197,13 +197,13 @@ sweep:
       - none-full
     peft_scheduling.schedule.2.start_epoch:
       values:
-      - 5
+      - 10
     peft_scheduling.schedule.2.peft_method:
       values:
       - none-full
     peft_scheduling.schedule.3.start_epoch:
       values:
-      - 5
+      - 15
     peft_scheduling.schedule.3.peft_method:
       values:
       - none-full
