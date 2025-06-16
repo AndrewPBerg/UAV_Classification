@@ -5,7 +5,7 @@ Images of the feature extracted samples of the Custom UAV dataset can be found a
 
  1️⃣ 4,500 Seconds [Accepted, Preprint]: [Arxiv 2505.23782](https://arxiv.org/abs/2505.23782) </br>
  &nbsp;&nbsp;&nbsp;&nbsp;↪️4,500 Seconds Oral Presenation: [YouTube Link](https://www.youtube.com/watch?v=zFLgPipWOqI) </br>
- 2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA </br>
+ 2️⃣ 15,500 Seconds [Under Review, Preprint]: [Arxiv 2506.11049](https://arxiv.org/abs/2506.11049)</br>
  3️⃣ The Unbearable Weight: TBD </br>
 
 # UAV Classification 🛩️
