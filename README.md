@@ -8,6 +8,9 @@ Images of the feature extracted samples of the Custom UAV dataset can be found a
  2️⃣ 15,500 Seconds [Under Review, Preprint]: [Arxiv 2506.11049](https://arxiv.org/abs/2506.11049)</br>
  3️⃣ The Unbearable Weight: TBD </br>
 
+# Training Logs 🪵
+
+[Weights & Biases Training Logs](https://wandb.ai/andberg9-self/projects)
 # UAV Classification 🛩️
 
 Code repository for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
