@@ -100,8 +100,6 @@ def create_augmentation_pipeline(augmentations: list[str], config: Dict[str, Any
                         transforms.append(TimeMask(
                             min_band_part=aug_config.min_band_part,
                             max_band_part=aug_config.max_band_part,
-                            # fade_duration=aug_config.fade_duration,
-                            mask_location="random",  # Default to random location
                             p=aug_config.p
                         ))
                     else:

@@ -1,0 +1,136 @@
+# Example PEFT Scheduling Configurations
+# These examples demonstrate different PEFT scheduling strategies
+
+# Simple two-stage schedule: classifier -> full
+simple_classifier_to_full:
+  enabled: true
+  model_name: "ast"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 10
+      peft_method: "none-full"
+      merge_previous: false
+
+# Progressive schedule for transformers: classifier -> bitfit -> full
+progressive_transformer:
+  enabled: true
+  model_name: "ast"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 5
+      peft_method: "bitfit"
+      merge_previous: false
+    - start_epoch: 15
+      peft_method: "none-full"
+      merge_previous: false
+
+# Progressive schedule for CNNs: classifier -> batchnorm -> full
+progressive_cnn:
+  enabled: true
+  model_name: "resnet18"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 5
+      peft_method: "batchnorm"
+      merge_previous: false
+    - start_epoch: 15
+      peft_method: "none-full"
+      merge_previous: false
+
+# Adapter-based schedule with merging: classifier -> lora -> full
+adapter_with_merging:
+  enabled: true
+  model_name: "ast"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 5
+      peft_method: "lora"
+      merge_previous: false
+    - start_epoch: 20
+      peft_method: "none-full"
+      merge_previous: true  # Merge LoRA weights before going to full fine-tuning
+
+# Complex multi-stage schedule
+complex_schedule:
+  enabled: true
+  model_name: "vit-base"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 3
+      peft_method: "bitfit"
+      merge_previous: false
+    - start_epoch: 8
+      peft_method: "lora"
+      merge_previous: false
+    - start_epoch: 15
+      peft_method: "adalora"
+      merge_previous: true  # Merge previous LoRA before applying AdaLoRA
+    - start_epoch: 25
+      peft_method: "none-full"
+      merge_previous: true  # Merge AdaLoRA before full fine-tuning
+
+# CNN with LoRA-C
+cnn_lorac_schedule:
+  enabled: true
+  model_name: "efficientnet_b0"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 5
+      peft_method: "lorac"
+      merge_previous: false
+    - start_epoch: 15
+      peft_method: "none-full"
+      merge_previous: true
+
+# Conservative schedule with minimal additive methods
+conservative_schedule:
+  enabled: true
+  model_name: "mert"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "none-classifier"
+      merge_previous: false
+    - start_epoch: 10
+      peft_method: "bitfit"
+      merge_previous: false
+    - start_epoch: 20
+      peft_method: "layernorm"
+      merge_previous: false
+    - start_epoch: 30
+      peft_method: "none-full"
+      merge_previous: false
+
+# Aggressive adapter schedule
+aggressive_adapter:
+  enabled: true
+  model_name: "vit-large"
+  auto_merge: true
+  schedule:
+    - start_epoch: 0
+      peft_method: "lora"
+      merge_previous: false
+    - start_epoch: 10
+      peft_method: "ssf"
+      merge_previous: true  # Merge LoRA before applying SSF
+    - start_epoch: 20
+      peft_method: "none-full"
+      merge_previous: true  # Merge SSF before full fine-tuning 

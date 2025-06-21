@@ -24,7 +24,7 @@ import wandb
 def change_config_value(file_path: str, key: str, value: Any) -> None:
     """
     Updates a specific key in the YAML configuration file.
-    Assumes the key exists and the file path is valid due to prior validation.
+    Creates nested structure if it doesn't exist.
     
     Args:
         file_path (str): Path to the YAML configuration file
@@ -34,12 +34,14 @@ def change_config_value(file_path: str, key: str, value: Any) -> None:
     with open(file_path, 'r') as f:
         config = yaml.safe_load(f)
     
-    # Navigate to the nested key
+    # Navigate to the nested key, creating structure as needed
     current = config
     key_parts = key.split('.')
     
-    # Set nested value
+    # Create nested dictionaries as needed
     for part in key_parts[:-1]:
+        if part not in current:
+            current[part] = {}
         current = current[part]
     current[key_parts[-1]] = value
     
@@ -50,21 +52,38 @@ def change_config_value(file_path: str, key: str, value: Any) -> None:
 def alter(changes: dict, file_path: str='config.yaml') -> None:
     """
     Applies validated changes to the config file.
-    Assumes changes dictionary structure matches config.yaml structure.
+    For sweep parameters, replaces the entire parameters section.
+    For other changes, updates individual keys.
     
     Args:
         changes (dict): Nested dictionary containing changes to apply
         file_path (str): Path to the config file
     """
-    def process_nested_dict(d: dict, prefix: str = ''):
-        for key, value in d.items():
-            current_path = f"{prefix}.{key}" if prefix else key
-            if isinstance(value, dict):
-                process_nested_dict(value, current_path)
-            else:
-                change_config_value(file_path, current_path, value)
+    with open(file_path, 'r') as f:
+        config = yaml.safe_load(f)
     
-    process_nested_dict(changes)
+    def apply_changes(target_dict: dict, changes_dict: dict, path: str = ''):
+        for key, value in changes_dict.items():
+            current_path = f"{path}.{key}" if path else key
+            
+            if isinstance(value, dict):
+                # Special handling for sweep parameters - replace entirely
+                if current_path == 'sweep.parameters':
+                    target_dict[key] = value
+                else:
+                    # For other nested dicts, create if doesn't exist and recurse
+                    if key not in target_dict:
+                        target_dict[key] = {}
+                    apply_changes(target_dict[key], value, current_path)
+            else:
+                # Direct value assignment
+                target_dict[key] = value
+    
+    apply_changes(config, changes)
+    
+    # Write back to file
+    with open(file_path, 'w') as f:
+        yaml.dump(config, f, default_flow_style=False, sort_keys=False)
 
 def is_valid(run: dict) -> tuple[bool, str]:
     """

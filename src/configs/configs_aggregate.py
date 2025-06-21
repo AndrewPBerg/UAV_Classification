@@ -10,6 +10,7 @@ try:
     from .augmentation_config import create_augmentation_configs, AugmentationConfig
     from .dataset_config import get_dataset_config, DatasetConfig
     from .optim_config import get_optimizer_config, OptimizerConfig
+    from .peft_scheduling_config import get_peft_scheduling_config, PEFTSchedulingConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
     from peft_config import PEFTConfig, get_peft_config  # Import the PEFTConfig type alias and get_peft_config function explicitly
@@ -17,6 +18,7 @@ except ImportError as e:
     from augmentation_config import create_augmentation_configs, AugmentationConfig
     from dataset_config import get_dataset_config, DatasetConfig
     from optim_config import get_optimizer_config, OptimizerConfig
+    from peft_scheduling_config import get_peft_scheduling_config, PEFTSchedulingConfig
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Custom exception handler that terminates the script on any exception"""
@@ -164,13 +166,13 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig, OptimizerConfig]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig, OptimizerConfig, Optional[PEFTSchedulingConfig]]: # noqa: F405
     """
     Load and validate all configuration objects from the config dictionary.
     
     Returns:
         Tuple containing all configuration objects in order:
-        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config)
+        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config)
     """
 
     # Create configuration instances from the dictionary
@@ -197,7 +199,10 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         optimizer_config = get_optimizer_config(config)
         ic("OptimizerConfig instance created successfully:")
 
-        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config
+        peft_scheduling_config = get_peft_scheduling_config(config)
+        ic("PEFTSchedulingConfig instance created successfully:")
+
+        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config
         
     except ValidationError as e:
         ic("Validation error occurred: ")
@@ -235,7 +240,10 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
             optimizer_config = get_optimizer_config(config)
             ic("OptimizerConfig instance created successfully (fallback):")
 
-            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config
+            peft_scheduling_config = get_peft_scheduling_config(config)
+            ic("PEFTSchedulingConfig instance created successfully (fallback):")
+
+            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config
             
         except Exception as fallback_error:
             ic("Fallback also failed:", fallback_error)
@@ -317,7 +325,8 @@ def main():
         wandb_config,
         sweep_config,
         augmentation_config,
-        optimizer_config
+        optimizer_config,
+        peft_scheduling_config
     ) = load_configs(config)
 
     ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config, optimizer_config))

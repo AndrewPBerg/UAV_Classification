@@ -76,7 +76,8 @@ def model_pipeline(sweep_config=None):
                 wandb_config,
                 sweep_config_obj,
                 augmentation_config,
-                optimizer_config
+                optimizer_config,
+                peft_scheduling_config
             ) = load_configs(mixed_params)
             
             # Log the augmentation config to the W&B run with error handling
@@ -119,7 +120,8 @@ def model_pipeline(sweep_config=None):
                 data_module=data_module,
                 model_factory=model_factory,
                 augmentation_config=augmentation_config,
-                optimizer_config=optimizer_config
+                optimizer_config=optimizer_config,
+                peft_scheduling_config=peft_scheduling_config
             )
             
             # Train model
@@ -161,6 +163,43 @@ def model_pipeline(sweep_config=None):
         # Re-raise the exception so WandB can handle it properly
         raise e
 
+def set_nested_value(config_dict: Dict[str, Any], key_path: str, value: Any) -> None:
+    """
+    Set a nested value in a dictionary using dot notation.
+    
+    Args:
+        config_dict: The dictionary to update
+        key_path: Dot-separated path to the key (e.g., 'peft_scheduling.schedule.0.peft_method')
+        value: The value to set
+    """
+    keys = key_path.split('.')
+    current = config_dict
+    
+    # Navigate to the parent of the target key
+    for key in keys[:-1]:
+        # Handle numeric keys (for list indices)
+        if key.isdigit():
+            key = int(key)
+            # Ensure the list is long enough
+            while len(current) <= key:
+                current.append({})
+            current = current[key]
+        else:
+            # Create the key if it doesn't exist
+            if key not in current:
+                current[key] = {}
+            current = current[key]
+    
+    # Set the final value
+    final_key = keys[-1]
+    if final_key.isdigit():
+        final_key = int(final_key)
+        # Ensure the list is long enough
+        while len(current) <= final_key:
+            current.append({})
+    
+    current[final_key] = value
+
 def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """
     Combine sweep configuration with general configuration.
@@ -172,8 +211,9 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     Returns:
         Mixed parameters dictionary with proper nested structure
     """
-    # Start with a copy of the general config to maintain structure
-    mixed_params = general_config.copy()
+    # Start with a deep copy of the general config to maintain structure
+    import copy
+    mixed_params = copy.deepcopy(general_config)
     
     # Modify distributed training settings for sweep compatibility
     if mixed_params['general']['distributed_training']:
@@ -193,6 +233,18 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     
     # Update general section with sweep config values
     for key, value in sweep_config.items():
+        print(f"Processing sweep parameter: {key} = {value}")
+        
+        # Handle nested parameters with dot notation (e.g., peft_scheduling.schedule.0.peft_method)
+        if '.' in key:
+            try:
+                set_nested_value(mixed_params, key, value)
+                print(f"Set nested parameter: {key} = {value}")
+                continue
+            except Exception as e:
+                print(f"Warning: Could not set nested parameter {key}: {e}")
+                # Fall through to the original logic
+        
         # Handle flattened optimizer parameters
         if key in ['optimizer_type', 'learning_rate', 'weight_decay', 'gradient_clipping_enabled']:
             if key == 'optimizer_type':
@@ -239,6 +291,10 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
     # Ensure inference_size is properly set if not in sweep_config
     if 'inference_size' not in sweep_config and 'inference_size' in general_config['general']:
         mixed_params['general']['inference_size'] = general_config['general']['inference_size']
+    
+    # Debug: Print the final peft_scheduling configuration
+    if 'peft_scheduling' in mixed_params:
+        print(f"Final peft_scheduling config: {mixed_params['peft_scheduling']}")
     
     return mixed_params
 

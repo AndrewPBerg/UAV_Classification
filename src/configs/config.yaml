@@ -1,20 +1,20 @@
 general:
-  model_type: efficientnet_b1
-  from_scratch: true
+  model_type: resnet18
+  from_scratch: false
   batch_size: 8
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
-  epochs: 2
+  epochs: 15
   save_model: false
   test_size: 0.0
   inference_size: 0.0
-  val_size: 0.0
+  val_size: 0.2
   sweep_count: 200
   accumulation_steps: 1
-  patience: 5
-  use_wandb: false
-  use_sweep: false
+  patience: 10
+  use_wandb: true
+  use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
@@ -25,6 +25,15 @@ general:
   distributed_training: false
   num_gpus: 1
   strategy: ddp
+peft_scheduling:
+  enabled: true
+  auto_merge: true
+  schedule:
+  - start_epoch: 10
+    peft_method: none-classifier
+  - start_epoch: 20
+    peft_method: none-full
+    merge_previous: true
 optimizer:
   optimizer_type: adamw
   adam:
@@ -33,13 +42,13 @@ optimizer:
     - 0.99
     - 0.999
   adamw:
-    lr: 0.0001
+    lr: 0.0008
     weight_decay: 0.01
     betas:
-    - 0.9
+    - 0.99
     - 0.999
   warmup:
-    enabled: false
+    enabled: true
     warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
@@ -51,20 +60,18 @@ optimizer:
     mode: max
     factor: 0.85
     patience: 3
-  gradient_clipping_enabled: false
-  gradient_clip_val: 5.0
+  gradient_clipping_enabled: true
+  gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: audiomnist
-  data_path: datasets/audiomnist_dataset
-  num_classes: 10
-  target_sr: 16000
-  target_duration: 1
-  file_extension: .wav
-  fold_based_split: true
+  dataset_type: esc50
+  data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 0
-  augmentations: []
+  augmentations_per_sample: 2
+  augmentations:
+  - time_mask
+  - time_stretch
+  - sin_distortion
   sin_distortion_min_rate: 0.1
   sin_distortion_max_rate: 0.6
   sin_distortion_p: 0.9
@@ -96,7 +103,7 @@ lora:
   - value
   - query
   - dense
-  lora_dropout: 0
+  lora_dropout: 0.1
   bias: lora_only
 ia3:
   feedforward_modules:
@@ -110,7 +117,7 @@ ia3:
   - query
   - dense
 adalora:
-  init_r: 4
+  init_r: 8
   target_r: 256
   target_modules:
   - key
@@ -129,8 +136,8 @@ oft:
   init_weights: true
 layernorm:
   target_modules:
-  - layernorm_before
-  - layernorm_after
+  - layernorm1
+  - layernorm2
   task_type: AUDIO_CLASSIFICATION
 hra:
   r: 2
@@ -146,7 +153,6 @@ ssf:
   - linear
   - dense
   - batchnorm2d
-  - conv2d
 batchnorm:
   target_modules:
   - batchnorm2d
@@ -162,62 +168,62 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: ast-eesc50-sweeps-baseline
-  name: ast-baseline-conservative-b48-lr1e4
+  project: esc50-ast-peft-baselines
+  name: ast-oft
   reinit: true
   notes: null
   tags:
-  - ast
-  - esc50
-  - baseline
-  - conservative
-  - kfold
-  - none-classifier
-  - batch48
-  - lr1e-4
+  - vit-base
   dir: wandb
 sweep:
-  project: ast-esc50-sweeps-baseline
-  name: ast-esc50-batch-optimizer-adapter
-  method: bayes
+  project: sweep-esc50
+  name: resnet18-peft-schedule-sweep
+  method: random
   metric:
     name: test_acc
     goal: maximize
   parameters:
-    batch_size:
+    peft_scheduling.schedule.0.start_epoch:
       values:
-      - 8
-    learning_rate:
-      values:
-      - 1e-4
-      - 5e-4
-    weight_decay:
-      values:
-      - 0.0
-      - 0.01
-      - 0.1
-    betas:
-      values:
-      - - 0.9
-        - 0.999
-      - - 0.99
-        - 0.999
-      - - 0.85
-        - 0.89
-      - - 0.8
-        - 0.85
-    gradient_clipping_enabled:
-      values:
-      - true
-      - false
-    adapter_type:
+      - 0
+    peft_scheduling.schedule.0.peft_method:
       values:
       - none-classifier
-      - none-full
+      - lorac
       - ssf
-      - layernorm
-      - lora
-      - ia3
-      - adalora
-      - oft
-      - hra
+      - none-full
+      - batchnorm
+      - bitfit
+    peft_scheduling.schedule.1.start_epoch:
+      values:
+      - 5
+    peft_scheduling.schedule.1.peft_method:
+      values:
+      - none-classifier
+      - lorac
+      - ssf
+      - none-full
+      - batchnorm
+      - bitfit
+    peft_scheduling.schedule.2.start_epoch:
+      values:
+      - 10
+    peft_scheduling.schedule.2.peft_method:
+      values:
+      - none-classifier
+      - lorac
+      - ssf
+      - none-full
+      - batchnorm
+      - bitfit
+    peft_scheduling.schedule.3.start_epoch:
+      values:
+      - 15
+    peft_scheduling.schedule.3.peft_method:
+      values:
+      - none-classifier
+      - lorac
+      - ssf
+      - none-full
+      - batchnorm
+      - bitfit

@@ -5,6 +5,7 @@ import numpy as np
 import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping, LearningRateMonitor, TQDMProgressBar
 from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.strategies import DDPStrategy
 from typing import Dict, List, Any, Optional, Union, Tuple, Callable
 import wandb
 from pathlib import Path
@@ -15,6 +16,7 @@ from .lightning_module import AudioClassifier
 from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepConfig, wandb_config_dict
 from configs.dataset_config import DatasetConfig
 from configs.optim_config import OptimizerConfig
+from configs.peft_scheduling_config import PEFTSchedulingConfig
 from .util import wandb_login
 import time
 
@@ -128,6 +130,8 @@ class PTLTrainer:
         model_factory: Callable,
         augmentation_config: AugmentationConfig,
         optimizer_config: OptimizerConfig,
+        peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        config_dict: Optional[Dict[str, Any]] = None,
     ):
         """
         Initialize the PTLTrainer.
@@ -143,6 +147,8 @@ class PTLTrainer:
             model_factory: Model factory function
             augmentation_config: Augmentation configuration
             optimizer_config: Optimizer configuration
+            peft_scheduling_config: PEFT scheduling configuration (optional)
+            config_dict: Configuration dictionary (optional)
         """
         self.general_config = general_config
         self.feature_extraction_config = feature_extraction_config
@@ -154,6 +160,8 @@ class PTLTrainer:
         self.model_factory = model_factory
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
+        self.peft_scheduling_config = peft_scheduling_config
+        self.config_dict = config_dict
         
         # GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -293,6 +301,36 @@ class PTLTrainer:
             # Fallback to dataset config
             return self.dataset_config.get_num_classes()
     
+    def _get_strategy(self):
+        """
+        Get the appropriate strategy for distributed training.
+        
+        Returns:
+            Strategy configuration for PyTorch Lightning trainer
+        """
+        if not self.general_config.distributed_training:
+            return "auto"
+        
+        # Check if PEFT scheduling is enabled
+        peft_scheduling_enabled = (
+            self.peft_scheduling_config is not None and 
+            self.peft_scheduling_config.enabled
+        )
+        
+        # If PEFT scheduling is enabled, we need to handle unused parameters
+        if peft_scheduling_enabled:
+            print("PEFT scheduling detected - enabling find_unused_parameters for DDP")
+            if self.general_config.strategy == "ddp":
+                return DDPStrategy(find_unused_parameters=True)
+            elif self.general_config.strategy == "ddp_spawn":
+                return DDPStrategy(process_group_backend="nccl", find_unused_parameters=True)
+            else:
+                # For other strategies, use the string and hope it works
+                return self.distributed_strategy
+        else:
+            # No PEFT scheduling, use the configured strategy
+            return self.distributed_strategy
+    
     def train(self) -> Dict[str, Any]:
         """
         Train the model using PyTorch Lightning.
@@ -308,7 +346,7 @@ class PTLTrainer:
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
             devices=self.num_gpus if self.gpu_available else "auto",
-            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
+            strategy=self._get_strategy(),
             callbacks=callbacks,
             logger=self.wandb_logger,
             deterministic=False,
@@ -340,7 +378,9 @@ class PTLTrainer:
             general_config=self.general_config,
             peft_config=self.peft_config,
             num_classes=num_classes,
-            optimizer_config=self.optimizer_config
+            optimizer_config=self.optimizer_config,
+            peft_scheduling_config=self.peft_scheduling_config,
+            config_dict=self.config_dict
         )
         
         # Print training start message with clear formatting
@@ -381,7 +421,7 @@ class PTLTrainer:
         print(f"\nTotal training time: {formatted_end_time}")
         
         if self.wandb_logger:
-            self.wandb_logger.experiment.log({
+            self.wandb_logger.log_metrics({
                 "total_train_time": formatted_end_time
             })
         
@@ -568,7 +608,7 @@ class PTLTrainer:
                 # Log metrics to wandb if wandb logger is enabled
                 if self.wandb_logger and all(metrics.values()):
                     print("Logging prediction metrics to wandb...")
-                    self.wandb_logger.experiment.log({
+                    self.wandb_logger.log_metrics({
                         "inference_accuracy": metrics["inference_acc"],
                         "inference_precision": metrics["inference_precision"],
                         "inference_recall": metrics["inference_recall"],
@@ -643,7 +683,7 @@ class PTLTrainer:
             # Log manually calculated metrics to wandb if wandb logger is enabled
             if self.wandb_logger:
                 print("Logging manually calculated metrics to wandb...")
-                self.wandb_logger.experiment.log({
+                self.wandb_logger.log_metrics({
                     "inference_accuracy": metrics["inference_acc"],
                     "inference_precision": metrics["inference_precision"],
                     "inference_recall": metrics["inference_recall"],
@@ -723,7 +763,9 @@ class PTLTrainer:
                 general_config=self.general_config,
                 peft_config=self.peft_config,
                 num_classes=self.data_module.num_classes,
-                optimizer_config=self.optimizer_config
+                optimizer_config=self.optimizer_config,
+                peft_scheduling_config=self.peft_scheduling_config,
+                config_dict=self.config_dict
             )
             
             # Create checkpoint directory for this fold
@@ -754,7 +796,7 @@ class PTLTrainer:
             max_epochs=self.general_config.epochs,
             accelerator="gpu" if self.gpu_available else "cpu",
             devices=self.num_gpus if self.gpu_available else "auto",
-            strategy=self.distributed_strategy if self.general_config.distributed_training else "auto",
+            strategy=self._get_strategy(),
             callbacks=fold_callbacks,
             logger=self.wandb_logger,
             deterministic=False,

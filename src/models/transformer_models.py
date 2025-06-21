@@ -268,8 +268,15 @@ class TransformerModel:
             # configuration (num layers, hidden dims, etc.), NOT to load pretrained weights
             try:
                 from transformers import ASTConfig
-                config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-            except OSError:
+                # Try local files first, but don't fail if they don't exist
+                try:
+                    config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+                except (OSError, AttributeError, Exception):
+                    # If local files don't exist or there's any other error, download
+                    config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            except Exception as e:
+                print(f"Error loading AST config: {e}")
+                # Fallback to downloading
                 config = ASTConfig.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
             
             # Set number of labels
@@ -281,8 +288,15 @@ class TransformerModel:
         else:
             # Load pretrained model with weights
             try:
-                model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-            except OSError:
+                # Try local files first, but don't fail if they don't exist
+                try:
+                    model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
+                except (OSError, AttributeError, Exception):
+                    # If local files don't exist or there's any other error, download
+                    model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
+            except Exception as e:
+                print(f"Error loading AST model: {e}")
+                # Fallback to downloading
                 model = ASTForAudioClassification.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
             
             # Update the classifier to match our number of classes
@@ -449,7 +463,8 @@ class TransformerModel:
         # Load feature extractor (this doesn't need to change based on from_scratch)
         try:
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError:
+        except (OSError, AttributeError, Exception):
+            # If local files don't exist or there's any other error, download
             feature_extractor = ASTFeatureExtractor.from_pretrained(pretrained_AST_model, cache_dir=CACHE_DIR)
 
         
@@ -481,7 +496,8 @@ class TransformerModel:
             try:
                 from transformers import AutoConfig
                 config = AutoConfig.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
-            except OSError:
+            except (OSError, AttributeError, Exception):
+                # If local files don't exist or there's any other error, download
                 config = AutoConfig.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
             
             # Create model from config (this will use random initialization, NO pretrained weights)
@@ -491,13 +507,15 @@ class TransformerModel:
             # Load pretrained model with weights
             try:
                 model = AutoModel.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, trust_remote_code=True, local_files_only=True)
-            except OSError:
+            except (OSError, AttributeError, Exception):
+                # If local files don't exist or there's any other error, download
                 model = AutoModel.from_pretrained(pretrained_MERT_model, trust_remote_code=True, cache_dir=CACHE_DIR)
         
         # Load feature extractor (this doesn't need to change based on from_scratch)
         try:
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR, local_files_only=True)
-        except OSError:
+        except (OSError, AttributeError, Exception):
+            # If local files don't exist or there's any other error, download
             feature_extractor = Wav2Vec2FeatureExtractor.from_pretrained(pretrained_MERT_model, cache_dir=CACHE_DIR)
         
         # Save original forward method
