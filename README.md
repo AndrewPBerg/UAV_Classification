@@ -1,9 +1,16 @@
+# Spectrogram Dataset 🔉
+Images of the feature extracted samples of the Custom UAV dataset can be found at [UAV Classification Dataset](https://github.com/AndrewPBerg/UAV_Classification_Dataset/tree/main/dataset)
+
 # Papers 📜
 
  1️⃣ 4,500 Seconds [Accepted, Preprint]: [Arxiv 2505.23782](https://arxiv.org/abs/2505.23782) </br>
- 2️⃣ 15,500 Seconds [Under Review, Preprint]: Link TBA </br>
+ &nbsp;&nbsp;&nbsp;&nbsp;↪️4,500 Seconds Oral Presenation: [YouTube Link](https://www.youtube.com/watch?v=zFLgPipWOqI) </br>
+ 2️⃣ 15,500 Seconds [Under Review, Preprint]: [Arxiv 2506.11049](https://arxiv.org/abs/2506.11049)</br>
  3️⃣ The Unbearable Weight: TBD </br>
 
+# Training Logs 🪵
+
+[Weights & Biases Training Logs](https://wandb.ai/andberg9-self/projects)
 # UAV Classification 🛩️
 
 Code repository for UAV (Unmanned Aerial Vehicle) classification using deep learning techniques. The project is containerized using Docker and supports experiment tracking with Weights & Biases.
