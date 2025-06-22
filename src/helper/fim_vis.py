@@ -5,7 +5,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 
-def save_fisher_heatmap(fisher: Dict[str, torch.Tensor], output_dir: str, title: str = "Fisher Information Heatmap") -> str:
+def save_fisher_heatmap(
+    fisher: Dict[str, torch.Tensor],
+    output_dir: str,
+    title: str = "Fisher Information Heatmap",
+    filename: str = "fim_heatmap.png",
+) -> str:
     """Save a heatmap visualising per-parameter Fisher scores.
 
     For each parameter we compute the mean of its diagonal Fisher entries and
@@ -30,7 +35,7 @@ def save_fisher_heatmap(fisher: Dict[str, torch.Tensor], output_dir: str, title:
 
     # Ensure output directory exists
     os.makedirs(output_dir, exist_ok=True)
-    filepath = os.path.join(output_dir, "fim_heatmap.png")
+    filepath = os.path.join(output_dir, filename)
 
     plt.figure(figsize=(4, max(4, len(names) * 0.25)))
     ax = sns.heatmap(

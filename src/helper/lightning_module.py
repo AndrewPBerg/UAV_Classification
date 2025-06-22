@@ -122,6 +122,32 @@ class AudioClassifier(pl.LightningModule):
         else:
             self.fisher_calculator = None
         
+        # --------------------------------------------------------------
+        # Per-epoch FIM settings (optional)
+        # --------------------------------------------------------------
+        self.save_fim_epochs = getattr(general_config, "save_fim_epochs", False)
+        if self.save_fim_epochs and getattr(general_config, "compute_fisher", False):
+            # Separate calculator that we reset every epoch
+            self.fisher_epoch_calculator = FisherInformation(self.model, general_config.fisher_mc_samples)
+            self._epoch_fishers: List[Dict[str, torch.Tensor]] = []
+        else:
+            self.fisher_epoch_calculator = None
+            self._epoch_fishers = []
+        
+        # --------------------------------------------------------------
+        # Prepare output directories early so epoch heatmaps can be saved
+        # --------------------------------------------------------------
+        if getattr(general_config, "compute_fisher", False):
+            from datetime import datetime  # already imported, but scoped for clarity
+            self._fim_timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            self.fim_run_dir = os.path.join("fim", f"{self._fim_timestamp_str}_{self.general_config.model_type}")
+            self.fim_epochs_dir = os.path.join(self.fim_run_dir, "fim_epochs")
+            if self.save_fim_epochs:
+                os.makedirs(self.fim_epochs_dir, exist_ok=True)
+        else:
+            self.fim_run_dir = None
+            self.fim_epochs_dir = None
+        
         # Initialize with first PEFT method if scheduling is enabled
         if self.peft_scheduling_config.enabled:
             initial_method = self.peft_scheduling_config.get_peft_config_for_epoch(0)
@@ -371,6 +397,10 @@ class AudioClassifier(pl.LightningModule):
         # ------------------------------------------------------------------
         if self.fisher_calculator is not None and not self.fisher_calculator.is_done:
             self.fisher_calculator.accumulate()
+        
+        # Epoch-level Fisher accumulation
+        if self.fisher_epoch_calculator is not None:
+            self.fisher_epoch_calculator.accumulate()
         
         # Update weights only when accumulation is complete
         if (self.current_step + 1) % self.accumulation_steps == 0:
@@ -836,12 +866,11 @@ class AudioClassifier(pl.LightningModule):
             and self.fisher_calculator is not None
             and self.fisher_calculator.sample_count > 0
         ):
-            fisher_dict = self.fisher_calculator.get_fisher()
+            # fisher_dict = self.fisher_calculator.get_fisher()
             # Create per-run subdirectory with timestamp and model name
-            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            run_dir = os.path.join("fim", f"{timestamp_str}_{self.general_config.model_type}")
+            timestamp_str = getattr(self, "_fim_timestamp_str", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+            run_dir = self.fim_run_dir or os.path.join("fim", f"{timestamp_str}_{self.general_config.model_type}")
             try:
-                path = save_fisher_heatmap(fisher_dict, run_dir)
                 # Save textual model architecture for reference
                 model_summary_text = str(self.model)
                 with open(os.path.join(run_dir, "model_summary.txt"), "w", encoding="utf-8") as f:
@@ -876,6 +905,65 @@ class AudioClassifier(pl.LightningModule):
                     json.dump(metadata, jf, indent=2, default=str)
 
                 print(f"[FIM] Heatmap saved to {path}")
+
+                # ------------------------------------------------------
+                # Save average heatmap from epoch snapshots, if any
+                # ------------------------------------------------------
+                if self.save_fim_epochs and self._epoch_fishers:
+                    # Compute average Fisher across epochs
+                    avg_fisher = {}
+                    for fd in self._epoch_fishers:
+                        for k, v in fd.items():
+                            if k not in avg_fisher:
+                                avg_fisher[k] = v.clone()
+                            else:
+                                avg_fisher[k] += v
+                    for k in avg_fisher:
+                        avg_fisher[k] /= len(self._epoch_fishers)
+
+                    # Save average heatmap inside fim_epochs directory
+                    try:
+                        save_fisher_heatmap(
+                            avg_fisher,
+                            self.fim_epochs_dir,
+                            title="Average Fisher Information",
+                            filename="average_fim_heatmap.png",
+                        )
+                    except Exception as e:
+                        print(f"[FIM] Failed to save average epoch heatmap: {e}")
+
             except Exception as e:
                 print(f"[FIM] Failed to save heatmap: {e}")
         super().on_train_end()
+
+    # ------------------------------------------------------------------
+    # Per-epoch Fisher heatmap saving
+    # ------------------------------------------------------------------
+    def on_train_epoch_end(self):
+        """Called at the end of each training epoch to save per-epoch FIM."""
+        super().on_train_epoch_end()
+
+        if (
+            self.save_fim_epochs
+            and self.fisher_epoch_calculator is not None
+            and self.fisher_epoch_calculator.sample_count > 0
+        ):
+            try:
+                fisher_dict = self.fisher_epoch_calculator.get_fisher()
+                # Save heatmap for this epoch
+                epoch_fname = f"epoch_{self.current_epoch}_fim_heatmap.png"
+                save_fisher_heatmap(
+                    fisher_dict,
+                    self.fim_epochs_dir,
+                    title=f"Epoch {self.current_epoch} Fisher Information",
+                    filename=epoch_fname,
+                )
+
+                # Store for averaging later
+                self._epoch_fishers.append(fisher_dict)
+
+            except Exception as e:
+                print(f"[FIM] Failed to save epoch heatmap: {e}")
+
+            # Reset for next epoch
+            self.fisher_epoch_calculator.reset()

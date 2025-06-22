@@ -102,6 +102,7 @@ class GeneralConfig(BaseModel):
     
     # Visualisation
     save_fim_heatmap: bool = False  # Save a heatmap of Fisher Information at end of training
+    save_fim_epochs: bool = False  # Save per-epoch Fisher Information heatmaps
     
     @model_validator(mode='after')
     def validate_from_scratch_with_adapter_type(self):

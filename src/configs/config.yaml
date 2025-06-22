@@ -1,11 +1,11 @@
 general:
-  model_type: ast
+  model_type: efficientnet_b1
   from_scratch: false
-  batch_size: 8
+  batch_size: 1
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
-  epochs: 8
+  epochs: 3
   save_model: false
   test_size: 0.0
   inference_size: 0.0
@@ -18,7 +18,7 @@ general:
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: none-full
+  adapter_type: batchnorm
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -28,6 +28,7 @@ general:
   compute_fisher: true
   fisher_mc_samples: 100
   save_fim_heatmap: true
+  save_fim_epochs: false
 peft_scheduling:
   enabled: false
   auto_merge: true
