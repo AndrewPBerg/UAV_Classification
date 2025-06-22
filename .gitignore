@@ -61,6 +61,7 @@ saved_models/
 *.pt
 *.pth
 *.ckpt
+fim/
 
 # Documentation files
 suggestions.md

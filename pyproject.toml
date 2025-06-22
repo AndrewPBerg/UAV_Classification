@@ -20,6 +20,7 @@ dependencies = [
     "pyyaml>=6.0.2",
     "scikit-learn>=1.6.1",
     "scipy>=1.15.2",
+    "seaborn>=0.13.2",
     "telebot>=0.0.5",
     "torch>=2.7.0",
     "torchaudio>=2.7.0",

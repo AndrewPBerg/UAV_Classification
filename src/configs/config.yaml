@@ -1,11 +1,11 @@
 general:
-  model_type: resnet18
+  model_type: ast
   from_scratch: false
   batch_size: 8
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
-  epochs: 15
+  epochs: 8
   save_model: false
   test_size: 0.0
   inference_size: 0.0
@@ -13,8 +13,8 @@ general:
   sweep_count: 200
   accumulation_steps: 1
   patience: 10
-  use_wandb: true
-  use_sweep: true
+  use_wandb: false
+  use_sweep: false
   torch_viz: false
   use_kfold: false
   k_folds: 5
@@ -25,8 +25,11 @@ general:
   distributed_training: false
   num_gpus: 1
   strategy: ddp
+  compute_fisher: true
+  fisher_mc_samples: 100
+  save_fim_heatmap: true
 peft_scheduling:
-  enabled: true
+  enabled: false
   auto_merge: true
   schedule:
   - start_epoch: 10
@@ -64,10 +67,10 @@ optimizer:
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: esc50
-  data_path: datasets/ESC-50-master/classes
+  dataset_type: esc10
+  data_path: datasets/ESC-10-master/classes
 augmentations:
-  augmentations_per_sample: 2
+  augmentations_per_sample: 0
   augmentations:
   - time_mask
   - time_stretch

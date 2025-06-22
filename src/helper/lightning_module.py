@@ -9,14 +9,17 @@ from icecream import ic
 import os
 import re
 import math
-
-# Suppress TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
-
 from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
 from configs.peft_config import get_peft_config
+from helper.FIM import FisherInformation
+from helper.fim_vis import save_fisher_heatmap
+from datetime import datetime
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
+
 
 
 def get_apply_peft_function(model_type: str):
@@ -111,6 +114,13 @@ class AudioClassifier(pl.LightningModule):
         # PEFT Scheduling
         self.peft_scheduling_config = peft_scheduling_config or PEFTSchedulingConfig()
         self.current_peft_method = None
+        
+        # Fisher Information Matrix (optional)
+        if getattr(general_config, 'compute_fisher', False):
+            self.fisher_calculator = FisherInformation(self.model, general_config.fisher_mc_samples)
+            print(f"[FIM] Enabled – collecting up to {general_config.fisher_mc_samples} mini-batch samples")
+        else:
+            self.fisher_calculator = None
         
         # Initialize with first PEFT method if scheduling is enabled
         if self.peft_scheduling_config.enabled:
@@ -354,6 +364,13 @@ class AudioClassifier(pl.LightningModule):
         
         # Backward pass with scaled loss
         self.manual_backward(scaled_loss)
+        
+        # ------------------------------------------------------------------
+        # Fisher Information accumulation (optional) – capture gradients
+        # before we potentially zero them.
+        # ------------------------------------------------------------------
+        if self.fisher_calculator is not None and not self.fisher_calculator.is_done:
+            self.fisher_calculator.accumulate()
         
         # Update weights only when accumulation is complete
         if (self.current_step + 1) % self.accumulation_steps == 0:
@@ -809,3 +826,56 @@ class AudioClassifier(pl.LightningModule):
                     
                 # Print the method name instead of logging it as a metric
                 print(f"PEFT method changed to: {required_method} at epoch {current_epoch}")
+
+    def on_train_end(self):
+        """Called once training finishes."""
+        # Save FIM heatmap if requested
+        if (
+            getattr(self.general_config, 'compute_fisher', False)
+            and getattr(self.general_config, 'save_fim_heatmap', False)
+            and self.fisher_calculator is not None
+            and self.fisher_calculator.sample_count > 0
+        ):
+            fisher_dict = self.fisher_calculator.get_fisher()
+            # Create per-run subdirectory with timestamp and model name
+            timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            run_dir = os.path.join("fim", f"{timestamp_str}_{self.general_config.model_type}")
+            try:
+                path = save_fisher_heatmap(fisher_dict, run_dir)
+                # Save textual model architecture for reference
+                model_summary_text = str(self.model)
+                with open(os.path.join(run_dir, "model_summary.txt"), "w", encoding="utf-8") as f:
+                    f.write(model_summary_text)
+
+                # ------------------------------------------------------------------
+                # Save metadata JSON with configs and summary
+                # ------------------------------------------------------------------
+                import json
+
+                def _safe_dump(obj):
+                    """Helper to convert pydantic models or others to plain dict."""
+                    if hasattr(obj, "model_dump"):
+                        return obj.model_dump()
+                    if hasattr(obj, "dict"):
+                        try:
+                            return obj.dict()
+                        except Exception:
+                            pass
+                    return str(obj)
+
+                metadata = {
+                    "timestamp": timestamp_str,
+                    "model_type": self.general_config.model_type,
+                    "model_summary": model_summary_text,
+                    "general_config": _safe_dump(self.general_config),
+                    "peft_scheduling_config": _safe_dump(self.peft_scheduling_config),
+                    "full_config_yaml": self.config_dict or {},
+                }
+
+                with open(os.path.join(run_dir, "metadata.json"), "w", encoding="utf-8") as jf:
+                    json.dump(metadata, jf, indent=2, default=str)
+
+                print(f"[FIM] Heatmap saved to {path}")
+            except Exception as e:
+                print(f"[FIM] Failed to save heatmap: {e}")
+        super().on_train_end()
