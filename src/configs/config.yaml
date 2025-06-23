@@ -1,24 +1,24 @@
 general:
-  model_type: efficientnet_b1
+  model_type: ast
   from_scratch: false
-  batch_size: 1
+  batch_size: 2
   seed: 42
   num_cuda_workers: 2
   pinned_memory: true
-  epochs: 3
+  epochs: 20
   save_model: false
   test_size: 0.0
   inference_size: 0.0
   val_size: 0.2
   sweep_count: 200
   accumulation_steps: 1
-  patience: 10
+  patience: 5
   use_wandb: false
   use_sweep: false
   torch_viz: false
   use_kfold: false
   k_folds: 5
-  adapter_type: batchnorm
+  adapter_type: none-full
   save_dataloader: false
   monitor: val_acc
   mode: max
@@ -28,18 +28,21 @@ general:
   compute_fisher: true
   fisher_mc_samples: 100
   save_fim_heatmap: true
-  save_fim_epochs: false
+  save_fim_epochs: true
 peft_scheduling:
   enabled: false
   auto_merge: true
   schedule:
-  - start_epoch: 10
+  - start_epoch: 1
     peft_method: none-classifier
-  - start_epoch: 20
+  - start_epoch: 2
     peft_method: none-full
     merge_previous: true
+  - start_epoch: 3
+    peft_method: ia3
+    merge_previous: true
 optimizer:
-  optimizer_type: adamw
+  optimizer_type: adam
   adam:
     lr: 1e-4
     betas:
@@ -47,7 +50,7 @@ optimizer:
     - 0.999
   adamw:
     lr: 0.0008
-    weight_decay: 0.01
+    weight_decay: 0.02
     betas:
     - 0.99
     - 0.999
@@ -68,8 +71,10 @@ optimizer:
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 dataset:
-  dataset_type: esc10
-  data_path: datasets/ESC-10-master/classes
+  # dataset_type: esc10
+  # data_path: datasets/ESC-10-master/classes
+  dataset_type: uav
+  data_path: datasets/UAV_Dataset_31
 augmentations:
   augmentations_per_sample: 0
   augmentations:

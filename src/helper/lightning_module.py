@@ -895,6 +895,9 @@ class AudioClassifier(pl.LightningModule):
                 metadata = {
                     "timestamp": timestamp_str,
                     "model_type": self.general_config.model_type,
+                    "current_peft_method": self.current_peft_method,
+                    "peft_scheduling_enabled": self.peft_scheduling_config.enabled if self.peft_scheduling_config else False,
+                    "final_epoch": self.current_epoch,
                     "model_summary": model_summary_text,
                     "general_config": _safe_dump(self.general_config),
                     "peft_scheduling_config": _safe_dump(self.peft_scheduling_config),
@@ -904,7 +907,18 @@ class AudioClassifier(pl.LightningModule):
                 with open(os.path.join(run_dir, "metadata.json"), "w", encoding="utf-8") as jf:
                     json.dump(metadata, jf, indent=2, default=str)
 
-                print(f"[FIM] Heatmap saved to {path}")
+                # Save final Fisher heatmap with PEFT information
+                fisher_dict = self.fisher_calculator.get_fisher()
+                heatmap_path = save_fisher_heatmap(
+                    fisher_dict,
+                    run_dir,
+                    title="Fisher Information Heatmap (Training Complete)",
+                    filename="fim_heatmap_final.png",
+                    peft_method=self.current_peft_method,
+                    epoch=self.current_epoch,
+                )
+
+                print(f"[FIM] Final heatmap saved to {heatmap_path}")
 
                 # ------------------------------------------------------
                 # Save average heatmap from epoch snapshots, if any
@@ -923,11 +937,19 @@ class AudioClassifier(pl.LightningModule):
 
                     # Save average heatmap inside fim_epochs directory
                     try:
+                        # Determine if PEFT scheduling was used
+                        peft_info = None
+                        if self.peft_scheduling_config.enabled:
+                            peft_info = "PEFT Scheduling Enabled"
+                        elif self.current_peft_method:
+                            peft_info = self.current_peft_method
+                        
                         save_fisher_heatmap(
                             avg_fisher,
                             self.fim_epochs_dir,
-                            title="Average Fisher Information",
+                            title="Average Fisher Information Across Epochs",
                             filename="average_fim_heatmap.png",
+                            peft_method=peft_info,
                         )
                     except Exception as e:
                         print(f"[FIM] Failed to save average epoch heatmap: {e}")
@@ -955,8 +977,10 @@ class AudioClassifier(pl.LightningModule):
                 save_fisher_heatmap(
                     fisher_dict,
                     self.fim_epochs_dir,
-                    title=f"Epoch {self.current_epoch} Fisher Information",
+                    title="Fisher Information Heatmap",
                     filename=epoch_fname,
+                    peft_method=self.current_peft_method,
+                    epoch=self.current_epoch,
                 )
 
                 # Store for averaging later
