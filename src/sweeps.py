@@ -260,6 +260,10 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
                     if 'adam' not in optimizer_params:
                         optimizer_params['adam'] = mixed_params['optimizer']['adam'].copy()
                     optimizer_params['adam']['lr'] = value
+                elif optimizer_type == 'adamspd':
+                    if 'adamspd' not in optimizer_params:
+                        optimizer_params['adamspd'] = mixed_params['optimizer']['adamspd'].copy()
+                    optimizer_params['adamspd']['lr'] = value
             elif key == 'weight_decay':
                 # Map weight_decay to the appropriate optimizer section
                 optimizer_type = sweep_config.get('optimizer_type', mixed_params['optimizer']['optimizer_type'])
@@ -267,6 +271,10 @@ def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any
                     if 'adamw' not in optimizer_params:
                         optimizer_params['adamw'] = mixed_params['optimizer']['adamw'].copy()
                     optimizer_params['adamw']['weight_decay'] = value
+                elif optimizer_type == 'adamspd':
+                    if 'adamspd' not in optimizer_params:
+                        optimizer_params['adamspd'] = mixed_params['optimizer']['adamspd'].copy()
+                    optimizer_params['adamspd']['weight_decay'] = value
                 # Note: Adam doesn't typically use weight_decay in the same way
             elif key == 'gradient_clipping_enabled':
                 optimizer_params['gradient_clipping_enabled'] = value

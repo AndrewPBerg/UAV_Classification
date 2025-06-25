@@ -215,6 +215,8 @@ class PTLTrainer:
             return self.optimizer_config.adamw.lr
         elif self.optimizer_config.optimizer_type == "adam":
             return self.optimizer_config.adam.lr
+        elif self.optimizer_config.optimizer_type == "adamspd":
+            return self.optimizer_config.adamspd.lr
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
     

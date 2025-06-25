@@ -5,6 +5,7 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
 from torch.optim.lr_scheduler import ReduceLROnPlateau, SequentialLR, LambdaLR
 from torch.optim import AdamW, Adam
+from helper.adam_SPD import AdamSPD
 from icecream import ic
 import os
 import re
@@ -553,6 +554,10 @@ class AudioClassifier(pl.LightningModule):
             optimizer_params = dict(self.optimizer_config.adam)
             target_lr = optimizer_params['lr']
             optimizer = Adam(self.model.parameters(), **optimizer_params)
+        elif self.optimizer_config.optimizer_type == "adamspd":
+            optimizer_params = dict(self.optimizer_config.adamspd)
+            target_lr = optimizer_params['lr']
+            optimizer = AdamSPD(self.model.parameters(), **optimizer_params)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
         
