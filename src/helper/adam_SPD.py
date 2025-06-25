@@ -21,12 +21,19 @@ class AdamSPD(Optimizer):
         defaults = dict(lr=lr, betas=betas, eps=eps,
                         weight_decay=weight_decay, amsgrad=amsgrad)
         super(AdamSPD, self).__init__(params, defaults)
+        
+        # Initialize 'pre' parameter for each parameter group
+        for group in self.param_groups:
+            group['pre'] = [param.data.clone() for param in group['params']]
 
 
     def __setstate__(self, state):
         super(AdamSPD, self).__setstate__(state)
         for group in self.param_groups:
             group.setdefault('amsgrad', False)
+            # Initialize 'pre' if not present (for backward compatibility)
+            if 'pre' not in group:
+                group['pre'] = [param.data.clone() for param in group['params']]
 
     @torch.no_grad()
     def step(self, closure=None):
@@ -148,7 +155,13 @@ class AdamSPD(Optimizer):
             if condition < 0.0:
                 ratio = self._ratio(new_p, param, pre)
                 new_p = new_p - weight_decay * ratio * (new_p - pre)
+            
+            # Update the parameter
             param.copy_(new_p)
+            
+            # Update the 'pre' parameter for next iteration
+            group['pre'][j] = param.data.clone()
+            
             i += 1
 
     def _ratio(self,new_p,param,pre):

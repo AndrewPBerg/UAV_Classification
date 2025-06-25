@@ -28,7 +28,8 @@ def main():
      sweep_config, 
      augmentation_config,
      optimizer_config,
-     peft_scheduling_config) = load_configs(config)
+     peft_scheduling_config,
+     loss_config) = load_configs(config)
     
     print("_"*40+"\n")
 
@@ -139,6 +140,7 @@ def main():
         augmentation_config=augmentation_config,
         optimizer_config=optimizer_config,
         peft_scheduling_config=peft_scheduling_config,
+        loss_config=loss_config,
         config_dict=config
     )
     

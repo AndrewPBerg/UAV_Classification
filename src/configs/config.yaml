@@ -78,6 +78,10 @@ optimizer:
   gradient_clipping_enabled: true
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
+loss:
+  type: cross_entropy
+  label_smoothing: 0.1  # Valid range: 0.0 (no smoothing) to 1.0 (maximum smoothing). Recommended: 0.1-0.3
+  class_weights: null  # Optional: [1.0, 1.0, 1.0] for balanced classes or custom weights for imbalanced datasets
 dataset:
   # dataset_type: esc10
   # data_path: datasets/ESC-10-master/classes

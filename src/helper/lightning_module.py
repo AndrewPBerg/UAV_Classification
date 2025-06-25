@@ -14,6 +14,7 @@ from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
 from configs.peft_config import get_peft_config
+from configs.loss_config import LossConfig
 from helper.FIM import FisherInformation
 from helper.fim_vis import save_fisher_heatmap
 from datetime import datetime
@@ -68,6 +69,7 @@ class AudioClassifier(pl.LightningModule):
         num_classes: Optional[int] = None,
         optimizer_config: Optional[OptimizerConfig] = None,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        loss_config: Optional[LossConfig] = None,
         config_dict: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the classifier.
@@ -79,6 +81,7 @@ class AudioClassifier(pl.LightningModule):
             num_classes: Number of classes (optional)
             optimizer_config: Optimizer configuration (optional)
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            loss_config: Loss configuration (optional)
             config_dict: Original config dictionary (optional)
         """
         super().__init__()
@@ -86,13 +89,14 @@ class AudioClassifier(pl.LightningModule):
         self.general_config = general_config
         self.peft_config = peft_config
         self.optimizer_config = optimizer_config or OptimizerConfig()  # Use default if not provided
+        self.loss_config = loss_config or LossConfig()  # Use default if not provided
         self.config_dict = config_dict  # Store the original config dictionary
         
         # Set number of classes
         self.num_classes = num_classes if num_classes is not None else general_config.num_classes
         
-        # Set up loss function
-        self.loss_fn = nn.CrossEntropyLoss()
+        # Set up loss function based on configuration
+        self._setup_loss_function()
         
         # Save hyperparameters for checkpointing
         self.save_hyperparameters(ignore=['model', 'config_dict'])
@@ -160,6 +164,49 @@ class AudioClassifier(pl.LightningModule):
             if hasattr(general_config, 'adapter_type'):
                 self.current_peft_method = general_config.adapter_type
                 print(f"Using static PEFT method: {general_config.adapter_type} (already applied during model creation)")
+
+    def _setup_loss_function(self):
+        """Set up the loss function based on configuration."""
+        print(f"\n{'='*60}")
+        print(f"LOSS FUNCTION CONFIGURATION")
+        print(f"{'='*60}")
+        print(f"Loss type: {self.loss_config.type}")
+        print(f"Label smoothing: {self.loss_config.label_smoothing}")
+        print(f"Class weights: {self.loss_config.class_weights}")
+        
+        if self.loss_config.type == "cross_entropy":
+            # Use label smoothing if specified
+            if self.loss_config.label_smoothing > 0.0:
+                self.loss_fn = nn.CrossEntropyLoss(label_smoothing=self.loss_config.label_smoothing)
+                print(f"✓ Using CrossEntropyLoss with label smoothing: {self.loss_config.label_smoothing}")
+                print(f"  → This will regularize the model by preventing overconfident predictions")
+            else:
+                self.loss_fn = nn.CrossEntropyLoss()
+                print("✓ Using standard CrossEntropyLoss (no label smoothing)")
+            
+            # Add class weights if specified
+            if self.loss_config.class_weights is not None:
+                class_weights = torch.tensor(self.loss_config.class_weights, dtype=torch.float32)
+                self.loss_fn = nn.CrossEntropyLoss(
+                    weight=class_weights,
+                    label_smoothing=self.loss_config.label_smoothing
+                )
+                print(f"✓ Applied class weights: {self.loss_config.class_weights}")
+                if self.loss_config.label_smoothing > 0.0:
+                    print(f"  → Combined with label smoothing: {self.loss_config.label_smoothing}")
+        
+        elif self.loss_config.type == "focal":
+            # Note: Focal loss would need to be implemented or imported from a library like torchvision
+            # For now, fall back to CrossEntropyLoss with a warning
+            print("⚠️  Warning: Focal loss not implemented yet, falling back to CrossEntropyLoss")
+            self.loss_fn = nn.CrossEntropyLoss(label_smoothing=self.loss_config.label_smoothing)
+            if self.loss_config.label_smoothing > 0.0:
+                print(f"✓ Applied label smoothing: {self.loss_config.label_smoothing}")
+        
+        else:
+            raise ValueError(f"Unsupported loss type: {self.loss_config.type}")
+        
+        print(f"{'='*60}\n")
 
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -385,6 +432,15 @@ class AudioClassifier(pl.LightningModule):
         
         # Store current loss for epoch-level logging
         self.current_train_loss = loss.detach().clone()
+        
+        # Print label smoothing verification on first batch of first epoch
+        if batch_idx == 0 and self.current_epoch == 0:
+            smoothing_value = getattr(self.loss_fn, 'label_smoothing', 0.0)
+            if smoothing_value > 0.0:
+                print(f"\n🔍 LABEL SMOOTHING VERIFICATION (First training batch)")
+                print(f"   → Loss function label_smoothing parameter: {smoothing_value}")
+                print(f"   → Training loss value: {loss.item():.4f}")
+                print(f"   → This loss value includes label smoothing regularization\n")
         
         # Scale loss by accumulation steps
         scaled_loss = loss / self.accumulation_steps

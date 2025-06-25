@@ -11,6 +11,7 @@ try:
     from .dataset_config import get_dataset_config, DatasetConfig
     from .optim_config import get_optimizer_config, OptimizerConfig
     from .peft_scheduling_config import get_peft_scheduling_config, PEFTSchedulingConfig
+    from .loss_config import get_loss_config, LossConfig
 except ImportError as e:
     from peft_config import * # noqa: F403
     from peft_config import PEFTConfig, get_peft_config  # Import the PEFTConfig type alias and get_peft_config function explicitly
@@ -19,6 +20,7 @@ except ImportError as e:
     from dataset_config import get_dataset_config, DatasetConfig
     from optim_config import get_optimizer_config, OptimizerConfig
     from peft_scheduling_config import get_peft_scheduling_config, PEFTSchedulingConfig
+    from loss_config import get_loss_config, LossConfig
 
 def handle_exception(exc_type, exc_value, exc_traceback):
     """Custom exception handler that terminates the script on any exception"""
@@ -174,13 +176,13 @@ class FeatureExtractionConfig(BaseModel):
     power: float = 2.0
 
 
-def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig, OptimizerConfig, Optional[PEFTSchedulingConfig]]: # noqa: F405
+def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, DatasetConfig, Optional[PEFTConfig], WandbConfig, SweepConfig, AugmentationConfig, OptimizerConfig, Optional[PEFTSchedulingConfig], LossConfig]: # noqa: F405
     """
     Load and validate all configuration objects from the config dictionary.
     
     Returns:
         Tuple containing all configuration objects in order:
-        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config)
+        (general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config, loss_config)
     """
 
     # Create configuration instances from the dictionary
@@ -210,7 +212,11 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
         peft_scheduling_config = get_peft_scheduling_config(config)
         ic("PEFTSchedulingConfig instance created successfully:")
 
-        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config
+        loss_config = get_loss_config(config)
+        ic("LossConfig instance created successfully:")
+        print(f"📋 Loss Config Loaded - Type: {loss_config.type}, Label Smoothing: {loss_config.label_smoothing}")
+
+        return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config, loss_config
         
     except ValidationError as e:
         ic("Validation error occurred: ")
@@ -251,7 +257,11 @@ def load_configs(config: dict) -> tuple[GeneralConfig, FeatureExtractionConfig, 
             peft_scheduling_config = get_peft_scheduling_config(config)
             ic("PEFTSchedulingConfig instance created successfully (fallback):")
 
-            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config
+            loss_config = get_loss_config(config)
+            ic("LossConfig instance created successfully (fallback):")
+            print(f"📋 Loss Config Loaded (fallback) - Type: {loss_config.type}, Label Smoothing: {loss_config.label_smoothing}")
+
+            return general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, sweep_config, augmentation_config, optimizer_config, peft_scheduling_config, loss_config
             
         except Exception as fallback_error:
             ic("Fallback also failed:", fallback_error)
@@ -334,7 +344,8 @@ def main():
         sweep_config,
         augmentation_config,
         optimizer_config,
-        peft_scheduling_config
+        peft_scheduling_config,
+        loss_config
     ) = load_configs(config)
 
     ic(wandb_config_dict(general_config, feature_extraction_config, dataset_config, peft_config, wandb_config, augmentation_config, optimizer_config))

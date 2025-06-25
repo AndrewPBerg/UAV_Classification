@@ -17,6 +17,7 @@ from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepCo
 from configs.dataset_config import DatasetConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig
+from configs.loss_config import LossConfig
 from .util import wandb_login
 import time
 
@@ -131,6 +132,7 @@ class PTLTrainer:
         augmentation_config: AugmentationConfig,
         optimizer_config: OptimizerConfig,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        loss_config: Optional[LossConfig] = None,
         config_dict: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -148,6 +150,7 @@ class PTLTrainer:
             augmentation_config: Augmentation configuration
             optimizer_config: Optimizer configuration
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            loss_config: Loss configuration (optional)
             config_dict: Configuration dictionary (optional)
         """
         self.general_config = general_config
@@ -161,6 +164,7 @@ class PTLTrainer:
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
         self.peft_scheduling_config = peft_scheduling_config
+        self.loss_config = loss_config
         self.config_dict = config_dict
         
         # GPU configuration
@@ -382,6 +386,7 @@ class PTLTrainer:
             num_classes=num_classes,
             optimizer_config=self.optimizer_config,
             peft_scheduling_config=self.peft_scheduling_config,
+            loss_config=self.loss_config,
             config_dict=self.config_dict
         )
         
@@ -389,6 +394,13 @@ class PTLTrainer:
         print("\n" + "="*80)
         print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
         print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
+        
+        # Print loss configuration verification
+        if self.loss_config:
+            print(f"Loss Config - Type: {self.loss_config.type}, Label Smoothing: {self.loss_config.label_smoothing}")
+        else:
+            print("⚠️  No loss config provided - using defaults")
+        
         print("="*80 + "\n")
         
         # Start timer
@@ -767,6 +779,7 @@ class PTLTrainer:
                 num_classes=self.data_module.num_classes,
                 optimizer_config=self.optimizer_config,
                 peft_scheduling_config=self.peft_scheduling_config,
+                loss_config=self.loss_config,
                 config_dict=self.config_dict
             )
             
