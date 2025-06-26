@@ -1,9 +1,9 @@
 general:
-  model_type: ast
+  model_type: resnet50
   from_scratch: false
-  batch_size: 2
+  batch_size: 32
   seed: 42
-  num_cuda_workers: 2
+  num_cuda_workers: 6
   pinned_memory: true
   epochs: 20
   save_model: false
@@ -13,7 +13,7 @@ general:
   sweep_count: 200
   accumulation_steps: 1
   patience: 5
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: false
@@ -25,7 +25,7 @@ general:
   distributed_training: false
   num_gpus: 1
   strategy: ddp
-  compute_fisher: true
+  compute_fisher: false
   fisher_mc_samples: 100
   save_fim_heatmap: true
   save_fim_epochs: true
@@ -42,15 +42,15 @@ peft_scheduling:
     peft_method: ia3
     merge_previous: true
 optimizer:
-  optimizer_type: adam
+  optimizer_type: adamw
   adam:
-    lr: 1e-4
+    lr: 1e-3
     betas:
     - 0.99
     - 0.999
   adamw:
-    lr: 0.0008
-    weight_decay: 0.02
+    lr: 1e-4
+    weight_decay: 1e-3
     betas:
     - 0.99
     - 0.999
@@ -80,13 +80,11 @@ optimizer:
   gradient_clip_algorithm: norm
 loss:
   type: cross_entropy
-  label_smoothing: 0.1  # Valid range: 0.0 (no smoothing) to 1.0 (maximum smoothing). Recommended: 0.1-0.3
-  class_weights: null  # Optional: [1.0, 1.0, 1.0] for balanced classes or custom weights for imbalanced datasets
+  label_smoothing: 0
+  class_weights: null
 dataset:
-  # dataset_type: esc10
-  # data_path: datasets/ESC-10-master/classes
-  dataset_type: uav
-  data_path: datasets/UAV_Dataset_31
+  dataset_type: esc50
+  data_path: datasets/ESC-50-master/classes
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -189,12 +187,12 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-ast-peft-baselines
-  name: ast-oft
+  project: esc50-resnet-deep-ensemble
+  name: resnet50-m5
   reinit: true
   notes: null
   tags:
-  - vit-base
+  - ensemble
   dir: wandb
 sweep:
   project: sweep-esc50
@@ -217,7 +215,7 @@ sweep:
       - bitfit
     peft_scheduling.schedule.1.start_epoch:
       values:
-      - 5
+      - 3
     peft_scheduling.schedule.1.peft_method:
       values:
       - none-classifier
@@ -228,7 +226,7 @@ sweep:
       - bitfit
     peft_scheduling.schedule.2.start_epoch:
       values:
-      - 10
+      - 6
     peft_scheduling.schedule.2.peft_method:
       values:
       - none-classifier
@@ -239,7 +237,7 @@ sweep:
       - bitfit
     peft_scheduling.schedule.3.start_epoch:
       values:
-      - 15
+      - 9
     peft_scheduling.schedule.3.peft_method:
       values:
       - none-classifier
@@ -248,11 +246,7 @@ sweep:
       - none-full
       - batchnorm
       - bitfit
-
-# -----------------------------------------------------------------------------------
-# Ensemble configuration
-# -----------------------------------------------------------------------------------
 ensemble:
-  enabled: false  # Set to true to activate ensemble mode
-  size: 1         # Constant M – number of models in the ensemble (M=1 → no ensemble)
-  same_minibatch: true  # true = each model sees same mini-batch, false = different mini-batches
+  enabled: true
+  size: 4
+  same_minibatch: false

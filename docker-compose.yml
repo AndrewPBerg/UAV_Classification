@@ -33,8 +33,8 @@ services:
             - driver: nvidia
               count: 2  # Use both GPUs
               capabilities: [gpu]  # Simplified capabilities
-    # command: python3 script.py
-    command: python3 main.py
+    command: python3 script.py
+    # command: python3 main.py
     # command: python3 sweeps.py
     # command: /bin/bash # interactive shell new
     stdin_open: true

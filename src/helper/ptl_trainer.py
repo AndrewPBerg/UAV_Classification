@@ -369,6 +369,116 @@ class PTLTrainer:
         Returns:
             Dictionary of test results
         """
+        # ------------------------------------------------------------------
+        # If ensemble mode is ACTIVE (M > 1) – train each member separately
+        # ------------------------------------------------------------------
+        if self.ensemble_config.is_active():
+            self.trained_models = []  # store trained LightningModules for later inference
+            member_results: List[Dict[str, Any]] = []
+
+            for m_idx in range(self.ensemble_config.M):
+                print("\n" + "#"*90)
+                print(f"TRAINING ENSEMBLE MEMBER {m_idx+1}/{self.ensemble_config.M}")
+                print("#"*90 + "\n")
+
+                # ------------------------------------------------------
+                # Fresh callbacks & logger so state doesn't leak between runs
+                # ------------------------------------------------------
+                callbacks = self._get_callbacks()
+
+                # Redirect checkpoints to member-specific folder if using the default dirpath
+                for cb in callbacks:
+                    if isinstance(cb, pl.callbacks.ModelCheckpoint):
+                        if cb.dirpath is None:
+                            cb.dirpath = os.path.join("checkpoints", f"member_{m_idx+1}")
+                        else:
+                            cb.dirpath = os.path.join(cb.dirpath, f"member_{m_idx+1}")
+
+                # Create a new wandb run per member if enabled
+                logger = None
+                if self.general_config.use_wandb:
+                    wandb_login()
+                    run_name = f"{self.wandb_config.name}-m{m_idx+1}" if self.wandb_config.name else f"ensemble-m{m_idx+1}"
+                    logger = WandbLogger(
+                        project=self.wandb_config.project,
+                        name=run_name,
+                        tags=self.wandb_config.tags if self.wandb_config.tags else [],
+                        notes=self.wandb_config.notes,
+                        log_model=False,
+                        save_dir=self.wandb_config.dir if self.wandb_config.dir else "wandb",
+                        reinit=True,
+                    )
+
+                # ------------------------------------------------------
+                # Diversify seed so models don't train identically unless user disables it
+                # ------------------------------------------------------
+                current_seed = self.general_config.seed + m_idx
+                torch.manual_seed(current_seed)
+                torch.cuda.manual_seed(current_seed)
+                np.random.seed(current_seed)
+
+                trainer = pl.Trainer(
+                    max_epochs=self.general_config.epochs,
+                    accelerator="gpu" if self.gpu_available else "cpu",
+                    devices=self.num_gpus if self.gpu_available else "auto",
+                    strategy=self._get_strategy(),
+                    callbacks=callbacks,
+                    logger=logger,
+                    deterministic=False,
+                    precision=32,
+                )
+
+                # Ensure data module is set up once (outside loop is already ok)
+                try:
+                    self.data_module.setup(stage="fit")
+                except Exception:
+                    pass
+
+                num_classes = self._get_num_classes()
+
+                model, _ = self.model_factory(self.device)
+
+                lightning_module = AudioClassifier(
+                    model=model,
+                    general_config=self.general_config,
+                    peft_config=self.peft_config,
+                    num_classes=num_classes,
+                    optimizer_config=self.optimizer_config,
+                    peft_scheduling_config=self.peft_scheduling_config,
+                    loss_config=self.loss_config,
+                    config_dict=self.config_dict,
+                )
+
+                trainer.fit(model=lightning_module, datamodule=self.data_module)
+
+                # Store trained model (move to CPU to free GPU memory)
+                lightning_module.cpu()
+                self.trained_models.append(lightning_module)
+
+                # Optionally collect metrics from trainer.callback_metrics
+                member_metrics = {k: v.item() if hasattr(v, "item") else v for k, v in trainer.callback_metrics.items()}
+                member_results.append(member_metrics)
+
+                # Clean up GPU memory before next member
+                torch.cuda.empty_cache()
+
+            # After ensemble training, we can trigger inference evaluation if desired
+
+            # Use first trained model's trainer instance for evaluation convenience
+            base_trainer = trainer  # last trainer created
+            base_module = self.trained_models[0]
+
+            inference_results = {}
+            if self.data_module is not None and self.general_config.inference_size > 0:
+                models_for_inf = getattr(self, 'trained_models', [])
+                inference_results = self._run_ensemble_inference(base_trainer, base_module, models_for_inf or None)
+
+            # Aggregate output
+            return {"members": member_results, **inference_results}
+
+        # ------------------------------------------------------------------
+        # SINGLE MODEL PATH (original behaviour)
+        # ------------------------------------------------------------------
         # Get callbacks
         callbacks = self._get_callbacks()
         
@@ -524,7 +634,8 @@ class PTLTrainer:
                 # Choose between standard and ensemble inference
                 # ------------------------------------------------------------------
                 if self.ensemble_config.is_active():
-                    inference_results = self._run_ensemble_inference(trainer, lightning_module)
+                    models_for_inf = getattr(self, 'trained_models', [])
+                    inference_results = self._run_ensemble_inference(trainer, lightning_module, models_for_inf or None)
                 else:
                     inference_results = self._run_inference(trainer, lightning_module)
                 
@@ -1126,7 +1237,7 @@ class PTLTrainer:
     # ------------------------------------------------------------------
     # Ensemble Inference
     # ------------------------------------------------------------------
-    def _run_ensemble_inference(self, trainer: pl.Trainer, base_module: pl.LightningModule) -> Dict[str, Any]:
+    def _run_ensemble_inference(self, trainer: pl.Trainer, base_module: pl.LightningModule, models: Optional[List[pl.LightningModule]] = None) -> Dict[str, Any]:
         """Run inference using an ensemble of *M* models.
 
         This implementation focuses on *prediction-time* ensembling; all models share
@@ -1153,11 +1264,16 @@ class PTLTrainer:
         device = base_module.device
 
         # ------------------------------------------------------------------
-        # Build ensemble list – deep copy to decouple parameters
+        # Build ensemble list
+        #   • If user supplied trained models list → use their .model attribute
+        #   • Otherwise fall back to cloning the base model
         # ------------------------------------------------------------------
-        models = [deepcopy(base_module.model).to(device).eval() for _ in range(self.ensemble_config.M)]
+        if models and len(models) >= self.ensemble_config.M:
+            models = [lm.model.to(device).eval() for lm in models[: self.ensemble_config.M]]
+        else:
+            models = [deepcopy(base_module.model).to(device).eval() for _ in range(self.ensemble_config.M)]
 
-        for idx, m in enumerate(models):
+        for m in models:
             m.eval()
             for p in m.parameters():
                 p.requires_grad_(False)
