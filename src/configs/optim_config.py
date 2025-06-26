@@ -20,6 +20,15 @@ class AdamWConfig(BaseModel):
     amsgrad: bool = False
 
 
+class AdamSPDConfig(BaseModel):
+    """AdamSPD (Selective Projection Decay) optimizer configuration"""
+    lr: float = 0.001
+    betas: tuple[float, float] = (0.9, 0.999)
+    eps: float = 1e-8
+    weight_decay: float = 0.01
+    amsgrad: bool = False
+
+
 class WarmupConfig(BaseModel):
     """Learning rate warmup configuration"""
     enabled: bool = False
@@ -60,11 +69,12 @@ class OptimizerConfig(BaseModel):
         strict = True
 
     # Optimizer selection
-    optimizer_type: Literal["adam", "adamw"] = "adamw" # default to adamw
+    optimizer_type: Literal["adam", "adamw", "adamspd"] = "adamw" # default to adamw
     
     # Optimizer configurations
     adam: AdamConfig = Field(default_factory=AdamConfig)
     adamw: AdamWConfig = Field(default_factory=AdamWConfig)
+    adamspd: AdamSPDConfig = Field(default_factory=AdamSPDConfig)
     
     # Warmup configuration
     warmup: WarmupConfig = Field(default_factory=WarmupConfig)

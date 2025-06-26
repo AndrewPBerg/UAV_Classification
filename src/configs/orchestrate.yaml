@@ -6,602 +6,543 @@ SEND_MESSAGE: true
 
 runs:
 
-  # ======================================================
-  # 1. ESC-50 Sweeps
-  # ======================================================
-
   - id: 1
     type: sweep
     changes:
       general:
-        model_type: ast
+        model_type: custom_cnn
+        from_scratch: false
+        sweep_count: 9
+        batch_size: 8
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
       dataset:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       sweep:
-        project: sweep-esc50
-        name: ast-peft-schedule-sweep
+        project: pretrained-scratch-sweeps
+        name: esc50_custom_cnn
         parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
   - id: 2
     type: sweep
     changes:
       general:
-        model_type: resnet18
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      sweep:
-        project: sweep-esc50
-        name: resnet18-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 3
-    type: sweep
-    changes:
-      general:
-        model_type: mobilenet_v3_small
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      sweep:
-        project: sweep-esc50
-        name: mobilenet-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 4
-    type: sweep
-    changes:
-      general:
-        model_type: vit-large
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      sweep:
-        project: sweep-esc50
-        name: vit-large-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  # ======================================================
-  # 2. ESC-10 Sweeps
-  # ======================================================
-
-  - id: 5
-    type: sweep
-    changes:
-      general:
-        model_type: ast
-      dataset:
-        dataset_type: esc10
-        data_path: datasets/ESC-10-master/classes
-      sweep:
-        project: sweep-esc10
-        name: ast-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  - id: 6
-    type: sweep
-    changes:
-      general:
-        model_type: resnet18
-      dataset:
-        dataset_type: esc10
-        data_path: datasets/ESC-10-master/classes
-      sweep:
-        project: sweep-esc10
-        name: resnet18-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 7
-    type: sweep
-    changes:
-      general:
-        model_type: mobilenet_v3_small
-      dataset:
-        dataset_type: esc10
-        data_path: datasets/ESC-10-master/classes
-      sweep:
-        project: sweep-esc10
-        name: mobilenet-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 8
-    type: sweep
-    changes:
-      general:
-        model_type: vit-large
-      dataset:
-        dataset_type: esc10
-        data_path: datasets/ESC-10-master/classes
-      sweep:
-        project: sweep-esc10
-        name: vit-large-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  # ======================================================
-  # 3. UrbanSound8K Sweeps
-  # ======================================================
-
-  - id: 9
-    type: sweep
-    changes:
-      general:
-        model_type: ast
-      dataset:
-        dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k/classes
-      sweep:
-        project: sweep-urbansound8k
-        name: ast-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  - id: 10
-    type: sweep
-    changes:
-      general:
-        model_type: resnet18
-      dataset:
-        dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k/classes
-      sweep:
-        project: sweep-urbansound8k
-        name: resnet18-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 11
-    type: sweep
-    changes:
-      general:
-        model_type: mobilenet_v3_small
-      dataset:
-        dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k/classes
-      sweep:
-        project: sweep-urbansound8k
-        name: mobilenet-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
-  - id: 12
-    type: sweep
-    changes:
-      general:
-        model_type: vit-large
-      dataset:
-        dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k/classes
-      sweep:
-        project: sweep-urbansound8k
-        name: vit-large-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  # ======================================================
-  # 4. UAV Sweeps
-  # ======================================================
-
-  - id: 13
-    type: sweep
-    changes:
-      general:
-        model_type: ast
+        model_type: custom_cnn
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
       dataset:
         dataset_type: uav
         data_path: datasets/UAV_Dataset_31
       sweep:
-        project: sweep-uav
-        name: ast-peft-schedule-sweep
+        project: pretrained-scratch-sweeps
+        name: uav_custom_cnn
         parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 3
+    type: sweep
+    changes:
+      general:
+        model_type: custom_cnn
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_custom_cnn
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 4
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 5
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 6
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 7
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_scratch
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 8
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_resnet_scratch
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 9
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_scratch
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 10
+    type: sweep
+    changes:
+      general:
+        model_type: efficientnet_b4
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: uav_efficientnet_b4_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 11
+    type: sweep
+    changes:
+      general:
+        model_type: efficientnet_b4
+        from_scratch: false
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_efficientnet_b4_pretrained
+  - id: 12
+    type: sweep
+    changes:
+      general:
+        model_type: efficientnet_b4
+        from_scratch: false
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_efficientnet_b4_pretrained
+  - id: 13
+    type: sweep
+    changes:
+      general:
+        model_type: efficientnet_b4
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: uav_efficientnet_b4_scratch
 
   - id: 14
     type: sweep
     changes:
       general:
-        model_type: resnet18
+        model_type: efficientnet_b4
+        from_scratch: true
       dataset:
-        dataset_type: uav
-        data_path: datasets/UAV_Dataset_31
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
       sweep:
-        project: sweep-uav
-        name: resnet18-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_efficientnet_b4_scratch
   - id: 15
     type: sweep
     changes:
       general:
-        model_type: mobilenet_v3_small
+        model_type: efficientnet_b4
+        from_scratch: true
       dataset:
-        dataset_type: uav
-        data_path: datasets/UAV_Dataset_31
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
       sweep:
-        project: sweep-uav
-        name: mobilenet-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
+        project: pretrained-scratch-sweeps
+        name: esc50_efficientnet_b4_scratch
   - id: 16
     type: sweep
     changes:
       general:
-        model_type: vit-large
+        model_type: ast
+        batch_size: 8
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
       dataset:
         dataset_type: uav
         data_path: datasets/UAV_Dataset_31
       sweep:
-        project: sweep-uav
-        name: vit-large-peft-schedule-sweep
+        project: pretrained-scratch-sweeps
+        name: uav_ast_pretrained
         parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
-  # ======================================================
-  # 5. AudioMNIST Sweeps
-  # ======================================================
-
-  # - id: 17 #skip bc of shaping issues
-  #   type: sweep
-  #   changes:
-  #     general:
-  #       model_type: ast
-  #     dataset:
-  #       dataset_type: audiomnist
-  #       data_path: datasets/audiomnist_dataset
-  #     sweep:
-  #       project: sweep-audiomnist
-  #       name: ast-peft-schedule-sweep
-    #     parameters:
-    #       peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-    #         values: [0]
-    #       peft_scheduling.schedule.0.peft_method:
-    #         values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-    #       peft_scheduling.schedule.1.start_epoch:
-    #         values: [3]
-    #       peft_scheduling.schedule.1.peft_method:
-    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-    #       peft_scheduling.schedule.2.start_epoch:
-    #         values: [6]
-    #       peft_scheduling.schedule.2.peft_method:
-    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-    #       peft_scheduling.schedule.3.start_epoch:
-    #         values: [9]
-    #       peft_scheduling.schedule.3.peft_method:
-    #         values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 17
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_ast_pretrained
   - id: 18
     type: sweep
     changes:
       general:
-        model_type: resnet18
+        model_type: ast
+        from_scratch: false
       dataset:
-        dataset_type: audiomnist
-        data_path: datasets/audiomnist_dataset
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
       sweep:
-        project: sweep-audiomnist
-        name: resnet18-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-
+        project: pretrained-scratch-sweeps
+        name: esc50_ast_pretrained
   - id: 19
     type: sweep
     changes:
       general:
-        model_type: mobilenet_v3_small
+        model_type: ast
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90  
+        patience: 15
       dataset:
-        dataset_type: audiomnist
-        data_path: datasets/audiomnist_dataset
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
       sweep:
-        project: sweep-audiomnist
-        name: mobilenet-peft-schedule-sweep
-        parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-classifier','lorac','ssf','none-full','batchnorm','bitfit']
+        project: pretrained-scratch-sweeps
+        name: uav_ast_scratch
 
   - id: 20
     type: sweep
     changes:
       general:
-        model_type: vit-large
+        model_type: ast
+        from_scratch: true
       dataset:
-        dataset_type: audiomnist
-        data_path: datasets/audiomnist_dataset
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
       sweep:
-        project: sweep-audiomnist
-        name: vit-large-peft-schedule-sweep
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_ast_scratch
+  - id: 21
+    type: sweep
+    changes:
+      general:
+        model_type: ast
+        from_scratch: true
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_ast_scratch
+  - id: 22
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        batch_size: 8
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: uav_vit-base_pretrained 
         parameters:
-          peft_scheduling.schedule.0.start_epoch: #the first adapter is always 0
-            values: [0]
-          peft_scheduling.schedule.0.peft_method:
-            values: ['none-classifier','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.1.start_epoch:
-            values: [3]
-          peft_scheduling.schedule.1.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.2.start_epoch:
-            values: [6]
-          peft_scheduling.schedule.2.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
-          peft_scheduling.schedule.3.start_epoch:
-            values: [9]
-          peft_scheduling.schedule.3.peft_method:
-            values: ['none-full','lora','adalora','hra','ia3','oft','ssf','none-full','layernorm','bitfit']
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 23
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        from_scratch: false
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_vit-base_pretrained
+  - id: 24
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        from_scratch: false
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-mviter/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_vit-base_pretrained
+  - id: 25
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        from_scratch: true
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90  
+        patience: 15  
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: uav_vit-base_scratch
+
+  - id: 26
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        from_scratch: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_vit-base_scratch
+  - id: 27
+    type: sweep
+    changes:
+      general:
+        model_type: vit-base
+        from_scratch: true
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-mviter/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_vit-base_scratch

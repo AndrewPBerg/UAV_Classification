@@ -21,6 +21,25 @@ from helper.teleBot import send_message
 import traceback
 import wandb
 
+def _get_nested(d: dict, path_parts: list[str]):
+    """Return the nested value at *path_parts* or None if any segment is missing."""
+    current = d
+    for p in path_parts:
+        if not isinstance(current, dict) or p not in current:
+            return None
+        current = current[p]
+    return current
+
+
+def _set_nested(d: dict, path_parts: list[str], value: Any):
+    """Set *value* at the nested location described by *path_parts* creating dictionaries as required."""
+    current = d
+    for p in path_parts[:-1]:
+        if p not in current or not isinstance(current[p], dict):
+            current[p] = {}
+        current = current[p]
+    current[path_parts[-1]] = value
+
 def change_config_value(file_path: str, key: str, value: Any) -> None:
     """
     Updates a specific key in the YAML configuration file.
@@ -66,6 +85,11 @@ def alter(changes: dict, file_path: str='config.yaml') -> None:
         for key, value in changes_dict.items():
             current_path = f"{path}.{key}" if path else key
             
+            # If the key itself contains dots, treat it as a direct path reference regardless of nesting.
+            if '.' in key:
+                _set_nested(target_dict, key.split('.'), value)
+                continue
+
             if isinstance(value, dict):
                 # Special handling for sweep parameters - replace entirely
                 if current_path == 'sweep.parameters':
@@ -88,58 +112,58 @@ def alter(changes: dict, file_path: str='config.yaml') -> None:
 def is_valid(run: dict) -> tuple[bool, str]:
     """
     Validates a single run configuration from orchestrate.yaml.
-    
-    Args:
-        run (dict): A single run configuration dictionary
-        
-    Returns:
-        tuple[bool, str]: (is_valid, error_message)
     """
     # Check if required keys exist
     required_keys = ['id', 'type', 'changes']
     for key in required_keys:
         if key not in run:
             return False, f"Missing required key: {key}"
-    
+
     # Validate id
-    if not isinstance(run['id'], (int)):
+    if not isinstance(run['id'], int):
         return False, f"Invalid id type: {type(run['id'])}. Must be int"
-    
+
     # Validate type
     valid_types = ['script', 'sweep']
     if run['type'] not in valid_types:
         return False, f"Invalid type: {run['type']}. Must be one of {valid_types}"
-    
+
     # Validate changes structure
     changes = run['changes']
     if not isinstance(changes, dict):
         return False, f"Changes must be a dictionary, got {type(changes)}"
-    
-    # Validate changes against config structure
+
     try:
         with open('configs/config.yaml', 'r') as f:
             config = yaml.safe_load(f)
-            
-        def validate_nested_dict(changes: dict, config: dict, path: str = '') -> tuple[bool, str]:
-            for key, value in changes.items():
-                current_path = f"{path}.{key}" if path else key
-                
-                # Check if key exists in config
-                if key not in config:
-                    return False, f"Invalid key in changes: {current_path}"
-                
-                # Recursively validate nested dictionaries
-                if isinstance(value, dict):
-                    if not isinstance(config[key], dict):
-                        return False, f"Mismatch in structure at {current_path}"
-                    valid, error = validate_nested_dict(value, config[key], current_path)
-                    if not valid:
-                        return False, error
-                
-            return True, ""
-        
-        return validate_nested_dict(changes, config)
-        
+
+        def extract_paths(node: dict, prefix: str = '') -> list[str]:
+            """Return a list of dotted paths for every key in *node* except those under sweep.parameters."""
+            paths: list[str] = []
+            for k, v in node.items():
+                new_prefix = f"{prefix}.{k}" if prefix else k
+
+                # Skip deep validation for sweep.parameters values –
+                # they intentionally allow arbitrary dotted keys for wandb sweeps.
+                if new_prefix.startswith('sweep.parameters'):
+                    paths.append('sweep.parameters')
+                    continue
+
+                if isinstance(v, dict):
+                    paths.extend(extract_paths(v, new_prefix))
+                else:
+                    paths.append(new_prefix)
+            return paths
+
+        for dotted_path in extract_paths(changes):
+            # skip the special case handled above
+            if dotted_path == 'sweep.parameters':
+                continue
+            if _get_nested(config, dotted_path.split('.')) is None:
+                return False, f"Invalid key in changes: {dotted_path}"
+
+        return True, ""
+
     except FileNotFoundError:
         return False, "Config file not found: config.yaml"
     except yaml.YAMLError:

@@ -17,8 +17,10 @@ from configs import GeneralConfig, FeatureExtractionConfig, WandbConfig, SweepCo
 from configs.dataset_config import DatasetConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig
+from configs.loss_config import LossConfig
 from .util import wandb_login
 import time
+from configs.ensemble_config import EnsembleConfig
 
 
 class CustomProgressBar(TQDMProgressBar):
@@ -131,6 +133,7 @@ class PTLTrainer:
         augmentation_config: AugmentationConfig,
         optimizer_config: OptimizerConfig,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        loss_config: Optional[LossConfig] = None,
         config_dict: Optional[Dict[str, Any]] = None,
     ):
         """
@@ -148,6 +151,7 @@ class PTLTrainer:
             augmentation_config: Augmentation configuration
             optimizer_config: Optimizer configuration
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            loss_config: Loss configuration (optional)
             config_dict: Configuration dictionary (optional)
         """
         self.general_config = general_config
@@ -161,7 +165,32 @@ class PTLTrainer:
         self.augmentation_config = augmentation_config
         self.optimizer_config = optimizer_config
         self.peft_scheduling_config = peft_scheduling_config
+        self.loss_config = loss_config
         self.config_dict = config_dict
+        
+        # ------------------------------------------------------------------
+        # Ensemble configuration (optional – defaults keep behaviour identical)
+        # ------------------------------------------------------------------
+        ensemble_cfg_raw: Dict[str, Any] = {}
+        if self.config_dict is not None and "ensemble" in self.config_dict:
+            ensemble_cfg_raw = self.config_dict["ensemble"] or {}
+
+        try:
+            self.ensemble_config = EnsembleConfig(**ensemble_cfg_raw)
+        except Exception as e:
+            print("[Ensemble] Invalid ensemble configuration – falling back to defaults. Error:", e)
+            self.ensemble_config = EnsembleConfig()
+
+        # Informative banner so the user immediately sees if ensembling is active
+        if self.ensemble_config.is_active():
+            print("="*80)
+            print("🧩 ENSEMBLE MODE ENABLED")
+            print(f"→ Ensemble size (M): {self.ensemble_config.M}")
+            print(f"→ Same mini-batch across models: {self.ensemble_config.same_minibatch}")
+            print("="*80)
+        else:
+            # Mild verbosity to confirm single-model path
+            print("[Ensemble] Single-model mode (M=1) – standard pipeline.")
         
         # GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -215,6 +244,8 @@ class PTLTrainer:
             return self.optimizer_config.adamw.lr
         elif self.optimizer_config.optimizer_type == "adam":
             return self.optimizer_config.adam.lr
+        elif self.optimizer_config.optimizer_type == "adamspd":
+            return self.optimizer_config.adamspd.lr
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
     
@@ -338,6 +369,129 @@ class PTLTrainer:
         Returns:
             Dictionary of test results
         """
+        # ------------------------------------------------------------------
+        # If ensemble mode is ACTIVE (M > 1) – train each member separately
+        # ------------------------------------------------------------------
+        if self.ensemble_config.is_active():
+            self.trained_models = []  # store trained LightningModules for later inference
+            member_results: List[Dict[str, Any]] = []
+
+            for m_idx in range(self.ensemble_config.M):
+                print("\n" + "#"*90)
+                print(f"TRAINING ENSEMBLE MEMBER {m_idx+1}/{self.ensemble_config.M}")
+                print("#"*90 + "\n")
+
+                # ------------------------------------------------------
+                # Fresh callbacks & logger so state doesn't leak between runs
+                # ------------------------------------------------------
+                callbacks = self._get_callbacks()
+
+                # Redirect checkpoints to member-specific folder if using the default dirpath
+                for cb in callbacks:
+                    if isinstance(cb, pl.callbacks.ModelCheckpoint):
+                        if cb.dirpath is None:
+                            cb.dirpath = os.path.join("checkpoints", f"member_{m_idx+1}")
+                        else:
+                            cb.dirpath = os.path.join(cb.dirpath, f"member_{m_idx+1}")
+
+                # Create a new wandb run per member if enabled
+                logger = None
+                if self.general_config.use_wandb:
+                    wandb_login()
+                    run_name = f"{self.wandb_config.name}-m{m_idx+1}" if self.wandb_config.name else f"ensemble-m{m_idx+1}"
+                    logger = WandbLogger(
+                        project=self.wandb_config.project,
+                        name=run_name,
+                        tags=self.wandb_config.tags if self.wandb_config.tags else [],
+                        notes=self.wandb_config.notes,
+                        log_model=False,
+                        save_dir=self.wandb_config.dir if self.wandb_config.dir else "wandb",
+                        reinit=True,
+                    )
+
+                # ------------------------------------------------------
+                # Diversify seed so models don't train identically unless user disables it
+                # ------------------------------------------------------
+                current_seed = self.general_config.seed + m_idx
+                torch.manual_seed(current_seed)
+                torch.cuda.manual_seed(current_seed)
+                np.random.seed(current_seed)
+
+                trainer = pl.Trainer(
+                    max_epochs=self.general_config.epochs,
+                    accelerator="gpu" if self.gpu_available else "cpu",
+                    devices=self.num_gpus if self.gpu_available else "auto",
+                    strategy=self._get_strategy(),
+                    callbacks=callbacks,
+                    logger=logger,
+                    deterministic=False,
+                    precision=32,
+                )
+
+                # Ensure data module is set up once (outside loop is already ok)
+                try:
+                    self.data_module.setup(stage="fit")
+                except Exception:
+                    pass
+
+                num_classes = self._get_num_classes()
+
+                model, _ = self.model_factory(self.device)
+
+                lightning_module = AudioClassifier(
+                    model=model,
+                    general_config=self.general_config,
+                    peft_config=self.peft_config,
+                    num_classes=num_classes,
+                    optimizer_config=self.optimizer_config,
+                    peft_scheduling_config=self.peft_scheduling_config,
+                    loss_config=self.loss_config,
+                    config_dict=self.config_dict,
+                )
+
+                trainer.fit(model=lightning_module, datamodule=self.data_module)
+
+                # Store trained model (move to CPU to free GPU memory)
+                lightning_module.cpu()
+                self.trained_models.append(lightning_module)
+
+                # Optionally collect metrics from trainer.callback_metrics
+                member_metrics = {k: v.item() if hasattr(v, "item") else v for k, v in trainer.callback_metrics.items()}
+                member_results.append(member_metrics)
+
+                # Clean up GPU memory before next member
+                torch.cuda.empty_cache()
+
+            # After ensemble training, we can trigger inference evaluation if desired
+            # ------------------------------------------------------------------
+            # Ensemble evaluation on VALIDATION set when no explicit test split
+            # ------------------------------------------------------------------
+            val_results: Dict[str, Any] = {}
+            try:
+                val_loader = self.data_module.val_dataloader()
+                if val_loader is not None and len(val_loader) > 0:
+                    print("\n" + "="*80)
+                    print("EVALUATING ENSEMBLE ON VALIDATION SET (softmax-averaged)")
+                    print("="*80 + "\n")
+                    val_results = self._ensemble_evaluate_on_loader(val_loader, self.trained_models)
+            except Exception as e:
+                print(f"[Ensemble] Validation evaluation skipped: {e}")
+
+            # Use first trained model's trainer instance for evaluation convenience
+            base_trainer = trainer  # last trainer created
+            base_module = self.trained_models[0]
+
+            inference_results = {}
+            if self.data_module is not None and self.general_config.inference_size > 0:
+                models_for_inf = getattr(self, 'trained_models', [])
+                inference_results = self._run_ensemble_inference(base_trainer, base_module, models_for_inf or None)
+
+            # Aggregate output
+            return {"members": member_results, **val_results, **inference_results}
+
+        # ------------------------------------------------------------------
+        # SINGLE MODEL PATH (original behaviour)
+        # ------------------------------------------------------------------
         # Get callbacks
         callbacks = self._get_callbacks()
         
@@ -380,6 +534,7 @@ class PTLTrainer:
             num_classes=num_classes,
             optimizer_config=self.optimizer_config,
             peft_scheduling_config=self.peft_scheduling_config,
+            loss_config=self.loss_config,
             config_dict=self.config_dict
         )
         
@@ -387,6 +542,13 @@ class PTLTrainer:
         print("\n" + "="*80)
         print(f"STARTING TRAINING: {self.general_config.model_type.upper()} MODEL")
         print(f"Epochs: {self.general_config.epochs} | Batch Size: {self.general_config.batch_size} | LR: {self._get_current_lr()}")
+        
+        # Print loss configuration verification
+        if self.loss_config:
+            print(f"Loss Config - Type: {self.loss_config.type}, Label Smoothing: {self.loss_config.label_smoothing}")
+        else:
+            print("⚠️  No loss config provided - using defaults")
+        
         print("="*80 + "\n")
         
         # Start timer
@@ -481,8 +643,14 @@ class PTLTrainer:
                 print("\n" + "="*80)
                 print("RUNNING INFERENCE EVALUATION")
                 print("="*80 + "\n")
-                
-                inference_results = self._run_inference(trainer, lightning_module)
+                # ------------------------------------------------------------------
+                # Choose between standard and ensemble inference
+                # ------------------------------------------------------------------
+                if self.ensemble_config.is_active():
+                    models_for_inf = getattr(self, 'trained_models', [])
+                    inference_results = self._run_ensemble_inference(trainer, lightning_module, models_for_inf or None)
+                else:
+                    inference_results = self._run_inference(trainer, lightning_module)
                 
                 # Print inference results in a nice table
                 if inference_results:
@@ -765,6 +933,7 @@ class PTLTrainer:
                 num_classes=self.data_module.num_classes,
                 optimizer_config=self.optimizer_config,
                 peft_scheduling_config=self.peft_scheduling_config,
+                loss_config=self.loss_config,
                 config_dict=self.config_dict
             )
             
@@ -1077,3 +1246,253 @@ class PTLTrainer:
                 avg_metrics[f"std_{key}"] = std_value
         
         return avg_metrics
+
+    # ------------------------------------------------------------------
+    # Ensemble Inference
+    # ------------------------------------------------------------------
+    def _run_ensemble_inference(self, trainer: pl.Trainer, base_module: pl.LightningModule, models: Optional[List[pl.LightningModule]] = None) -> Dict[str, Any]:
+        """Run inference using an ensemble of *M* models.
+
+        This implementation focuses on *prediction-time* ensembling; all models share
+        the same weights as the trained ``base_module`` (unless the user replaces or
+        perturbs them externally).  The logic is as follows:
+
+        1. **Model preparation** – create *M* deep copies of the trained model to
+           avoid gradient sharing and place them on the correct device.
+        2. **Data strategy**     – depending on ``same_minibatch`` either feed the
+           *same* mini-batch to every model or consume *M* consecutive mini-batches,
+           one per model.
+        3. **Prediction fusion** – aggregate the *logits* by arithmetic mean and
+           derive final class predictions via ``argmax``.
+        4. **Metric computation** – identical to the single-model path.
+        """
+
+        if not self.ensemble_config.is_active():
+            # Safety guard – should never happen because the caller checks this.
+            return self._run_inference(trainer, base_module)
+
+        from copy import deepcopy
+        import torch.nn.functional as F
+
+        device = base_module.device
+
+        # ------------------------------------------------------------------
+        # Build ensemble list
+        #   • If user supplied trained models list → use their .model attribute
+        #   • Otherwise fall back to cloning the base model
+        # ------------------------------------------------------------------
+        if models and len(models) >= self.ensemble_config.M:
+            models = [lm.model.to(device).eval() for lm in models[: self.ensemble_config.M]]
+        else:
+            models = [deepcopy(base_module.model).to(device).eval() for _ in range(self.ensemble_config.M)]
+
+        for m in models:
+            m.eval()
+            for p in m.parameters():
+                p.requires_grad_(False)
+
+        # ------------------------------------------------------------------
+        # Data loading
+        # ------------------------------------------------------------------
+        inference_loader = self.data_module.predict_dataloader()
+
+        # Prepare metric accumulators
+        all_preds = []
+        all_targets = []
+
+        loader_iter = iter(inference_loader)
+
+        while True:
+            try:
+                if self.ensemble_config.same_minibatch:
+                    batch = next(loader_iter)
+                    x, y = batch
+                    x = x.to(device)
+                    y = y.to(device)
+
+                    # ------------------------------------------------------
+                    # Vectorised forward pass with torch.vmap for efficiency
+                    # ------------------------------------------------------
+                    try:
+                        from torch.func import stack_module_state, functional_call, vmap
+
+                        # Combine parameters & buffers across ensemble
+                        params, buffers = stack_module_state(models)
+
+                        # Build a meta copy of the model architecture once
+                        from copy import deepcopy
+                        base_for_vmap = deepcopy(models[0]).to("meta")
+
+                        def _fmodel(p, b, xx):
+                            return functional_call(base_for_vmap, (p, b), (xx,))
+
+                        logits_vmap = vmap(_fmodel)(params, buffers, x)  # (M, B, C)
+                        avg_logits = logits_vmap.mean(dim=0)
+
+                    except Exception as e:
+                        # Fallback to simple Python loop if vmap path fails
+                        print("[Ensemble] vmap path failed – falling back to Python loop. Error:", e)
+                        logits_list = [m(x) for m in models]
+                        stacked_logits = torch.stack([
+                            lg.logits if hasattr(lg, "logits") else lg for lg in logits_list
+                        ])
+                        avg_logits = stacked_logits.mean(dim=0)
+
+                    preds = torch.argmax(F.softmax(avg_logits, dim=1), dim=1)
+
+                    all_preds.append(preds.detach())
+                    all_targets.append(y.detach())
+
+                else:
+                    # Different mini-batch per model – fetch up to M batches
+                    batch_list = []
+                    for _ in range(self.ensemble_config.M):
+                        batch_list.append(next(loader_iter))
+                    # Extract x & y for each model
+                    logits_collection = []
+                    # Using majority vote averaging logits over different data may
+                    # not make sense, but we follow user's request and process
+                    for model, (x_m, y_m) in zip(models, batch_list):
+                        x_m = x_m.to(device)
+                        y_m = y_m.to(device)
+                        logits_m = model(x_m)
+                        if hasattr(logits_m, "logits"):
+                            logits_m = logits_m.logits
+                        logits_collection.append(logits_m)
+                        all_targets.append(y_m.detach())
+                    # For heterogeneous mini-batches we cannot average logits
+                    # directly.  Instead we derive predictions per model and
+                    # concatenate.
+                    preds_concat = [torch.argmax(F.softmax(lg, dim=1), dim=1) for lg in logits_collection]
+                    all_preds.extend([p.detach() for p in preds_concat])
+
+            except StopIteration:
+                break
+
+        # Flatten lists
+        all_preds = torch.cat(all_preds)
+        all_targets = torch.cat(all_targets)
+
+        # ------------------------------------------------------------------
+        # Compute metrics – re-use helper from _run_inference for consistency
+        # ------------------------------------------------------------------
+        # Use torchmetrics functional API for simplicity here
+        from torchmetrics.functional.classification import (
+            multiclass_accuracy,
+            multiclass_precision,
+            multiclass_recall,
+            multiclass_f1_score,
+        )
+
+        num_classes = self.data_module.num_classes
+
+        accuracy = multiclass_accuracy(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        precision = multiclass_precision(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        recall = multiclass_recall(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        f1 = multiclass_f1_score(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+
+        metrics = {
+            "inference_acc": accuracy,
+            "inference_precision": precision,
+            "inference_recall": recall,
+            "inference_f1": f1,
+        }
+
+        print("\n" + "="*80)
+        print("ENSEMBLE INFERENCE RESULTS (aggregated)")
+        print("="*80)
+        for m_name, m_val in metrics.items():
+            print(f"{m_name:<20} {m_val:.4f}")
+        print("="*80 + "\n")
+
+        # Log to wandb if available
+        if self.wandb_logger:
+            self.wandb_logger.log_metrics(metrics)
+
+        return metrics
+
+    # ------------------------------------------------------------------
+    # Generic loader evaluation for trained ensemble (softmax averaging)
+    # ------------------------------------------------------------------
+    def _ensemble_evaluate_on_loader(self, loader, trained_modules: List[pl.LightningModule]) -> Dict[str, Any]:
+        """Evaluate ensemble on a given DataLoader by averaging softmax outputs.
+
+        Parameters
+        ----------
+        loader : torch.utils.data.DataLoader
+            The dataloader (validation, test, etc.)
+        trained_modules : list[LightningModule]
+            List of fully–trained LightningModules representing the ensemble.
+        Returns
+        -------
+        dict
+            Weighted accuracy / precision / recall / f1 for the loader.
+        """
+        import torch.nn.functional as F
+        device = self.device
+
+        if not trained_modules:
+            raise ValueError("No trained ensemble members supplied for evaluation.")
+
+        # Ensure models are in eval mode and on correct device
+        models = []
+        for lm in trained_modules[: self.ensemble_config.M]:
+            m = lm.model.to(device).eval()
+            for p in m.parameters():
+                p.requires_grad_(False)
+            models.append(m)
+
+        all_preds = []
+        all_targets = []
+
+        with torch.no_grad():
+            for batch in loader:
+                x, y = batch
+                x = x.to(device)
+                y = y.to(device)
+
+                probs_stack = []
+                for m in models:
+                    logits = m(x)
+                    if hasattr(logits, "logits"):
+                        logits = logits.logits
+                    probs = F.softmax(logits, dim=1)
+                    probs_stack.append(probs)
+
+                avg_probs = torch.stack(probs_stack).mean(dim=0)
+                preds = avg_probs.argmax(dim=1)
+
+                all_preds.append(preds.cpu())
+                all_targets.append(y.cpu())
+
+        all_preds = torch.cat(all_preds)
+        all_targets = torch.cat(all_targets)
+
+        from torchmetrics.functional.classification import (
+            multiclass_accuracy,
+            multiclass_precision,
+            multiclass_recall,
+            multiclass_f1_score,
+        )
+
+        num_classes = self.data_module.num_classes
+
+        metrics = {
+            "val_ensemble_acc": multiclass_accuracy(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_precision": multiclass_precision(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_recall": multiclass_recall(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_f1": multiclass_f1_score(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+        }
+
+        print("\n" + "="*80)
+        print("ENSEMBLE VALIDATION METRICS")
+        print("="*80)
+        for k, v in metrics.items():
+            print(f"{k:<25} {v:.4f}")
+        print("="*80 + "\n")
+
+        # Log to wandb if enabled
+        if self.wandb_logger:
+            self.wandb_logger.log_metrics(metrics)
+
+        return metrics

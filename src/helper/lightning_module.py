@@ -5,18 +5,23 @@ from typing import Dict, List, Any, Optional, Union, Tuple
 from torchmetrics.classification import MulticlassPrecision, MulticlassRecall, MulticlassF1Score, MulticlassAccuracy, Accuracy, Precision, Recall, F1Score
 from torch.optim.lr_scheduler import ReduceLROnPlateau, SequentialLR, LambdaLR
 from torch.optim import AdamW, Adam
+from helper.adam_SPD import AdamSPD
 from icecream import ic
 import os
 import re
 import math
-
-# Suppress TensorFlow warnings
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
-
 from configs import GeneralConfig
 from configs.optim_config import OptimizerConfig
 from configs.peft_scheduling_config import PEFTSchedulingConfig, get_peft_scheduling_config, requires_reparameterization
 from configs.peft_config import get_peft_config
+from configs.loss_config import LossConfig
+from helper.FIM import FisherInformation
+from helper.fim_vis import save_fisher_heatmap
+from datetime import datetime
+
+# Suppress TensorFlow warnings
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'  # 0=all, 1=info, 2=warning, 3=error
+
 
 
 def get_apply_peft_function(model_type: str):
@@ -64,6 +69,7 @@ class AudioClassifier(pl.LightningModule):
         num_classes: Optional[int] = None,
         optimizer_config: Optional[OptimizerConfig] = None,
         peft_scheduling_config: Optional[PEFTSchedulingConfig] = None,
+        loss_config: Optional[LossConfig] = None,
         config_dict: Optional[Dict[str, Any]] = None,
     ):
         """Initialize the classifier.
@@ -75,6 +81,7 @@ class AudioClassifier(pl.LightningModule):
             num_classes: Number of classes (optional)
             optimizer_config: Optimizer configuration (optional)
             peft_scheduling_config: PEFT scheduling configuration (optional)
+            loss_config: Loss configuration (optional)
             config_dict: Original config dictionary (optional)
         """
         super().__init__()
@@ -82,13 +89,14 @@ class AudioClassifier(pl.LightningModule):
         self.general_config = general_config
         self.peft_config = peft_config
         self.optimizer_config = optimizer_config or OptimizerConfig()  # Use default if not provided
+        self.loss_config = loss_config or LossConfig()  # Use default if not provided
         self.config_dict = config_dict  # Store the original config dictionary
         
         # Set number of classes
         self.num_classes = num_classes if num_classes is not None else general_config.num_classes
         
-        # Set up loss function
-        self.loss_fn = nn.CrossEntropyLoss()
+        # Set up loss function based on configuration
+        self._setup_loss_function()
         
         # Save hyperparameters for checkpointing
         self.save_hyperparameters(ignore=['model', 'config_dict'])
@@ -112,6 +120,39 @@ class AudioClassifier(pl.LightningModule):
         self.peft_scheduling_config = peft_scheduling_config or PEFTSchedulingConfig()
         self.current_peft_method = None
         
+        # Fisher Information Matrix (optional)
+        if getattr(general_config, 'compute_fisher', False):
+            self.fisher_calculator = FisherInformation(self.model, general_config.fisher_mc_samples)
+            print(f"[FIM] Enabled – collecting up to {general_config.fisher_mc_samples} mini-batch samples")
+        else:
+            self.fisher_calculator = None
+        
+        # --------------------------------------------------------------
+        # Per-epoch FIM settings (optional)
+        # --------------------------------------------------------------
+        self.save_fim_epochs = getattr(general_config, "save_fim_epochs", False)
+        if self.save_fim_epochs and getattr(general_config, "compute_fisher", False):
+            # Separate calculator that we reset every epoch
+            self.fisher_epoch_calculator = FisherInformation(self.model, general_config.fisher_mc_samples)
+            self._epoch_fishers: List[Dict[str, torch.Tensor]] = []
+        else:
+            self.fisher_epoch_calculator = None
+            self._epoch_fishers = []
+        
+        # --------------------------------------------------------------
+        # Prepare output directories early so epoch heatmaps can be saved
+        # --------------------------------------------------------------
+        if getattr(general_config, "compute_fisher", False):
+            from datetime import datetime  # already imported, but scoped for clarity
+            self._fim_timestamp_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+            self.fim_run_dir = os.path.join("fim", f"{self._fim_timestamp_str}_{self.general_config.model_type}")
+            self.fim_epochs_dir = os.path.join(self.fim_run_dir, "fim_epochs")
+            if self.save_fim_epochs:
+                os.makedirs(self.fim_epochs_dir, exist_ok=True)
+        else:
+            self.fim_run_dir = None
+            self.fim_epochs_dir = None
+        
         # Initialize with first PEFT method if scheduling is enabled
         if self.peft_scheduling_config.enabled:
             initial_method = self.peft_scheduling_config.get_peft_config_for_epoch(0)
@@ -123,6 +164,49 @@ class AudioClassifier(pl.LightningModule):
             if hasattr(general_config, 'adapter_type'):
                 self.current_peft_method = general_config.adapter_type
                 print(f"Using static PEFT method: {general_config.adapter_type} (already applied during model creation)")
+
+    def _setup_loss_function(self):
+        """Set up the loss function based on configuration."""
+        print(f"\n{'='*60}")
+        print(f"LOSS FUNCTION CONFIGURATION")
+        print(f"{'='*60}")
+        print(f"Loss type: {self.loss_config.type}")
+        print(f"Label smoothing: {self.loss_config.label_smoothing}")
+        print(f"Class weights: {self.loss_config.class_weights}")
+        
+        if self.loss_config.type == "cross_entropy":
+            # Use label smoothing if specified
+            if self.loss_config.label_smoothing > 0.0:
+                self.loss_fn = nn.CrossEntropyLoss(label_smoothing=self.loss_config.label_smoothing)
+                print(f"✓ Using CrossEntropyLoss with label smoothing: {self.loss_config.label_smoothing}")
+                print(f"  → This will regularize the model by preventing overconfident predictions")
+            else:
+                self.loss_fn = nn.CrossEntropyLoss()
+                print("✓ Using standard CrossEntropyLoss (no label smoothing)")
+            
+            # Add class weights if specified
+            if self.loss_config.class_weights is not None:
+                class_weights = torch.tensor(self.loss_config.class_weights, dtype=torch.float32)
+                self.loss_fn = nn.CrossEntropyLoss(
+                    weight=class_weights,
+                    label_smoothing=self.loss_config.label_smoothing
+                )
+                print(f"✓ Applied class weights: {self.loss_config.class_weights}")
+                if self.loss_config.label_smoothing > 0.0:
+                    print(f"  → Combined with label smoothing: {self.loss_config.label_smoothing}")
+        
+        elif self.loss_config.type == "focal":
+            # Note: Focal loss would need to be implemented or imported from a library like torchvision
+            # For now, fall back to CrossEntropyLoss with a warning
+            print("⚠️  Warning: Focal loss not implemented yet, falling back to CrossEntropyLoss")
+            self.loss_fn = nn.CrossEntropyLoss(label_smoothing=self.loss_config.label_smoothing)
+            if self.loss_config.label_smoothing > 0.0:
+                print(f"✓ Applied label smoothing: {self.loss_config.label_smoothing}")
+        
+        else:
+            raise ValueError(f"Unsupported loss type: {self.loss_config.type}")
+        
+        print(f"{'='*60}\n")
 
     def _init_metrics(self):
         """Initialize metrics for training, validation, and testing."""
@@ -349,11 +433,31 @@ class AudioClassifier(pl.LightningModule):
         # Store current loss for epoch-level logging
         self.current_train_loss = loss.detach().clone()
         
+        # Print label smoothing verification on first batch of first epoch
+        if batch_idx == 0 and self.current_epoch == 0:
+            smoothing_value = getattr(self.loss_fn, 'label_smoothing', 0.0)
+            if smoothing_value > 0.0:
+                print(f"\n🔍 LABEL SMOOTHING VERIFICATION (First training batch)")
+                print(f"   → Loss function label_smoothing parameter: {smoothing_value}")
+                print(f"   → Training loss value: {loss.item():.4f}")
+                print(f"   → This loss value includes label smoothing regularization\n")
+        
         # Scale loss by accumulation steps
         scaled_loss = loss / self.accumulation_steps
         
         # Backward pass with scaled loss
         self.manual_backward(scaled_loss)
+        
+        # ------------------------------------------------------------------
+        # Fisher Information accumulation (optional) – capture gradients
+        # before we potentially zero them.
+        # ------------------------------------------------------------------
+        if self.fisher_calculator is not None and not self.fisher_calculator.is_done:
+            self.fisher_calculator.accumulate()
+        
+        # Epoch-level Fisher accumulation
+        if self.fisher_epoch_calculator is not None:
+            self.fisher_epoch_calculator.accumulate()
         
         # Update weights only when accumulation is complete
         if (self.current_step + 1) % self.accumulation_steps == 0:
@@ -506,6 +610,10 @@ class AudioClassifier(pl.LightningModule):
             optimizer_params = dict(self.optimizer_config.adam)
             target_lr = optimizer_params['lr']
             optimizer = Adam(self.model.parameters(), **optimizer_params)
+        elif self.optimizer_config.optimizer_type == "adamspd":
+            optimizer_params = dict(self.optimizer_config.adamspd)
+            target_lr = optimizer_params['lr']
+            optimizer = AdamSPD(self.model.parameters(), **optimizer_params)
         else:
             raise ValueError(f"Unsupported optimizer type: {self.optimizer_config.optimizer_type}")
         
@@ -809,3 +917,138 @@ class AudioClassifier(pl.LightningModule):
                     
                 # Print the method name instead of logging it as a metric
                 print(f"PEFT method changed to: {required_method} at epoch {current_epoch}")
+
+    def on_train_end(self):
+        """Called once training finishes."""
+        # Save FIM heatmap if requested
+        if (
+            getattr(self.general_config, 'compute_fisher', False)
+            and getattr(self.general_config, 'save_fim_heatmap', False)
+            and self.fisher_calculator is not None
+            and self.fisher_calculator.sample_count > 0
+        ):
+            # fisher_dict = self.fisher_calculator.get_fisher()
+            # Create per-run subdirectory with timestamp and model name
+            timestamp_str = getattr(self, "_fim_timestamp_str", datetime.now().strftime("%Y-%m-%d_%H-%M-%S"))
+            run_dir = self.fim_run_dir or os.path.join("fim", f"{timestamp_str}_{self.general_config.model_type}")
+            try:
+                # Save textual model architecture for reference
+                model_summary_text = str(self.model)
+                with open(os.path.join(run_dir, "model_summary.txt"), "w", encoding="utf-8") as f:
+                    f.write(model_summary_text)
+
+                # ------------------------------------------------------------------
+                # Save metadata JSON with configs and summary
+                # ------------------------------------------------------------------
+                import json
+
+                def _safe_dump(obj):
+                    """Helper to convert pydantic models or others to plain dict."""
+                    if hasattr(obj, "model_dump"):
+                        return obj.model_dump()
+                    if hasattr(obj, "dict"):
+                        try:
+                            return obj.dict()
+                        except Exception:
+                            pass
+                    return str(obj)
+
+                metadata = {
+                    "timestamp": timestamp_str,
+                    "model_type": self.general_config.model_type,
+                    "current_peft_method": self.current_peft_method,
+                    "peft_scheduling_enabled": self.peft_scheduling_config.enabled if self.peft_scheduling_config else False,
+                    "final_epoch": self.current_epoch,
+                    "model_summary": model_summary_text,
+                    "general_config": _safe_dump(self.general_config),
+                    "peft_scheduling_config": _safe_dump(self.peft_scheduling_config),
+                    "full_config_yaml": self.config_dict or {},
+                }
+
+                with open(os.path.join(run_dir, "metadata.json"), "w", encoding="utf-8") as jf:
+                    json.dump(metadata, jf, indent=2, default=str)
+
+                # Save final Fisher heatmap with PEFT information
+                fisher_dict = self.fisher_calculator.get_fisher()
+                heatmap_path = save_fisher_heatmap(
+                    fisher_dict,
+                    run_dir,
+                    title="Fisher Information Heatmap (Training Complete)",
+                    filename="fim_heatmap_final.png",
+                    peft_method=self.current_peft_method,
+                    epoch=self.current_epoch,
+                )
+
+                print(f"[FIM] Final heatmap saved to {heatmap_path}")
+
+                # ------------------------------------------------------
+                # Save average heatmap from epoch snapshots, if any
+                # ------------------------------------------------------
+                if self.save_fim_epochs and self._epoch_fishers:
+                    # Compute average Fisher across epochs
+                    avg_fisher = {}
+                    for fd in self._epoch_fishers:
+                        for k, v in fd.items():
+                            if k not in avg_fisher:
+                                avg_fisher[k] = v.clone()
+                            else:
+                                avg_fisher[k] += v
+                    for k in avg_fisher:
+                        avg_fisher[k] /= len(self._epoch_fishers)
+
+                    # Save average heatmap inside fim_epochs directory
+                    try:
+                        # Determine if PEFT scheduling was used
+                        peft_info = None
+                        if self.peft_scheduling_config.enabled:
+                            peft_info = "PEFT Scheduling Enabled"
+                        elif self.current_peft_method:
+                            peft_info = self.current_peft_method
+                        
+                        save_fisher_heatmap(
+                            avg_fisher,
+                            self.fim_epochs_dir,
+                            title="Average Fisher Information Across Epochs",
+                            filename="average_fim_heatmap.png",
+                            peft_method=peft_info,
+                        )
+                    except Exception as e:
+                        print(f"[FIM] Failed to save average epoch heatmap: {e}")
+
+            except Exception as e:
+                print(f"[FIM] Failed to save heatmap: {e}")
+        super().on_train_end()
+
+    # ------------------------------------------------------------------
+    # Per-epoch Fisher heatmap saving
+    # ------------------------------------------------------------------
+    def on_train_epoch_end(self):
+        """Called at the end of each training epoch to save per-epoch FIM."""
+        super().on_train_epoch_end()
+
+        if (
+            self.save_fim_epochs
+            and self.fisher_epoch_calculator is not None
+            and self.fisher_epoch_calculator.sample_count > 0
+        ):
+            try:
+                fisher_dict = self.fisher_epoch_calculator.get_fisher()
+                # Save heatmap for this epoch
+                epoch_fname = f"epoch_{self.current_epoch}_fim_heatmap.png"
+                save_fisher_heatmap(
+                    fisher_dict,
+                    self.fim_epochs_dir,
+                    title="Fisher Information Heatmap",
+                    filename=epoch_fname,
+                    peft_method=self.current_peft_method,
+                    epoch=self.current_epoch,
+                )
+
+                # Store for averaging later
+                self._epoch_fishers.append(fisher_dict)
+
+            except Exception as e:
+                print(f"[FIM] Failed to save epoch heatmap: {e}")
+
+            # Reset for next epoch
+            self.fisher_epoch_calculator.reset()

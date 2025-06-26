@@ -1,18 +1,18 @@
 general:
-  model_type: resnet18
+  model_type: custom_cnn
   from_scratch: false
-  batch_size: 8
+  batch_size: 16
   seed: 42
-  num_cuda_workers: 2
+  num_cuda_workers: 5
   pinned_memory: true
-  epochs: 15
+  epochs: 90
   save_model: false
   test_size: 0.0
   inference_size: 0.0
   val_size: 0.2
-  sweep_count: 200
+  sweep_count: 9
   accumulation_steps: 1
-  patience: 10
+  patience: 15
   use_wandb: true
   use_sweep: true
   torch_viz: false
@@ -25,49 +25,71 @@ general:
   distributed_training: false
   num_gpus: 1
   strategy: ddp
+  compute_fisher: false
+  fisher_mc_samples: 100
+  save_fim_heatmap: true
+  save_fim_epochs: true
 peft_scheduling:
-  enabled: true
+  enabled: false
   auto_merge: true
   schedule:
-  - start_epoch: 10
+  - start_epoch: 1
     peft_method: none-classifier
-  - start_epoch: 20
+  - start_epoch: 2
     peft_method: none-full
+    merge_previous: true
+  - start_epoch: 3
+    peft_method: ia3
     merge_previous: true
 optimizer:
   optimizer_type: adamw
   adam:
-    lr: 1e-4
+    lr: 1e-8
     betas:
     - 0.99
     - 0.999
   adamw:
-    lr: 0.0008
-    weight_decay: 0.01
+    lr: 1e-8
+    weight_decay: 1e-3
     betas:
     - 0.99
     - 0.999
+  adamspd:
+    lr: 1e-8
+    weight_decay: 0.01
+    betas:
+    - 0.9
+    - 0.999
+    eps: 1e-8
+    amsgrad: false
   warmup:
-    enabled: true
+    enabled: false
     warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: cosine_annealing_lr
+  scheduler_type: step_lr
   cosine_annealing_lr:
     T_max: 50
     eta_min: 0.0
   reduce_lr_on_plateau:
-    mode: max
-    factor: 0.85
-    patience: 3
+    mode: min
+    factor: 0.1
+    patience: 10
+  StepLRConfig:
+    step_size: 10
+    gamma: 0.1
   gradient_clipping_enabled: true
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
+loss:
+  type: cross_entropy
+  label_smoothing: 0
+  class_weights: null
 dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 2
+  augmentations_per_sample: 0
   augmentations:
   - time_mask
   - time_stretch
@@ -153,6 +175,7 @@ ssf:
   - linear
   - dense
   - batchnorm2d
+  - conv2d
 batchnorm:
   target_modules:
   - batchnorm2d
@@ -168,62 +191,32 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-ast-peft-baselines
-  name: ast-oft
+  project: esc50-resnet-deep-ensemble
+  name: resnet50-m4-ssf
   reinit: true
   notes: null
   tags:
-  - vit-base
+  - ensemble
   dir: wandb
 sweep:
-  project: sweep-esc50
-  name: resnet18-peft-schedule-sweep
-  method: random
+  project: pretrained-scratch-sweeps
+  name: esc50_custom_cnn
+  method: grid
   metric:
-    name: test_acc
+    name: val_acc
     goal: maximize
   parameters:
-    peft_scheduling.schedule.0.start_epoch:
+    optimizer.adamw.lr:
       values:
-      - 0
-    peft_scheduling.schedule.0.peft_method:
+      - 1e-4
+      - 1e-3
+      - 1e-2
+    loss.label_smoothing:
       values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.1.start_epoch:
-      values:
-      - 5
-    peft_scheduling.schedule.1.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.2.start_epoch:
-      values:
-      - 10
-    peft_scheduling.schedule.2.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.3.start_epoch:
-      values:
-      - 15
-    peft_scheduling.schedule.3.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
+      - 0.0
+      - 0.1
+      - 0.2
+ensemble:
+  enabled: false
+  size: 4
+  same_minibatch: false

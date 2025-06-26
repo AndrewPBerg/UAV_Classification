@@ -85,6 +85,8 @@ except ImportError:
         TaskType = DummyConfig
 
 # Import Wandb configurations
+from .ensemble_config import EnsembleConfig
+
 from .wandb_config import (
     WandbConfig,
     SweepConfig,
@@ -136,5 +138,7 @@ __all__ = [
     # wandb_config exports
     'WandbConfig',
     'SweepConfig',
-    'get_wandb_config'
+    'get_wandb_config',
+    # ensemble_config exports
+    'EnsembleConfig'
 ] 
