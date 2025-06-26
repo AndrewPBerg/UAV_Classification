@@ -1,20 +1,20 @@
 general:
-  model_type: resnet50
+  model_type: custom_cnn
   from_scratch: false
-  batch_size: 32
+  batch_size: 16
   seed: 42
-  num_cuda_workers: 6
+  num_cuda_workers: 5
   pinned_memory: true
-  epochs: 20
+  epochs: 30
   save_model: false
   test_size: 0.0
   inference_size: 0.0
   val_size: 0.2
-  sweep_count: 200
+  sweep_count: 9
   accumulation_steps: 1
   patience: 5
   use_wandb: true
-  use_sweep: false
+  use_sweep: true
   torch_viz: false
   use_kfold: false
   k_folds: 5
@@ -63,18 +63,21 @@ optimizer:
     eps: 1e-8
     amsgrad: false
   warmup:
-    enabled: true
+    enabled: false
     warmup_steps: 100
     warmup_start_lr: 1e-6
     warmup_method: linear
-  scheduler_type: cosine_annealing_lr
+  scheduler_type: step_lr
   cosine_annealing_lr:
     T_max: 50
     eta_min: 0.0
   reduce_lr_on_plateau:
-    mode: max
-    factor: 0.85
-    patience: 3
+    mode: min
+    factor: 0.1
+    patience: 10
+  StepLRConfig:
+    step_size: 10
+    gamma: 0.1
   gradient_clipping_enabled: true
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
@@ -172,6 +175,7 @@ ssf:
   - linear
   - dense
   - batchnorm2d
+  - conv2d
 batchnorm:
   target_modules:
   - batchnorm2d
@@ -188,65 +192,31 @@ bitfit:
   - bias
 wandb:
   project: esc50-resnet-deep-ensemble
-  name: resnet50-m5
+  name: resnet50-m4-ssf
   reinit: true
   notes: null
   tags:
   - ensemble
   dir: wandb
 sweep:
-  project: sweep-esc50
-  name: resnet18-peft-schedule-sweep
-  method: random
+  project: pretrained-scratch-sweeps
+  name: esc50_custom_cnn_pretrained
+  method: grid
   metric:
-    name: test_acc
+    name: val_acc
     goal: maximize
   parameters:
-    peft_scheduling.schedule.0.start_epoch:
+    lr:
       values:
-      - 0
-    peft_scheduling.schedule.0.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.1.start_epoch:
-      values:
-      - 3
-    peft_scheduling.schedule.1.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.2.start_epoch:
-      values:
-      - 6
-    peft_scheduling.schedule.2.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
-    peft_scheduling.schedule.3.start_epoch:
-      values:
-      - 9
-    peft_scheduling.schedule.3.peft_method:
-      values:
-      - none-classifier
-      - lorac
-      - ssf
-      - none-full
-      - batchnorm
-      - bitfit
+      - 1e-4
+      - 1e-3
+      - 1e-2
+    label_smoothing:
+      value: 0.1
+      min: 0.0
+      max: 0.2
+      distribution: uniform
 ensemble:
-  enabled: true
+  enabled: false
   size: 4
   same_minibatch: false
