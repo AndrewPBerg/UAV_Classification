@@ -463,6 +463,19 @@ class PTLTrainer:
                 torch.cuda.empty_cache()
 
             # After ensemble training, we can trigger inference evaluation if desired
+            # ------------------------------------------------------------------
+            # Ensemble evaluation on VALIDATION set when no explicit test split
+            # ------------------------------------------------------------------
+            val_results: Dict[str, Any] = {}
+            try:
+                val_loader = self.data_module.val_dataloader()
+                if val_loader is not None and len(val_loader) > 0:
+                    print("\n" + "="*80)
+                    print("EVALUATING ENSEMBLE ON VALIDATION SET (softmax-averaged)")
+                    print("="*80 + "\n")
+                    val_results = self._ensemble_evaluate_on_loader(val_loader, self.trained_models)
+            except Exception as e:
+                print(f"[Ensemble] Validation evaluation skipped: {e}")
 
             # Use first trained model's trainer instance for evaluation convenience
             base_trainer = trainer  # last trainer created
@@ -474,7 +487,7 @@ class PTLTrainer:
                 inference_results = self._run_ensemble_inference(base_trainer, base_module, models_for_inf or None)
 
             # Aggregate output
-            return {"members": member_results, **inference_results}
+            return {"members": member_results, **val_results, **inference_results}
 
         # ------------------------------------------------------------------
         # SINGLE MODEL PATH (original behaviour)
@@ -1393,6 +1406,92 @@ class PTLTrainer:
         print("="*80 + "\n")
 
         # Log to wandb if available
+        if self.wandb_logger:
+            self.wandb_logger.log_metrics(metrics)
+
+        return metrics
+
+    # ------------------------------------------------------------------
+    # Generic loader evaluation for trained ensemble (softmax averaging)
+    # ------------------------------------------------------------------
+    def _ensemble_evaluate_on_loader(self, loader, trained_modules: List[pl.LightningModule]) -> Dict[str, Any]:
+        """Evaluate ensemble on a given DataLoader by averaging softmax outputs.
+
+        Parameters
+        ----------
+        loader : torch.utils.data.DataLoader
+            The dataloader (validation, test, etc.)
+        trained_modules : list[LightningModule]
+            List of fully–trained LightningModules representing the ensemble.
+        Returns
+        -------
+        dict
+            Weighted accuracy / precision / recall / f1 for the loader.
+        """
+        import torch.nn.functional as F
+        device = self.device
+
+        if not trained_modules:
+            raise ValueError("No trained ensemble members supplied for evaluation.")
+
+        # Ensure models are in eval mode and on correct device
+        models = []
+        for lm in trained_modules[: self.ensemble_config.M]:
+            m = lm.model.to(device).eval()
+            for p in m.parameters():
+                p.requires_grad_(False)
+            models.append(m)
+
+        all_preds = []
+        all_targets = []
+
+        with torch.no_grad():
+            for batch in loader:
+                x, y = batch
+                x = x.to(device)
+                y = y.to(device)
+
+                probs_stack = []
+                for m in models:
+                    logits = m(x)
+                    if hasattr(logits, "logits"):
+                        logits = logits.logits
+                    probs = F.softmax(logits, dim=1)
+                    probs_stack.append(probs)
+
+                avg_probs = torch.stack(probs_stack).mean(dim=0)
+                preds = avg_probs.argmax(dim=1)
+
+                all_preds.append(preds.cpu())
+                all_targets.append(y.cpu())
+
+        all_preds = torch.cat(all_preds)
+        all_targets = torch.cat(all_targets)
+
+        from torchmetrics.functional.classification import (
+            multiclass_accuracy,
+            multiclass_precision,
+            multiclass_recall,
+            multiclass_f1_score,
+        )
+
+        num_classes = self.data_module.num_classes
+
+        metrics = {
+            "val_ensemble_acc": multiclass_accuracy(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_precision": multiclass_precision(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_recall": multiclass_recall(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+            "val_ensemble_f1": multiclass_f1_score(all_preds, all_targets, num_classes=num_classes, average="weighted").item(),
+        }
+
+        print("\n" + "="*80)
+        print("ENSEMBLE VALIDATION METRICS")
+        print("="*80)
+        for k, v in metrics.items():
+            print(f"{k:<25} {v:.4f}")
+        print("="*80 + "\n")
+
+        # Log to wandb if enabled
         if self.wandb_logger:
             self.wandb_logger.log_metrics(metrics)
 
