@@ -166,41 +166,49 @@ def model_pipeline(sweep_config=None):
         raise e
 
 def set_nested_value(config_dict: Dict[str, Any], key_path: str, value: Any) -> None:
+    """Set a nested value into *config_dict* using dot-notation *key_path*.
+
+    Supports shorthand optimizer paths like "adamw.lr" which are automatically
+    expanded to "optimizer.adamw.lr".
     """
-    Set a nested value in a dictionary using dot notation.
-    
-    Args:
-        config_dict: The dictionary to update
-        key_path: Dot-separated path to the key (e.g., 'peft_scheduling.schedule.0.peft_method')
-        value: The value to set
-    """
-    keys = key_path.split('.')
-    current = config_dict
-    
-    # Navigate to the parent of the target key
-    for key in keys[:-1]:
-        # Handle numeric keys (for list indices)
-        if key.isdigit():
-            key = int(key)
-            # Ensure the list is long enough
-            while len(current) <= key:
+    optimizer_subkeys = {"adam", "adamw", "adamspd"}
+    parts = key_path.split('.')
+
+    # Expand shorthand if first token targets an optimizer sub-section
+    if parts[0] in optimizer_subkeys and 'optimizer' in config_dict:
+        parts = ['optimizer'] + parts
+
+    current: Any = config_dict
+    for token in parts[:-1]:
+        # Handle list indices specified as digits
+        if token.isdigit():
+            idx = int(token)
+            if not isinstance(current, list):
+                raise TypeError(f"Expected list while traversing {key_path} but found {type(current)} at segment '{token}'")
+            # Extend list as needed
+            while len(current) <= idx:
                 current.append({})
-            current = current[key]
+            current = current[idx]
         else:
-            # Create the key if it doesn't exist
-            if key not in current:
-                current[key] = {}
-            current = current[key]
-    
+            if not isinstance(current, dict):
+                raise TypeError(f"Expected dict while traversing {key_path} but found {type(current)} at segment '{token}'")
+            if token not in current or not isinstance(current[token], (dict, list)):
+                current[token] = {}
+            current = current[token]
+
     # Set the final value
-    final_key = keys[-1]
-    if final_key.isdigit():
-        final_key = int(final_key)
-        # Ensure the list is long enough
-        while len(current) <= final_key:
+    final = parts[-1]
+    if final.isdigit():
+        idx = int(final)
+        if not isinstance(current, list):
+            raise TypeError(f"Expected list at final segment of {key_path} but found {type(current)}")
+        while len(current) <= idx:
             current.append({})
-    
-    current[final_key] = value
+        current[idx] = value
+    else:
+        if not isinstance(current, dict):
+            raise TypeError(f"Expected dict at final segment of {key_path} but found {type(current)}")
+        current[final] = value
 
 def get_mixed_params(general_config: Dict[str, Any], sweep_config: Dict[str, Any]) -> Dict[str, Any]:
     """

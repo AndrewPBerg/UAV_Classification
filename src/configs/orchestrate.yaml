@@ -14,7 +14,8 @@ runs:
         from_scratch: false
         sweep_count: 9
         adapter_type: none-full
-        epochs: 30
+        epochs: 90
+        patience: 15
         use_wandb: true
         use_sweep: true
       dataset:
@@ -22,16 +23,160 @@ runs:
         data_path: datasets/ESC-50-master/classes
       sweep:
         project: pretrained-scratch-sweeps
-        name: esc50_custom_cnn_pretrained
+        name: esc50_custom_cnn
         parameters:
-          lr:
+          optimizer.adamw.lr:
             values:
             - 1e-4
             - 1e-3
             - 1e-2
-          label_smoothing:
-            value: 0.1
-            min: 0.0
-            max: 0.2
-            distribution: uniform
-
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 2
+    type: sweep
+    changes:
+      general:
+        model_type: custom_cnn
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: uav_custom_cnn
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 3
+    type: sweep
+    changes:
+      general:
+        model_type: custom_cnn
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_custom_cnn
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 4
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: esc50
+        data_path: datasets/ESC-50-master/classes
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 5
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: urbansound8k
+        data_path: datasets/UrbanSound8k
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: urbansound8k_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
+  - id: 6
+    type: sweep
+    changes:
+      general:
+        model_type: resnet152
+        from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
+      dataset:
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
+      sweep:
+        project: pretrained-scratch-sweeps
+        name: esc50_resnet_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
