@@ -248,3 +248,11 @@ sweep:
       - none-full
       - batchnorm
       - bitfit
+
+# -----------------------------------------------------------------------------------
+# Ensemble configuration
+# -----------------------------------------------------------------------------------
+ensemble:
+  enabled: false  # Set to true to activate ensemble mode
+  size: 1         # Constant M – number of models in the ensemble (M=1 → no ensemble)
+  same_minibatch: true  # true = each model sees same mini-batch, false = different mini-batches

@@ -181,3 +181,11 @@ sweep:
       distribution: int_uniform
       min: 0
       max: 1000 
+
+# -----------------------------------------------------------------------------------
+# Ensemble configuration
+# -----------------------------------------------------------------------------------
+ensemble:
+  enabled: false  # Set to true to activate ensemble mode
+  size: 1         # Constant M – number of models in the ensemble (M=1 → no ensemble)
+  same_minibatch: true  # true = same mini-batch, false = different mini-batches 

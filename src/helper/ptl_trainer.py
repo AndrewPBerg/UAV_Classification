@@ -20,6 +20,7 @@ from configs.peft_scheduling_config import PEFTSchedulingConfig
 from configs.loss_config import LossConfig
 from .util import wandb_login
 import time
+from configs.ensemble_config import EnsembleConfig
 
 
 class CustomProgressBar(TQDMProgressBar):
@@ -166,6 +167,30 @@ class PTLTrainer:
         self.peft_scheduling_config = peft_scheduling_config
         self.loss_config = loss_config
         self.config_dict = config_dict
+        
+        # ------------------------------------------------------------------
+        # Ensemble configuration (optional – defaults keep behaviour identical)
+        # ------------------------------------------------------------------
+        ensemble_cfg_raw: Dict[str, Any] = {}
+        if self.config_dict is not None and "ensemble" in self.config_dict:
+            ensemble_cfg_raw = self.config_dict["ensemble"] or {}
+
+        try:
+            self.ensemble_config = EnsembleConfig(**ensemble_cfg_raw)
+        except Exception as e:
+            print("[Ensemble] Invalid ensemble configuration – falling back to defaults. Error:", e)
+            self.ensemble_config = EnsembleConfig()
+
+        # Informative banner so the user immediately sees if ensembling is active
+        if self.ensemble_config.is_active():
+            print("="*80)
+            print("🧩 ENSEMBLE MODE ENABLED")
+            print(f"→ Ensemble size (M): {self.ensemble_config.M}")
+            print(f"→ Same mini-batch across models: {self.ensemble_config.same_minibatch}")
+            print("="*80)
+        else:
+            # Mild verbosity to confirm single-model path
+            print("[Ensemble] Single-model mode (M=1) – standard pipeline.")
         
         # GPU configuration
         self.gpu_available = torch.cuda.is_available()
@@ -495,8 +520,13 @@ class PTLTrainer:
                 print("\n" + "="*80)
                 print("RUNNING INFERENCE EVALUATION")
                 print("="*80 + "\n")
-                
-                inference_results = self._run_inference(trainer, lightning_module)
+                # ------------------------------------------------------------------
+                # Choose between standard and ensemble inference
+                # ------------------------------------------------------------------
+                if self.ensemble_config.is_active():
+                    inference_results = self._run_ensemble_inference(trainer, lightning_module)
+                else:
+                    inference_results = self._run_inference(trainer, lightning_module)
                 
                 # Print inference results in a nice table
                 if inference_results:
@@ -1092,3 +1122,162 @@ class PTLTrainer:
                 avg_metrics[f"std_{key}"] = std_value
         
         return avg_metrics
+
+    # ------------------------------------------------------------------
+    # Ensemble Inference
+    # ------------------------------------------------------------------
+    def _run_ensemble_inference(self, trainer: pl.Trainer, base_module: pl.LightningModule) -> Dict[str, Any]:
+        """Run inference using an ensemble of *M* models.
+
+        This implementation focuses on *prediction-time* ensembling; all models share
+        the same weights as the trained ``base_module`` (unless the user replaces or
+        perturbs them externally).  The logic is as follows:
+
+        1. **Model preparation** – create *M* deep copies of the trained model to
+           avoid gradient sharing and place them on the correct device.
+        2. **Data strategy**     – depending on ``same_minibatch`` either feed the
+           *same* mini-batch to every model or consume *M* consecutive mini-batches,
+           one per model.
+        3. **Prediction fusion** – aggregate the *logits* by arithmetic mean and
+           derive final class predictions via ``argmax``.
+        4. **Metric computation** – identical to the single-model path.
+        """
+
+        if not self.ensemble_config.is_active():
+            # Safety guard – should never happen because the caller checks this.
+            return self._run_inference(trainer, base_module)
+
+        from copy import deepcopy
+        import torch.nn.functional as F
+
+        device = base_module.device
+
+        # ------------------------------------------------------------------
+        # Build ensemble list – deep copy to decouple parameters
+        # ------------------------------------------------------------------
+        models = [deepcopy(base_module.model).to(device).eval() for _ in range(self.ensemble_config.M)]
+
+        for idx, m in enumerate(models):
+            m.eval()
+            for p in m.parameters():
+                p.requires_grad_(False)
+
+        # ------------------------------------------------------------------
+        # Data loading
+        # ------------------------------------------------------------------
+        inference_loader = self.data_module.predict_dataloader()
+
+        # Prepare metric accumulators
+        all_preds = []
+        all_targets = []
+
+        loader_iter = iter(inference_loader)
+
+        while True:
+            try:
+                if self.ensemble_config.same_minibatch:
+                    batch = next(loader_iter)
+                    x, y = batch
+                    x = x.to(device)
+                    y = y.to(device)
+
+                    # ------------------------------------------------------
+                    # Vectorised forward pass with torch.vmap for efficiency
+                    # ------------------------------------------------------
+                    try:
+                        from torch.func import stack_module_state, functional_call, vmap
+
+                        # Combine parameters & buffers across ensemble
+                        params, buffers = stack_module_state(models)
+
+                        # Build a meta copy of the model architecture once
+                        from copy import deepcopy
+                        base_for_vmap = deepcopy(models[0]).to("meta")
+
+                        def _fmodel(p, b, xx):
+                            return functional_call(base_for_vmap, (p, b), (xx,))
+
+                        logits_vmap = vmap(_fmodel)(params, buffers, x)  # (M, B, C)
+                        avg_logits = logits_vmap.mean(dim=0)
+
+                    except Exception as e:
+                        # Fallback to simple Python loop if vmap path fails
+                        print("[Ensemble] vmap path failed – falling back to Python loop. Error:", e)
+                        logits_list = [m(x) for m in models]
+                        stacked_logits = torch.stack([
+                            lg.logits if hasattr(lg, "logits") else lg for lg in logits_list
+                        ])
+                        avg_logits = stacked_logits.mean(dim=0)
+
+                    preds = torch.argmax(F.softmax(avg_logits, dim=1), dim=1)
+
+                    all_preds.append(preds.detach())
+                    all_targets.append(y.detach())
+
+                else:
+                    # Different mini-batch per model – fetch up to M batches
+                    batch_list = []
+                    for _ in range(self.ensemble_config.M):
+                        batch_list.append(next(loader_iter))
+                    # Extract x & y for each model
+                    logits_collection = []
+                    # Using majority vote averaging logits over different data may
+                    # not make sense, but we follow user's request and process
+                    for model, (x_m, y_m) in zip(models, batch_list):
+                        x_m = x_m.to(device)
+                        y_m = y_m.to(device)
+                        logits_m = model(x_m)
+                        if hasattr(logits_m, "logits"):
+                            logits_m = logits_m.logits
+                        logits_collection.append(logits_m)
+                        all_targets.append(y_m.detach())
+                    # For heterogeneous mini-batches we cannot average logits
+                    # directly.  Instead we derive predictions per model and
+                    # concatenate.
+                    preds_concat = [torch.argmax(F.softmax(lg, dim=1), dim=1) for lg in logits_collection]
+                    all_preds.extend([p.detach() for p in preds_concat])
+
+            except StopIteration:
+                break
+
+        # Flatten lists
+        all_preds = torch.cat(all_preds)
+        all_targets = torch.cat(all_targets)
+
+        # ------------------------------------------------------------------
+        # Compute metrics – re-use helper from _run_inference for consistency
+        # ------------------------------------------------------------------
+        # Use torchmetrics functional API for simplicity here
+        from torchmetrics.functional.classification import (
+            multiclass_accuracy,
+            multiclass_precision,
+            multiclass_recall,
+            multiclass_f1_score,
+        )
+
+        num_classes = self.data_module.num_classes
+
+        accuracy = multiclass_accuracy(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        precision = multiclass_precision(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        recall = multiclass_recall(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+        f1 = multiclass_f1_score(all_preds, all_targets, num_classes=num_classes, average="weighted").item()
+
+        metrics = {
+            "inference_acc": accuracy,
+            "inference_precision": precision,
+            "inference_recall": recall,
+            "inference_f1": f1,
+        }
+
+        print("\n" + "="*80)
+        print("ENSEMBLE INFERENCE RESULTS (aggregated)")
+        print("="*80)
+        for m_name, m_val in metrics.items():
+            print(f"{m_name:<20} {m_val:.4f}")
+        print("="*80 + "\n")
+
+        # Log to wandb if available
+        if self.wandb_logger:
+            self.wandb_logger.log_metrics(metrics)
+
+        return metrics
