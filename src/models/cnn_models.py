@@ -74,11 +74,23 @@ class CNNModel:
         else:
             raise ValueError(f"Unsupported ResNet model type: {model_type}")
         
-        # Modify first convolutional layer to accept grayscale input
-        # if input_shape[0] == 1:
-        model.conv1 = nn.Conv2d(
-            1, 64, kernel_size=7, stride=2, padding=3, bias=False
-        )
+        # Ensure the first convolution expects 3-channel input (triple-spectrogram)
+        if model.conv1.in_channels != 3:
+            new_conv = nn.Conv2d(
+                3,
+                64,
+                kernel_size=model.conv1.kernel_size,
+                stride=model.conv1.stride,
+                padding=model.conv1.padding,
+                bias=False,
+            )
+            # Replicate weights from the old 1-channel conv if available
+            with torch.no_grad():
+                if model.conv1.weight.shape[1] == 1:
+                    new_conv.weight.copy_(model.conv1.weight.repeat(1, 3, 1, 1))
+                else:
+                    new_conv.weight.copy_(model.conv1.weight[:, :3, :, :])
+            model.conv1 = new_conv
         
         # Replace classification head
         in_features = model.fc.in_features
@@ -103,7 +115,7 @@ class CNNModel:
                 
                 # First convolutional block
                 self.conv1 = nn.Sequential(
-                    nn.Conv2d(1, 16, kernel_size=3, padding=1),
+                    nn.Conv2d(3, 16, kernel_size=3, padding=1),
                     nn.ReLU(),
                     nn.MaxPool2d(2),
                     nn.BatchNorm2d(16)
@@ -145,21 +157,17 @@ class CNNModel:
                     print(f"CustomCNN: Processing input with shape {x.shape}")
                     self._input_shape_logged = True
                 
-                # Add channel dimension if not present (batch_size, height, width) -> (batch_size, 1, height, width)
-                if x.dim() == 3:
-                    x = x.unsqueeze(1)
-                elif x.dim() == 2:
-                    # Handle case where batch dimension might be missing
+                # Add channel dimension if needed (handles single spectrogram without batch/channel dims)
+                if x.dim() == 3:  # (C, H, W)
+                    x = x.unsqueeze(0)
+                elif x.dim() == 2:  # (H, W)
                     x = x.unsqueeze(0).unsqueeze(0)
-                
-                # Ensure we have the right number of channels (should be 1 for grayscale spectrograms)
-                if x.size(1) != 1:
-                    # If RGB or other multi-channel, convert to grayscale
-                    if x.size(1) == 3:
-                        x = torch.mean(x, dim=1, keepdim=True)
-                    else:
-                        # Take only the first channel
-                        x = x[:, :1, :, :]
+
+                # Input is expected to have 3 channels; if not, replicate or trim as a safeguard
+                if x.size(1) == 1:
+                    x = x.repeat(1, 3, 1, 1)
+                elif x.size(1) > 3:
+                    x = x[:, :3, :, :]
                 
                 # Convolutional layers
                 x = self.conv1(x)
@@ -243,11 +251,16 @@ class CNNModel:
         else:
             raise ValueError(f"Unsupported MobileNet model type: {model_type}")
         
-        # Modify first convolutional layer to accept grayscale input
-
-        model.features[0][0] = nn.Conv2d(
-            1, 16, kernel_size=3, stride=2, padding=1, bias=False
-        )
+        # Ensure first convolution expects 3-channel input
+        if model.features[0][0].in_channels != 3:
+            model.features[0][0] = nn.Conv2d(
+                3,
+                16,
+                kernel_size=3,
+                stride=2,
+                padding=1,
+                bias=False,
+            )
         
         # Replace classification head
         in_features = model.classifier[-1].in_features
@@ -320,16 +333,17 @@ class CNNModel:
         else:
             raise ValueError(f"Unsupported EfficientNet model type: {model_type}")
         
-        # Modify first convolutional layer to accept grayscale input
-
-        model.features[0][0] = nn.Conv2d(
-            1, model.features[0][0].out_channels,
-            kernel_size=model.features[0][0].kernel_size,
-            stride=model.features[0][0].stride,
-            padding=model.features[0][0].padding,
-            bias=False
-        )
-    
+        # Ensure first convolution expects 3-channel input
+        if model.features[0][0].in_channels != 3:
+            model.features[0][0] = nn.Conv2d(
+                3,
+                model.features[0][0].out_channels,
+                kernel_size=model.features[0][0].kernel_size,
+                stride=model.features[0][0].stride,
+                padding=model.features[0][0].padding,
+                bias=False,
+            )
+        
         # Replace classification head
         in_features = model.classifier[-1].in_features
         model.classifier[-1] = nn.Linear(in_features, num_classes)

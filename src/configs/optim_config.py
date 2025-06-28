@@ -61,6 +61,22 @@ class CosineAnnealingLRConfig(BaseModel):
     eta_min: float = 0.0
 
 
+class SGDConfig(BaseModel):
+    """Stochastic Gradient Descent optimizer configuration"""
+    lr: float = 0.01
+    momentum: float = 0.9
+    weight_decay: float = 0.0
+    nesterov: bool = False
+
+    # Validate that nesterov is only enabled when momentum > 0
+    @field_validator('nesterov')
+    @classmethod
+    def validate_nesterov_requires_momentum(cls, v, values):
+        if v and values.get('momentum', 0.0) == 0.0:
+            raise ValueError('nesterov requires momentum > 0.0')
+        return v
+
+
 class OptimizerConfig(BaseModel):
     """
     Optimizer configuration with support for different optimizers and schedulers
@@ -69,12 +85,13 @@ class OptimizerConfig(BaseModel):
         strict = True
 
     # Optimizer selection
-    optimizer_type: Literal["adam", "adamw", "adamspd"] = "adamw" # default to adamw
+    optimizer_type: Literal["adam", "adamw", "adamspd", "sgd"] = "adamw"  # default to adamw
     
     # Optimizer configurations
     adam: AdamConfig = Field(default_factory=AdamConfig)
     adamw: AdamWConfig = Field(default_factory=AdamWConfig)
     adamspd: AdamSPDConfig = Field(default_factory=AdamSPDConfig)
+    sgd: SGDConfig = Field(default_factory=SGDConfig)
     
     # Warmup configuration
     warmup: WarmupConfig = Field(default_factory=WarmupConfig)

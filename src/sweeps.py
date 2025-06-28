@@ -8,9 +8,11 @@ from icecream import ic
 
 # Import the PyTorch Lightning implementation
 from helper.ptl_trainer import PTLTrainer
-from esc50.esc50_datamodule import ESC50DataModule, create_esc50_datamodule
 from models.model_factory import ModelFactory
 from configs.configs_aggregate import load_configs
+
+# Use the generic datamodule factory instead of hard-coding ESC-50
+from helper.datamodule_factory import create_datamodule
 
 from helper.util import wandb_login
 
@@ -93,13 +95,14 @@ def model_pipeline(sweep_config=None):
             except Exception as e:
                 print(f"Warning: Could not log augmentation config to WandB: {e}")
 
-            # Create ESC50 data module
-            data_module = create_esc50_datamodule(
+            # Create the appropriate DataModule for the chosen dataset
+            data_module = create_datamodule(
                 general_config=general_config,
                 feature_extraction_config=feature_extraction_config,
-                esc50_config=dataset_config,  # dataset_config contains ESC50Config
+                dataset_config=dataset_config,
                 augmentation_config=augmentation_config,
-                use_filename_based_splits=True
+                wandb_config=wandb_config,
+                sweep_config=sweep_config_obj,
             )
             
             # Get model factory function

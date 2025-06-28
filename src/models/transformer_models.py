@@ -470,6 +470,23 @@ class TransformerModel:
         
         model = apply_peft(model, peft_config, general_config)
 
+        # ------------------------------------------------------------------
+        # Make patch_embeddings projection accept 3-channel input if required
+        # ------------------------------------------------------------------
+        patch_proj = model.audio_spectrogram_transformer.embeddings.patch_embeddings.projection
+        if getattr(patch_proj, "in_channels", 0) == 1:
+            new_proj = nn.Conv2d(
+                3,
+                patch_proj.out_channels,
+                kernel_size=patch_proj.kernel_size,
+                stride=patch_proj.stride,
+                padding=patch_proj.padding,
+                bias=False,
+            )
+            with torch.no_grad():
+                # Replicate original single-channel weights across the three channels
+                new_proj.weight.copy_(patch_proj.weight.repeat(1, 3, 1, 1) / 3.0)
+            model.audio_spectrogram_transformer.embeddings.patch_embeddings.projection = new_proj
         
         return model, feature_extractor
         
@@ -548,14 +565,9 @@ class TransformerModel:
             # Handle 4D input [batch, channels, height, width]
             if len(x.shape) == 4:
                 batch_size, channels, height, width = x.shape
-                if channels == 1:
-                    # For single channel input, reshape to [batch, sequence_length]
-                    x = x.squeeze(1)  # Remove channel dimension
-                    if height == 1:
-                        x = x.squeeze(1)  # Remove height dimension if it's 1
-                    else:
-                        x = x.view(batch_size, -1)  # Flatten remaining dimensions
-                    logger.debug(f"Reshaped 4D input to: {x.shape}")
+                # Flatten the spectrogram to a 2-D sequence regardless of channel count
+                x = x.view(batch_size, -1)
+                logger.debug(f"Flattened 4D spectrogram to: {x.shape}")
             
             # Handle 3D input [batch, channels, sequence_length]
             elif len(x.shape) == 3:

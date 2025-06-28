@@ -6,65 +6,65 @@ SEND_MESSAGE: true
 
 runs:
 
-  - id: 1
-    type: sweep
-    changes:
-      general:
-        model_type: custom_cnn
-        from_scratch: false
-        sweep_count: 9
-        batch_size: 8
-        adapter_type: none-full
-        epochs: 90
-        patience: 15
-        use_wandb: true
-        use_sweep: true
-      dataset:
-        dataset_type: esc50
-        data_path: datasets/ESC-50-master/classes
-      sweep:
-        project: pretrained-scratch-sweeps
-        name: esc50_custom_cnn
-        parameters:
-          optimizer.adamw.lr:
-            values:
-            - 1e-4
-            - 1e-3
-            - 1e-2
-          loss.label_smoothing:
-            values:
-            - 0.0
-            - 0.1
-            - 0.2
-  - id: 2
-    type: sweep
-    changes:
-      general:
-        model_type: custom_cnn
-        from_scratch: false
-        sweep_count: 9
-        adapter_type: none-full
-        epochs: 90
-        patience: 15
-        use_wandb: true
-        use_sweep: true
-      dataset:
-        dataset_type: uav
-        data_path: datasets/UAV_Dataset_31
-      sweep:
-        project: pretrained-scratch-sweeps
-        name: uav_custom_cnn
-        parameters:
-          optimizer.adamw.lr:
-            values:
-            - 1e-4
-            - 1e-3
-            - 1e-2
-          loss.label_smoothing:
-            values:
-            - 0.0
-            - 0.1
-            - 0.2
+  # - id: 1
+  #   type: sweep
+  #   changes:
+  #     general:
+  #       model_type: custom_cnn
+  #       from_scratch: false
+  #       sweep_count: 9
+  #       batch_size: 8
+  #       adapter_type: none-full
+  #       epochs: 90
+  #       patience: 15
+  #       use_wandb: true
+  #       use_sweep: true
+  #     dataset:
+  #       dataset_type: esc50
+  #       data_path: datasets/ESC-50-master/classes
+  #     sweep:
+  #       project: pretrained-scratch-sweeps
+  #       name: esc50_custom_cnn
+  #       parameters:
+  #         optimizer.adamw.lr:
+  #           values:
+  #           - 1e-4
+  #           - 1e-3
+  #           - 1e-2
+  #         loss.label_smoothing:
+  #           values:
+  #           - 0.0
+  #           - 0.1
+  #           - 0.2
+  # - id: 2
+  #   type: sweep
+  #   changes:
+  #     general:
+  #       model_type: custom_cnn
+  #       from_scratch: false
+  #       sweep_count: 9
+  #       adapter_type: none-full
+  #       epochs: 90
+  #       patience: 15
+  #       use_wandb: true
+  #       use_sweep: true
+  #     dataset:
+  #       dataset_type: uav
+  #       data_path: datasets/UAV_Dataset_31
+  #     sweep:
+  #       project: pretrained-scratch-sweeps
+  #       name: uav_custom_cnn
+  #       parameters:
+  #         optimizer.adamw.lr:
+  #           values:
+  #           - 1e-4
+  #           - 1e-3
+  #           - 1e-2
+  #         loss.label_smoothing:
+  #           values:
+  #           - 0.0
+  #           - 0.1
+  #           - 0.2
   - id: 3
     type: sweep
     changes:
@@ -79,7 +79,7 @@ runs:
         use_sweep: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_custom_cnn
@@ -137,7 +137,7 @@ runs:
         use_sweep: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_resnet_pretrained
@@ -224,7 +224,7 @@ runs:
         use_sweep: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_resnet_scratch
@@ -301,24 +301,56 @@ runs:
       general:
         model_type: efficientnet_b4
         from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
       dataset:
-        dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        dataset_type: uav
+        data_path: datasets/UAV_Dataset_31
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_efficientnet_b4_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
   - id: 12
     type: sweep
     changes:
       general:
         model_type: efficientnet_b4
         from_scratch: false
+        sweep_count: 9
+        adapter_type: none-full
+        epochs: 90
+        patience: 15
+        use_wandb: true
+        use_sweep: true
       dataset:
         dataset_type: esc50
         data_path: datasets/ESC-50-master/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: esc50_efficientnet_b4_pretrained
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing:
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
   - id: 13
     type: sweep
     changes:
@@ -329,13 +361,25 @@ runs:
         adapter_type: none-full
         epochs: 90
         patience: 15
+        use_wandb: true
+        use_sweep: true
       dataset:
         dataset_type: uav
         data_path: datasets/UAV_Dataset_31
       sweep:
         project: pretrained-scratch-sweeps
         name: uav_efficientnet_b4_scratch
-
+        parameters:
+          optimizer.adamw.lr:
+            values:
+            - 1e-4
+            - 1e-3
+            - 1e-2
+          loss.label_smoothing: 
+            values:
+            - 0.0
+            - 0.1
+            - 0.2
   - id: 14
     type: sweep
     changes:
@@ -344,7 +388,7 @@ runs:
         from_scratch: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_efficientnet_b4_scratch
@@ -396,7 +440,7 @@ runs:
         from_scratch: false
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_ast_pretrained
@@ -437,7 +481,7 @@ runs:
         from_scratch: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_ast_scratch
@@ -489,7 +533,7 @@ runs:
         from_scratch: false
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_vit-base_pretrained
@@ -530,7 +574,7 @@ runs:
         from_scratch: true
       dataset:
         dataset_type: urbansound8k
-        data_path: datasets/UrbanSound8k
+        data_path: datasets/UrbanSound8K/classes
       sweep:
         project: pretrained-scratch-sweeps
         name: urbansound8k_vit-base_scratch

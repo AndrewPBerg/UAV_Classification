@@ -24,6 +24,7 @@ from icecream import ic
 from time import time as timer
 from dotenv import load_dotenv
 from configs import AugConfig as AugmentationConfig
+from .spectrogram_extractors import TripleMelExtractor
 
 def generate_model_image(model: torch.nn.Module, device=None):
     # Create a random input tensor
@@ -215,8 +216,12 @@ class UAVDataset(Dataset):
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
-                logger.debug(f"MelSpectrogram features shape: {features.input_values.shape}")
-                return features.input_values
+                tensor = features.input_values
+                # Ensure 3-channel output if tensor has a single channel
+                if tensor.size(0) == 1:
+                    tensor = tensor.repeat(3, 1, 1)
+                logger.debug(f"MelSpectrogram features shape: {tensor.shape}")
+                return tensor
             # For MFCC feature extractor
             elif isinstance(self.feature_extractor, MFCCFeatureExtractor):
                 logger.debug("Using MFCCFeatureExtractor")
@@ -225,8 +230,11 @@ class UAVDataset(Dataset):
                     sampling_rate=self.target_sr,
                     return_tensors="pt"
                 )
-                logger.debug(f"MFCC features shape: {features.input_values.shape}")
-                return features.input_values
+                tensor = features.input_values
+                if tensor.size(0) == 1:
+                    tensor = tensor.repeat(3, 1, 1)
+                logger.debug(f"MFCC features shape: {tensor.shape}")
+                return tensor
             # For AST feature extractor
             elif isinstance(self.feature_extractor, ASTFeatureExtractor):
                 logger.debug("Using ASTFeatureExtractor")
@@ -379,6 +387,10 @@ class UAVDataset(Dataset):
                     padding=True
                 )
                 return features.input_features.squeeze(0)
+            # === Triple 3-channel log-mel spectrogram extractor ===
+            elif isinstance(self.feature_extractor, TripleMelExtractor):
+                # TripleMelExtractor already returns a tensor in the desired shape
+                return self.feature_extractor(audio_tensor, sampling_rate=self.target_sr)
             else:
                 raise ValueError(f"Unsupported feature extractor type: {type(self.feature_extractor)}")
 

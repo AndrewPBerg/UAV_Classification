@@ -1,7 +1,7 @@
 general:
-  model_type: custom_cnn
+  model_type: resnet50
   from_scratch: false
-  batch_size: 16
+  batch_size: 32
   seed: 42
   num_cuda_workers: 5
   pinned_memory: true
@@ -13,8 +13,8 @@ general:
   sweep_count: 9
   accumulation_steps: 1
   patience: 15
-  use_wandb: true
-  use_sweep: true
+  use_wandb: false
+  use_sweep: false
   torch_viz: false
   use_kfold: false
   k_folds: 5
@@ -42,14 +42,14 @@ peft_scheduling:
     peft_method: ia3
     merge_previous: true
 optimizer:
-  optimizer_type: adamw
+  optimizer_type: sgd
   adam:
     lr: 1e-8
     betas:
     - 0.99
     - 0.999
   adamw:
-    lr: 1e-8
+    lr: 1e-4
     weight_decay: 1e-3
     betas:
     - 0.99
@@ -62,6 +62,11 @@ optimizer:
     - 0.999
     eps: 1e-8
     amsgrad: false
+  sgd:
+    lr: 1e-4
+    momentum: 0.9
+    weight_decay: 1e-3
+    nesterov: false
   warmup:
     enabled: false
     warmup_steps: 100
@@ -76,14 +81,14 @@ optimizer:
     factor: 0.1
     patience: 10
   StepLRConfig:
-    step_size: 10
+    step_size: 30
     gamma: 0.1
   gradient_clipping_enabled: true
   gradient_clip_val: 1.0
   gradient_clip_algorithm: norm
 loss:
   type: cross_entropy
-  label_smoothing: 0
+  label_smoothing: 0.1
   class_weights: null
 dataset:
   dataset_type: esc50
@@ -91,23 +96,12 @@ dataset:
 augmentations:
   augmentations_per_sample: 0
   augmentations:
-  - time_mask
-  - time_stretch
-  - sin_distortion
-  sin_distortion_min_rate: 0.1
-  sin_distortion_max_rate: 0.6
-  sin_distortion_p: 0.9
-  polarity_inversion_p: 0.8
-  gaussian_noise_min_amplitude: 0.1
-  gaussian_noise_max_amplitude: 0.15
-  gaussian_noise_p: 0.8
-  time_mask_min_band_part: 0.01
-  time_mask_max_band_part: 0.15
-  time_mask_fade_duration: 0.01
-  time_mask_p: 0.8
+    - time_mask
+    - time_stretch
+  
 feature_extraction:
   type: melspectrogram
-  sampling_rate: 16000
+  sampling_rate: 44100
   n_mfcc: 40
   n_mels: 128
   n_fft: 1024
@@ -220,3 +214,10 @@ ensemble:
   enabled: false
   size: 4
   same_minibatch: false
+spectrogram3ch:
+  window_sizes_ms: [25, 50, 100]
+  hop_sizes_ms: [10, 25, 50]
+  n_mels: 128
+  n_fft: 44100
+  target_width: 250
+  eps: 1.0e-6
