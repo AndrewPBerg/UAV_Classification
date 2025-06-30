@@ -3,6 +3,8 @@ import torch
 import sys
 from icecream import ic
 
+torch.set_float32_matmul_precision('medium')
+
 # Import the rest of the modules
 from helper.ptl_trainer import PTLTrainer
 from helper.UAV_datamodule import UAVDataModule

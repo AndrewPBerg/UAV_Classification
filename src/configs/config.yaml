@@ -1,7 +1,7 @@
 general:
-  model_type: resnet50
+  model_type: resnet152
   from_scratch: false
-  batch_size: 32
+  batch_size: 16
   seed: 42
   num_cuda_workers: 5
   pinned_memory: true
@@ -11,9 +11,9 @@ general:
   inference_size: 0.0
   val_size: 0.2
   sweep_count: 9
-  accumulation_steps: 1
+  accumulation_steps: 2
   patience: 15
-  use_wandb: false
+  use_wandb: true
   use_sweep: false
   torch_viz: false
   use_kfold: false
@@ -42,7 +42,7 @@ peft_scheduling:
     peft_method: ia3
     merge_previous: true
 optimizer:
-  optimizer_type: sgd
+  optimizer_type: adamw
   adam:
     lr: 1e-8
     betas:
@@ -94,11 +94,10 @@ dataset:
   dataset_type: esc50
   data_path: datasets/ESC-50-master/classes
 augmentations:
-  augmentations_per_sample: 0
+  augmentations_per_sample: 2
   augmentations:
-    - time_mask
-    - time_stretch
-  
+  - time_mask
+  - time_stretch
 feature_extraction:
   type: melspectrogram
   sampling_rate: 44100
@@ -185,8 +184,8 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-resnet-deep-ensemble
-  name: resnet50-m4-ssf
+  project: testing-esc50-resnet152
+  name: resnet50-m4-none-full
   reinit: true
   notes: null
   tags:
@@ -211,13 +210,19 @@ sweep:
       - 0.1
       - 0.2
 ensemble:
-  enabled: false
-  size: 4
+  enabled: true
+  size: 5
   same_minibatch: false
 spectrogram3ch:
-  window_sizes_ms: [25, 50, 100]
-  hop_sizes_ms: [10, 25, 50]
+  window_sizes_ms:
+  - 25
+  - 50
+  - 100
+  hop_sizes_ms:
+  - 10
+  - 25
+  - 50
   n_mels: 128
-  n_fft: 44100
+  n_fft: 2048
   target_width: 250
-  eps: 1.0e-6
+  eps: 1.0e-06

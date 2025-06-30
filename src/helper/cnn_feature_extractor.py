@@ -11,7 +11,7 @@ class MelSpectrogramFeatureExtractor:
     """
     sampling_rate: int = 16000
     n_mels: int = 128
-    n_fft: int = 1024
+    n_fft: int = 2048
     hop_length: int = 512
     power: float = 2.0
 
@@ -36,6 +36,7 @@ class MelSpectrogramFeatureExtractor:
         Returns:
             Object with input_values attribute containing the mel spectrogram
         """
+        # print("You are using the MelSpectrogramFeatureExtractor, which is a custom feature extractor designed to mimic the ASTFeatureExtractor interface.")
         if isinstance(audio, torch.Tensor):
             waveform = audio
         else:
@@ -68,7 +69,7 @@ class MFCCFeatureExtractor:
     n_mfcc: int = 40
     melkwargs: dict = None
     n_mels: int = 128
-    n_fft: int = 1024
+    n_fft: int = 2048
     hop_length: int = 512
     
     def __post_init__(self):
