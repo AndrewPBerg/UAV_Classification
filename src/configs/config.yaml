@@ -1,27 +1,27 @@
 general:
-  model_type: custom_cnn
+  model_type: efficientnet_b7
   from_scratch: false
-  batch_size: 16
+  batch_size: 8
   seed: 42
   num_cuda_workers: 5
   pinned_memory: true
-  epochs: 90
+  epochs: 20
   save_model: false
   test_size: 0.0
   inference_size: 0.0
   val_size: 0.2
   sweep_count: 9
-  accumulation_steps: 1
+  accumulation_steps: 2
   patience: 15
   use_wandb: true
-  use_sweep: true
+  use_sweep: false
   torch_viz: false
-  use_kfold: false
+  use_kfold: true
   k_folds: 5
   adapter_type: none-full
   save_dataloader: false
-  monitor: val_acc
-  mode: max
+  monitor: test_loss
+  mode: min
   distributed_training: false
   num_gpus: 1
   strategy: ddp
@@ -42,9 +42,9 @@ peft_scheduling:
     peft_method: ia3
     merge_previous: true
 optimizer:
-  optimizer_type: adamw
+  optimizer_type: adam
   adam:
-    lr: 1e-8
+    lr: 0.001
     betas:
     - 0.99
     - 0.999
@@ -86,8 +86,8 @@ loss:
   label_smoothing: 0
   class_weights: null
 dataset:
-  dataset_type: esc50
-  data_path: datasets/ESC-50-master/classes
+  dataset_type: uav
+  data_path: /app/src/datasets/UAV_Dataset_31
 augmentations:
   augmentations_per_sample: 0
   augmentations:
@@ -191,12 +191,17 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: esc50-resnet-deep-ensemble
-  name: resnet50-m4-ssf
+  project: 31-class-kfold
+  name: efficientnet_b7-full-0-augs-RERUN
   reinit: true
   notes: null
   tags:
-  - ensemble
+  - 31-class
+  - kfold
+  - efficientnet_b7
+  - full
+  - 0-augs
+  - RERUN
   dir: wandb
 sweep:
   project: pretrained-scratch-sweeps
