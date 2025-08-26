@@ -5,165 +5,116 @@ SEND_MESSAGE: true
 
 
 runs:
-  # - id: 0
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       use_wandb: true
-  #       use_kfold: true
-  #       data_path: /app/src/datasets/UAV_Dataset_31
-  #       num_classes: 31
-  #       adapter_type: none-full
-  #       k_folds: 5
-  #       learning_rate: 0.001
-  #       batch_size: 8
-  #       epochs: 20
-  #       accumulation_steps: 2
-  #       patience: 3
-  #       seed: 42
-  #       test_size: 0.2
-  #       inference_size: 0.1
-  #       val_size: 0.1
-  #     augmentations:
-  #       augmentations_per_sample: 0
-  #     wandb:
-  #       project: EfficientNet-B0-to-B7
-  #       name: efficientnet_b0-none-full-0-augs
-  #       reinit: true
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - none-full
-  #         - 0-augs
-  # - id: 1
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: none-full
-  #     augmentations:
-  #       augmentations_per_sample: 3
-  #     wandb:
-  #       name: efficientnet_b0-none-full-3-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - none-full
-  #         - 3-augs
-
-  # - id: 2
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: none-classifier
-  #     augmentations:
-  #       augmentations_per_sample: 0
-  #     wandb:
-  #       name: efficientnet_b0-none-classifier-0-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - none-classifier
-  #         - 0-augs
-
-  # - id: 3
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: none-classifier
-  #     augmentations:
-  #       augmentations_per_sample: 3
-  #     wandb:
-  #       name: efficientnet_b0-none-classifier-3-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - none-classifier
-  #         - 3-augs
-
-  # - id: 4
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: ssf
-  #     augmentations:
-  #       augmentations_per_sample: 0
-  #     wandb:
-  #       name: efficientnet_b0-ssf-0-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - ssf
-  #         - 0-augs
-
-  # - id: 5
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: ssf
-  #     augmentations:
-  #       augmentations_per_sample: 3
-  #     wandb:
-  #       name: efficientnet_b0-ssf-3-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - ssf
-  #         - 3-augs
-
-  # - id: 6
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: batchnorm
-  #     augmentations:
-  #       augmentations_per_sample: 0
-  #     wandb:
-  #       name: efficientnet_b0-batchnorm-0-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - batchnorm
-  #         - 0-augs
-
-  # - id: 7
-  #   type: script
-  #   changes:
-  #     general:
-  #       model_type: efficientnet_b0
-  #       adapter_type: batchnorm
-  #     augmentations:
-  #       augmentations_per_sample: 3
-  #     wandb:
-  #       name: efficientnet_b0-batchnorm-3-augs
-  #       tags:
-  #         - 31-class
-  #         - kfold
-  #         - efficientnet_b0
-  #         - batchnorm
-  #         - 3-augs
-
-  - id: 8
+  - id: 4
     type: script
     changes:
       general:
-        model_type: efficientnet_b1
-        adapter_type: none-full
+        model_type: efficientnet_b7
         use_wandb: true
         use_kfold: true
+        use_sweep: false
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: ssf
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b7-ssf-0-augs-RERUN
+        reinit: true
+        tags:
+          - 31-class
+          - kfold
+          - efficientnet_b7
+          - ssf
+          - 0-augs
+          - RERUN
+  - id: 5
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: true
+        use_sweep: false
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: batchnorm
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b7-batchnorm-0-augs-RERUN
+        reinit: true
+        tags:
+          - 31-class
+          - kfold
+          - efficientnet_b7
+          - batchnorm
+          - 0-augs
+          - RERUN
+  - id: 6
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: true
+        use_sweep: false
+        data_path: /app/src/datasets/UAV_Dataset_31
+        num_classes: 31
+        adapter_type: none-classifier
+        k_folds: 5
+        learning_rate: 0.001
+        batch_size: 8
+        epochs: 20
+        accumulation_steps: 2
+        patience: 3
+        seed: 42
+        test_size: 0.2
+        inference_size: 0.1
+        val_size: 0.1
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: 31-class-kfold
+        name: efficientnet_b7-none-classifier-0-augs-RERUN
+        reinit: true
+        tags:
+          - 31-class
+          - kfold
+          - efficientnet_b7
+          - none-classifier
+          - 0-augs
+          - RERUN
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        use_wandb: true
+        use_kfold: true
+        use_sweep: false
         data_path: /app/src/datasets/UAV_Dataset_31
         num_classes: 31
         adapter_type: none-full
@@ -180,947 +131,13 @@ runs:
       augmentations:
         augmentations_per_sample: 0
       wandb:
-        name: efficientnet_b1-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - none-full
-          - 0-augs
-  - id: 9
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b1-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - none-full
-          - 3-augs
-
-  - id: 10
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b1-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - none-classifier
-          - 0-augs
-
-  - id: 11
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b1-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - none-classifier
-          - 3-augs
-
-  - id: 12
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b1-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - ssf
-          - 0-augs
-
-  - id: 13
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b1-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - ssf
-          - 3-augs
-
-  - id: 14
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b1-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - batchnorm
-          - 0-augs
-
-  - id: 15
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b1
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b1-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b1
-          - batchnorm
-          - 3-augs
-    
-  - id: 16
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b2-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - none-full
-          - 0-augs
-
-  - id: 17
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b2-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - none-full
-          - 3-augs
-
-  - id: 18
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b2-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - none-classifier
-          - 0-augs
-
-  - id: 19
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b2-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - none-classifier
-          - 3-augs
-
-  - id: 20
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b2-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - ssf
-          - 0-augs
-
-  - id: 21
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b2-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - ssf
-          - 3-augs
-
-  - id: 22
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b2-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - batchnorm
-          - 0-augs
-
-  - id: 23
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b2
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b2-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b2
-          - batchnorm
-          - 3-augs
-  - id: 24
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b3-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - none-full
-          - 0-augs
-
-  - id: 25
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b3-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - none-full
-          - 3-augs
-
-  - id: 26
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b3-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - none-classifier
-          - 0-augs
-
-  - id: 27
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b3-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - none-classifier
-          - 3-augs
-
-  - id: 28
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b3-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - ssf
-          - 0-augs
-
-  - id: 29
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b3-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - ssf
-          - 3-augs
-
-  - id: 30
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b3-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - batchnorm
-          - 0-augs
-
-  - id: 31
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b3
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b3-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b3
-          - batchnorm
-          - 3-augs
-
-  - id: 32
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b4-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - none-full
-          - 0-augs
-
-  - id: 33
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b4-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - none-full
-          - 3-augs
-
-  - id: 34
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b4-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - none-classifier
-          - 0-augs
-
-  - id: 35
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b4-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - none-classifier
-          - 3-augs
-
-  - id: 36
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b4-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - ssf
-          - 0-augs
-
-  - id: 37
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b4-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - ssf
-          - 3-augs
-
-  - id: 38
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b4-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - batchnorm
-          - 0-augs
-
-  - id: 39
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b4
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b4-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b4
-          - batchnorm
-          - 3-augs
-  - id: 40
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b5-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - none-full
-          - 0-augs
-
-  - id: 41
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b5-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - none-full
-          - 3-augs
-
-  - id: 42
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b5-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - none-classifier
-          - 0-augs
-
-  - id: 43
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b5-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - none-classifier
-          - 3-augs
-
-  - id: 44
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b5-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - ssf
-          - 0-augs
-
-  - id: 45
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b5-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - ssf
-          - 3-augs
-
-  - id: 46
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b5-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - batchnorm
-          - 0-augs
-
-  - id: 47
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b5
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b5-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b5
-          - batchnorm
-          - 3-augs
-
-  - id: 48
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b6-none-full-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - none-full
-          - 0-augs
-
-  - id: 49
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b6-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - none-full
-          - 3-augs
-
-  - id: 50
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b6-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - none-classifier
-          - 0-augs
-
-  - id: 51
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b6-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - none-classifier
-          - 3-augs
-
-  - id: 52
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b6-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - ssf
-          - 0-augs
-
-  - id: 53
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b6-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - ssf
-          - 3-augs
-
-  - id: 54
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b6-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - batchnorm
-          - 0-augs
-
-  - id: 55
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b6
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b6-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b6
-          - batchnorm
-          - 3-augs
-
-  - id: 56
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b7-none-full-0-augs
+        project: 31-class-kfold
+        name: efficientnet_b7-none-full-0-augs-RERUN
+        reinit: true
         tags:
           - 31-class
           - kfold
           - efficientnet_b7
           - none-full
           - 0-augs
-
-  - id: 57
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: none-full
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b7-none-full-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - none-full
-          - 3-augs
-
-  - id: 58
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b7-none-classifier-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - none-classifier
-          - 0-augs
-
-  - id: 59
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: none-classifier
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b7-none-classifier-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - none-classifier
-          - 3-augs
-  - id: 60
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b7-ssf-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - ssf
-          - 0-augs
-
-  - id: 61
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: ssf
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b7-ssf-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - ssf
-          - 3-augs
-
-  - id: 62
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 0
-      wandb:
-        name: efficientnet_b7-batchnorm-0-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - batchnorm
-          - 0-augs
-
-  - id: 63
-    type: script
-    changes:
-      general:
-        model_type: efficientnet_b7
-        adapter_type: batchnorm
-      augmentations:
-        augmentations_per_sample: 3
-      wandb:
-        name: efficientnet_b7-batchnorm-3-augs
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - batchnorm
-          - 3-augs
-
-
-# ... Repeat for efficientnet_b1, ..., efficientnet_b7 and all peft configs, incrementing id each time ...
-
-
-
+          - RERUN

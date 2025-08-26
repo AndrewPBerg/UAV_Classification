@@ -1,0 +1,6 @@
+"Name","final_average_val_acc","final_std_val_acc","wandb_config.name","model/total_parameters","model/trainable_parameters"
+"custom_cnn-3augs-31-class-kfold","0.947311794757843","0.008220334158228794","custom_cnn-ssf-0augs-31-class-kfold","5012479","5012479"
+"efficientnet_b0-none-full-3augs-31-class-kfold","0.9594982266426086","0.006061482002274889","efficientnet_b0-none-full-3augs-31-class-kfold","4046683","4046683"
+"mobilenet_v3_large-none-full-3augs-31-class-kfold","0.9505376219749452","0.00814180943513035","mobilenet_v3_large-none-full-3augs-31-class-kfold","4241455","4241455"
+"resnet18-batchnorm-3augs-31-class-kfold","0.948387098312378","0.00930519673043238","resnet18-batchnorm-3augs-31-class-kfold","11186143","9600"
+"AST-ssf-3augs-31-class-kfold","0.95268816947937","0.010668720324384928","AST-ssf-3augs-31-class-kfold","86418525","205886"
