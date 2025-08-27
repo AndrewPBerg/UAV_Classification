@@ -1,5 +1,5 @@
 general:
-  model_type: efficientnet_b7
+  model_type: resnet18
   from_scratch: false
   batch_size: 8
   seed: 42
@@ -7,8 +7,8 @@ general:
   pinned_memory: true
   epochs: 20
   save_model: false
-  test_size: 0.0
-  inference_size: 0.0
+  test_size: 0
+  inference_size: 0
   val_size: 0.2
   sweep_count: 9
   accumulation_steps: 2
@@ -49,7 +49,7 @@ optimizer:
     - 0.99
     - 0.999
   adamw:
-    lr: 1e-8
+    lr: 0.001
     weight_decay: 1e-3
     betas:
     - 0.99
@@ -91,20 +91,8 @@ dataset:
 augmentations:
   augmentations_per_sample: 0
   augmentations:
-  - time_mask
   - time_stretch
   - sin_distortion
-  sin_distortion_min_rate: 0.1
-  sin_distortion_max_rate: 0.6
-  sin_distortion_p: 0.9
-  polarity_inversion_p: 0.8
-  gaussian_noise_min_amplitude: 0.1
-  gaussian_noise_max_amplitude: 0.15
-  gaussian_noise_p: 0.8
-  time_mask_min_band_part: 0.01
-  time_mask_max_band_part: 0.15
-  time_mask_fade_duration: 0.01
-  time_mask_p: 0.8
 feature_extraction:
   type: melspectrogram
   sampling_rate: 16000
@@ -191,17 +179,12 @@ bitfit:
   trainable_components:
   - bias
 wandb:
-  project: 31-class-kfold
-  name: efficientnet_b7-full-0-augs-RERUN
+  project: Unbearable-Weight-Results
+  name: resnet18-full-0augs
   reinit: true
   notes: null
   tags:
-  - 31-class
-  - kfold
-  - efficientnet_b7
-  - full
-  - 0-augs
-  - RERUN
+  - 31-class-kfold
   dir: wandb
 sweep:
   project: pretrained-scratch-sweeps

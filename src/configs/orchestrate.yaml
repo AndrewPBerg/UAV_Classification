@@ -5,12 +5,13 @@
 SEND_MESSAGE: true
 
 runs:
-
-  - id: 1
+# resnet18 runs
+  
+  - id: 0
     type: script
     changes:
       general:
-        model_type: efficientnet_b7
+        model_type: resnet18
         from_scratch: false
         batch_size: 8
         adapter_type: none-full
@@ -20,104 +21,915 @@ runs:
         use_kfold: true
         use_sweep: false
         accumulation_steps: 2
+        test_size: 0
+        inference_size: 0
+        val_size: 0.2
+      augmentations:
+        augmentations_per_sample: 0
+      optimizer:
+        optimizer_type: adam
+        adam:
+          lr: 0.001
+          betas:
+          - 0.99
+          - 0.999
       dataset:
         dataset_type: uav
         data_path: /app/src/datasets/UAV_Dataset_31
       wandb:
-        project: 31-class-kfold
-        name: efficientnet_b7-full-0-augs-RERUN
-        reinit: true
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - full
-          - 0-augs
-          - RERUN
+        project: Unbearable-Weight-Results
+        name: resnet18-full-0augs
+
+
+
+  - id: 1
+    type: script
+    changes:
+      general:
+        model_type: resnet18
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet18-full-3augs
+  
   - id: 2
     type: script
     changes:
       general:
-        model_type: efficientnet_b7
-        from_scratch: false
-        batch_size: 8
+        model_type: resnet18
         adapter_type: none-classifier
-        epochs: 20
-        patience: 15
-        use_wandb: true
-        use_kfold: true
-        use_sweep: false
-        accumulation_steps: 2
-      dataset:
-        dataset_type: uav
-        data_path: /app/src/datasets/UAV_Dataset_31
+      augmentations:
+        augmentations_per_sample: 0
       wandb:
-        project: 31-class-kfold
-        name: efficientnet_b7-classifier-0-augs-RERUN
-        reinit: true
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - classifier
-          - 0-augs
-          - RERUN
-
+        project: Unbearable-Weight-Results
+        name: resnet18-classifier-0augs
   - id: 3
     type: script
     changes:
       general:
-        model_type: efficientnet_b7
-        from_scratch: false
-        batch_size: 8
-        adapter_type: ssf
-        epochs: 20
-        patience: 15
-        use_wandb: true
-        use_kfold: true
-        use_sweep: false
-        accumulation_steps: 2
-      dataset:
-        dataset_type: uav
-        data_path: /app/src/datasets/UAV_Dataset_31
+        model_type: resnet18
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
       wandb:
-        project: 31-class-kfold
-        name: efficientnet_b7-ssf-0-augs-RERUN
-        reinit: true
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - ssf
-          - 0-augs
-          - RERUN
-
+        project: Unbearable-Weight-Results
+        name: resnet18-classifier-3augs
   - id: 4
     type: script
     changes:
       general:
+        model_type: resnet18
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      ssf:
+        target_modules:
+        - linear
+        - dense
+        - batchnorm2d
+        - conv2d
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet18-ssf-0augs
+  - id: 5
+    type: script
+    changes:
+      general:
+        model_type: resnet18
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet18-ssf-3augs
+  - id: 6
+    type: script
+    changes:
+      general:
+        model_type: resnet18
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet18-batchnorm-0augs
+  - id: 7
+    type: script
+    changes:
+      general:
+        model_type: resnet18
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet18-batchnorm-3augs
+
+# resnet152 runs
+  - id: 8
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-full-0augs
+
+
+
+  - id: 9
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-full-3augs
+  
+  - id: 10
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-classifier-0augs
+  - id: 11
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-classifier-3augs
+  - id: 12
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      ssf:
+        target_modules:
+        - linear
+        - dense
+        - batchnorm2d
+        - conv2d
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-ssf-0augs
+  - id: 13
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-ssf-3augs
+  - id: 14
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-batchnorm-0augs
+  - id: 15
+    type: script
+    changes:
+      general:
+        model_type: resnet152
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: resnet152-batchnorm-3augs
+
+# MobileNet_v3_small runs
+
+  - id: 16
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-full-0augs
+
+
+
+  - id: 17
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-full-3augs
+  
+  - id: 18
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-classifier-0augs
+  - id: 19
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-classifier-3augs
+  - id: 20
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      ssf:
+        target_modules:
+        - linear
+        - dense
+        - batchnorm2d
+        - conv2d
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-ssf-0augs
+  - id: 21
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-ssf-3augs
+  - id: 22
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-batchnorm-0augs
+  - id: 23
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_small
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_small-batchnorm-3augs
+
+# MobileNet_v3_large runs
+
+  - id: 24
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-full-0augs
+
+  - id: 25
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-full-3augs
+
+  - id: 26
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-classifier-0augs
+
+
+  - id: 27
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-classifier-3augs     
+  
+  - id: 28
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-ssf-0augs
+  
+  - id: 29
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-ssf-3augs
+  
+  - id: 30
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-batchnorm-0augs
+  - id: 31
+    type: script
+    changes:
+      general:
+        model_type: mobilenet_v3_large
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: mobilenet_v3_large-batchnorm-3augs
+
+# EfficientNet_b0 runs
+
+  - id: 32
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-full-0augs
+
+  - id: 33
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-full-3augs
+
+  - id: 34
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-classifier-0augs
+
+  - id: 35
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-classifier-3augs
+
+  - id: 36
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-ssf-0augs
+
+  - id: 37
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-ssf-3augs
+
+  - id: 38
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-batchnorm-0augs
+
+  - id: 39
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b0
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b0-batchnorm-3augs
+
+# efficientnet_b7 runs
+
+  - id: 40
+    type: script
+    changes:
+      general:
         model_type: efficientnet_b7
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-full-0augs
+
+  - id: 41
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-full-3augs
+
+  - id: 42
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-classifier-0augs
+
+  - id: 43
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-classifier-3augs
+
+  - id: 44
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-ssf-0augs
+
+  - id: 45
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-ssf-3augs
+
+  - id: 46
+    type: script
+    changes:
+      general:  
+        model_type: efficientnet_b7
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-batchnorm-0augs
+
+  - id: 47
+    type: script
+    changes:
+      general:
+        model_type: efficientnet_b7
+        adapter_type: batchnorm
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: efficientnet_b7-batchnorm-3augs
+
+# Custom CNN
+
+
+  - id: 48
+    type: script
+    changes:
+      general:
+        model_type: custom_cnn
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: custom_cnn-full-0augs
+  
+  - id: 49
+    type: script
+    changes:
+      general:
+        model_type: custom_cnn
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: custom_cnn-full-3augs
+
+# AST rusn
+
+  - id: 50
+    type: script
+    changes:
+      general:
+        model_type: ast
         from_scratch: false
         batch_size: 8
-        adapter_type: batchnorm
+        adapter_type: none-full
         epochs: 20
-        patience: 15
-        use_wandb: true
-        use_kfold: true
-        use_sweep: false
-        accumulation_steps: 2
-      dataset:
-        dataset_type: uav
-        data_path: /app/src/datasets/UAV_Dataset_31
+      augmentations:
+        augmentations_per_sample: 0
+      optimizer:
+        optimizer_type: adamw
+        adamw:
+          lr: 0.001
+          betas:
+          - 0.99
+          - 0.999
+          weight_decay: 1e-3
       wandb:
-        project: 31-class-kfold
-        name: efficientnet_b7-batchnorm-0-augs-RERUN
-        reinit: true
-        tags:
-          - 31-class
-          - kfold
-          - efficientnet_b7
-          - batchnorm
-          - 0-augs
-          - RERUN
+        project: Unbearable-Weight-Results
+        name: ast-full-0augs
+
+  - id: 51
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: none-full
+        epochs: 20
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-full-3augs
+  - id: 52
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: none-classifier
+        epochs: 20
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-classifier-0augs
+    
+  - id: 53
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: none-classifier
+        epochs: 20
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-classifier-3augs
+
+
+  - id: 54
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: ssf
+      ssf:
+        target_modules:
+        - linear
+        - dense
+        - layernorm
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-ssf-0augs
+
+  - id: 55
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-ssf-3augs
+  
+
+  - id: 56
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: ia3
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-ia3-0augs
+
+  - id: 57
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: ia3
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-ia3-3augs
+    
+  - id: 58
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: oft
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-oft-0augs
+        
+  - id: 59
+    type: script
+    changes:
+      general:
+        model_type: ast
+        from_scratch: false
+        batch_size: 8
+        adapter_type: oft
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: ast-oft-3augs
+
+
+# Vit runs
+
+  - id: 60
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: none-full
+        epochs: 20
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-full-0augs
+  
+  - id: 61
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: none-full
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-full-3augs
+  
+  - id: 62
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-classifier-0augs
+  
+  - id: 63
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: none-classifier
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-classifier-3augs
+  
+  - id: 64
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-ssf-0augs
+  
+  - id: 65
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: ssf
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-ssf-3augs
+  
+  - id: 66
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: ia3
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-ia3-0augs
+  
+  - id: 67
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: ia3
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-ia3-3augs
+  
+  - id: 68
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: oft
+      augmentations:
+        augmentations_per_sample: 0
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-oft-0augs
+  
+  - id: 69
+    type: script
+    changes:
+      general:
+        model_type: vit-base
+        adapter_type: oft
+      augmentations:
+        augmentations_per_sample: 3
+      wandb:
+        project: Unbearable-Weight-Results
+        name: vit-base-oft-3augs
 

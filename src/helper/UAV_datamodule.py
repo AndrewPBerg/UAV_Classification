@@ -333,7 +333,7 @@ class UAVDataModule(pl.LightningDataModule):
             ic(f"UAV Fold {fold+1} datasets loaded")
         
         # Create inference dataset
-        if inference_indices.any():
+        if inference_indices:
             ic(f"Creating UAV Inference dataset with {len(inference_indices)} samples")
             inference_paths = [str(all_paths[i]) for i in inference_indices]
             self.inference_dataset = UAVDataset(
