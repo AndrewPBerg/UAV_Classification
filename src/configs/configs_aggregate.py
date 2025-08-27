@@ -276,6 +276,15 @@ def wandb_config_dict(general_config, feature_extraction_config, dataset_config,
     """
     res = {}
     
+    # Add model_type and adapter_type as top-level keys for better visibility
+    try:
+        res['model_type'] = general_config.model_type
+        res['adapter_type'] = general_config.adapter_type
+    except Exception as e:
+        print(f"Warning: Could not extract model_type/adapter_type: {e}")
+        res['model_type'] = 'unknown'
+        res['adapter_type'] = 'unknown'
+    
     try:
         res['wandb_config'] = wandb_config.model_dump() if hasattr(wandb_config, 'model_dump') else dict(wandb_config)
     except Exception as e:
