@@ -5,7 +5,8 @@ import numpy as np
 import re
 
 # Load the CSV file
-csv_path = "Best Results Export Aug 1 2025.csv"
+# csv_path = "Best Results Export Aug 1 2025.csv"
+csv_path = "Best Results Export Aug 26 2025.csv" # this path has metrics on trainable parameters.
 df = pd.read_csv(csv_path)
 
 def extract_model_type_from_name(name):
@@ -72,7 +73,7 @@ plt.rcParams['font.family'] = 'sans-serif'
 plt.rcParams['font.sans-serif'] = ['SF Pro Display', 'Helvetica', 'Arial', 'DejaVu Sans']
 
 # Create the main plot with more generous spacing
-fig, ax = plt.subplots(1, 1, figsize=(12.1, 9))
+fig, ax = plt.subplots(1, 1, figsize=(13, 9))
 
 # Apple-inspired minimal color palette - grays with one accent color
 accent_color = '#007AFF'  # Apple's signature blue
@@ -136,8 +137,8 @@ for i, (x, row) in enumerate(zip(x_pos, model_df.itertuples())):
     ax.errorbar(x, accuracy, 
                 yerr=std_accuracy,
                 fmt=marker_map[model_type],  # Different marker shapes
-                capsize=0,  # Remove caps for cleaner look
-                capthick=0,
+                capsize=4,  # Add caps at the ends of error bars
+                capthick=1.5,
                 markersize=marker_size,
                 markerfacecolor=color_map[model_type],
                 markeredgecolor='white',  # Subtle white edge
@@ -165,7 +166,7 @@ ax.spines['left'].set_linewidth(0.8)
 y_ticks = [93, 94, 95, 96, 97, 98, 99, 100]  # Include both start (93) and end (100) range numbers
 ax.set_yticks(y_ticks)
 for y in y_ticks:
-    ax.axhline(y=y, color='#F2F2F7', linewidth=0.5, zorder=0)
+    ax.axhline(y=y, color='#D1D1D6', linewidth=1, zorder=0)  # Darker gray hex
 
 # Remove x-axis labels for models as requested - clean minimal x-axis
 ax.set_xticks(x_pos)
@@ -225,10 +226,9 @@ for i, model in enumerate(unique_models):
                                          markeredgewidth=1.5,
                                          alpha=alpha_map[model]))
 
-legend_elements.reverse()
 
 # Position legend elegantly without frame
-ax.legend(legend_elements, unique_models, 
+ax.legend(legend_elements[::-1], unique_models[::-1], 
           loc='upper left', 
           frameon=False,  # Remove legend frame for cleaner look
           fontsize=20,  # Increased by 50% from 13
@@ -238,7 +238,7 @@ ax.legend(legend_elements, unique_models,
           labelcolor=medium_gray)
 
 # Apply generous margins and spacing (Apple design loves white space)
-plt.subplots_adjust(left=0.08, right=0.95, top=0.92, bottom=0.15)
+plt.subplots_adjust(left=0.08, right=0.85, top=0.92, bottom=0.15)
 
 # Save with high quality for crisp, clean output
 output_path = "/Users/applefella/Documents/UAV_Classification/UAV_Classification/src/images/best_results_model_performance_comparison.png"
