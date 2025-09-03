@@ -22,6 +22,7 @@ checkpoints/
 Drone_Lab_Server_Access.ipynb
 /fim
 fim
+/src/images/*.png
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
